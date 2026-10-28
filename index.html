@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1E6A50">
+<title>Control de Gastos Familiares</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: libro contable de trabajo — barra fija arriba, vistas por pestaña, tablas densas con cifras en mono */
+:root{
+  --bg:#F4F6F3; --panel:#FFFFFF; --sunk:#EBEFEA; --line:#D7DDD6; --fg:#18211D; --muted:#5D6B64;
+  --accent:#1E6A50; --accent-ink:#FFFFFF; --accent-soft:#DCEDE5;
+  --warn:#9A6A12; --warn-soft:#F8ECD3; --bad:#A93E2B; --bad-soft:#F7E0DA; --good:#2C7A4B;
+  --ca:#1E6A50; --cb:#7A4E9C; --cc:#B0601E;
+  --f-ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111613; --panel:#18201C; --sunk:#1F2924; --line:#2E3A34; --fg:#E3EAE5; --muted:#93A39A;
+  --accent:#4DB88D; --accent-ink:#0D1511; --accent-soft:#1C3A2E;
+  --warn:#E0B055; --warn-soft:#3A2F17; --bad:#E7826D; --bad-soft:#3D221C; --good:#6BCB8F;
+  --ca:#4DB88D; --cb:#B897D6; --cc:#E3995B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111613; --panel:#18201C; --sunk:#1F2924; --line:#2E3A34; --fg:#E3EAE5; --muted:#93A39A;
+  --accent:#4DB88D; --accent-ink:#0D1511; --accent-soft:#1C3A2E;
+  --warn:#E0B055; --warn-soft:#3A2F17; --bad:#E7826D; --bad-soft:#3D221C; --good:#6BCB8F;
+  --ca:#4DB88D; --cb:#B897D6; --cc:#E3995B; color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.num,.mono{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.num{text-align:right;white-space:nowrap}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1320px;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
+.brand b{font-size:17px;letter-spacing:-.01em}
+.brand span{color:var(--muted);font-size:12px}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap}
+nav.tabs a{padding:7px 12px;border-radius:7px;color:var(--muted);text-decoration:none;font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center}
+nav.tabs a[aria-current="page"]{background:var(--accent-soft);color:var(--fg)}
+nav.tabs a .dot{width:8px;height:8px;border-radius:50%}
+.count{font-family:var(--f-num);font-size:11px;background:var(--accent);color:var(--accent-ink);border-radius:9px;padding:0 6px;line-height:17px}
+.btn{border:1px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:7px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+a.btn{text-decoration:none;display:inline-flex;align-items:center;color:var(--fg)}
+a.btn.pri{color:var(--accent-ink)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+.sync-meta{font-size:12px;color:var(--muted)}
+main{padding-block:20px 60px}
+h1{font-size:22px;letter-spacing:-.015em;margin:0;text-wrap:balance}
+h2{font-size:15px;margin:0;letter-spacing:.01em}
+.eyebrow{text-transform:uppercase;letter-spacing:.08em;font-size:11px;color:var(--muted);font-weight:600}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.panel>.hd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line)}
+.panel>.bd{padding:14px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.chip.app{background:var(--accent-soft);color:var(--accent)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip .dot{width:7px;height:7px;border-radius:50%}
+.c-a{background:var(--ca)} .c-b{background:var(--cb)} .c-c{background:var(--cc)} .c-d{background:var(--warn)} .c-e{background:var(--muted)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--panel);position:sticky;top:0}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--sunk)}
+td.desc{min-width:220px}
+td .cat{font-size:11px;color:var(--muted)}
+select.in,input.in{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 6px;font-size:12.5px;max-width:190px}
+input.in.num{width:110px}
+.empty{padding:36px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{background:var(--panel);padding:12px 14px}
+.kpi .v{font-family:var(--f-num);font-size:19px;font-weight:500;margin-top:2px}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+.months{display:flex;gap:6px;flex-wrap:wrap}
+.months button{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:4px 11px;font-size:12.5px;font-weight:600}
+.months button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.dist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
+.dist td,.dist th{padding:7px 10px}
+.dist tr.tot td{font-weight:700;border-top:2px solid var(--fg)}
+.note{font-size:12px;color:var(--muted)}
+.bulk{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bulk select{background:var(--bg);color:var(--fg);border:0}
+.bulk .btn{background:var(--bg);color:var(--fg);border:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:50;max-width:90vw}
+.modal-bg{position:fixed;inset:0;background:rgba(10,16,13,.55);z-index:40;display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 16px 24px;overflow:auto}
+.modal{background:var(--panel);border-radius:12px;max-width:640px;width:100%;border:1px solid var(--line)}
+.modal .hd{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.modal .bd{padding:18px;display:flex;flex-direction:column;gap:14px}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--muted)}
+.drop.on{border-color:var(--accent);color:var(--fg);background:var(--accent-soft)}
+textarea.paste{width:100%;min-height:70px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);padding:8px;font-family:var(--f-num);font-size:12px}
+.bm{display:inline-block;padding:8px 14px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;text-decoration:none}
+code.blk{display:block;white-space:pre-wrap;word-break:break-all;font-family:var(--f-num);font-size:11px;background:var(--sunk);padding:10px;border-radius:8px;max-height:110px;overflow:auto}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px}
+.form-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.form-grid input,.form-grid select{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 8px;font-size:13px;color:var(--fg);font-weight:400}
+.chk{flex-direction:row!important;align-items:center;gap:8px!important}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters input[type=search]{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 10px;min-width:200px;flex:1;max-width:320px}
+.filters select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px}
+.addrow td{background:var(--sunk)}
+.loading{padding:60px 16px;text-align:center;color:var(--muted)}
+@media (max-width:600px){.brand span{display:none}.sync-meta{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+a{color:var(--accent)}
+.auth{max-width:440px;margin:6vh auto 0;display:flex;flex-direction:column;gap:16px}
+.brand-auth{display:flex;flex-direction:column;gap:2px;text-align:center}
+.brand-auth b{font-size:22px;letter-spacing:-.015em}
+.brand-auth span{color:var(--muted);font-size:13px}
+label.fld{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+label.fld input{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px 11px;font-size:15px;color:var(--fg);font-weight:400}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:14px}
+a.card-link{color:inherit;text-decoration:none;display:block}
+a.card-link:hover{border-color:var(--accent)}
+a.kpi{color:inherit;text-decoration:none}
+a.kpi:hover{background:var(--sunk)}
+.count.warn-bg{background:var(--warn);color:var(--panel)}
+.count.muted-bg{background:var(--muted);color:var(--panel)}
+.warn-t{color:var(--warn)}
+tr.st-pendiente td{background:var(--warn-soft)}
+tr.st-rechazado td{opacity:.6}
+.panel.nuevo{border-color:var(--warn)}
+#userBox{display:flex;align-items:center;gap:6px}
+.top .wrap{row-gap:8px}
+</style>
+</head>
+<body>
+<header class="top" id="topbar" hidden>
+  <div class="wrap">
+    <div class="brand"><b>Control de Gastos</b></div>
+    <nav class="tabs" id="tabs"></nav>
+    <div class="row" style="gap:8px">
+      <span class="sync-meta" id="syncMeta"></span>
+      <button class="btn pri" id="btnSync" hidden>Sincronizar</button>
+      <span id="userBox"></span>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="app"><div class="loading">Cargando…</div></main>
+<div id="modalRoot"></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+(() => {
+'use strict';
+/* ================= utilidades ================= */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const NF = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const L = v => (v < 0 ? '-L ' : 'L ') + NF.format(Math.abs(v || 0));
+const MES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+const mesLargo = m => { if (!m || m === 'general') return 'Todo el proyecto'; const [y, mm] = m.split('-'); return MES[+mm - 1].charAt(0) + MES[+mm - 1].slice(1).toLowerCase() + ' ' + y; };
+const mesHoja = m => { const [y, mm] = m.split('-'); return `${y.slice(2)} ${mm} | ${MES[+mm - 1]}`; };
+const fFecha = d => d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '—';
+const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const cents = v => Math.round(Math.abs(+v || 0) * 100);
+const dias = (a, b) => Math.abs((Date.parse(a) - Date.parse(b)) / 864e5);
+const lsGet = k => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+let toastT;
+function toast(msg) {
+  let t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3600);
+}
+const app = () => $('#app');
+
+/* ================= conexión ================= */
+const CFG = Object.assign({supabaseUrl: '', supabaseAnonKey: ''}, window.CG_CONFIG || {});
+if (!CFG.supabaseUrl) { CFG.supabaseUrl = lsGet('cg-sb-url') || ''; CFG.supabaseAnonKey = lsGet('cg-sb-key') || ''; }
+let sb = null;
+
+/* ================= estado ================= */
+const S = {
+  me: null, ctrls: [], movs: new Map(), tx: new Map(), ign: new Map(), aj: {}, perfiles: [], accesos: [],
+  view: 'inicio', sel: new Set(), mesSel: {}, filtros: {q: '', ctrl: '', mes: '', todos: false, estado: ''}, limite: 300,
+  authView: 'login', recuperando: false, ligarAbierto: null, rechazoAbierto: null,
+};
+let D = {txs: [], byId: new Map(), asig: new Map()};
+const esAdmin = () => !!(S.me && S.me.rol === 'admin' && S.me.activo);
+const ctrls = () => S.ctrls;
+const ctrlById = id => S.ctrls.find(c => c.id === id);
+const colorClass = c => 'c-' + (c && c.color || 'e');
+const esProy = c => !!c && !c.porMes;
+const cerrado = c => esProy(c) && c.estado === 'cerrado';
+const familiares = () => S.ctrls.filter(c => !esProy(c));
+const proyectos = () => S.ctrls.filter(esProy);
+const abiertos = () => S.ctrls.filter(c => !cerrado(c));
+const hrefC = c => '#' + (esProy(c) ? 'p-' : 'c-') + c.id;
+const nombreDe = id => { if (S.me && id === S.me.id) return 'Tú'; const p = S.perfiles.find(x => x.id === id); return p ? (p.nombre || p.email) : 'Otro usuario'; };
+
+const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, porMes: r.tipo === 'mensual', personas: r.personas || [], categorias: r.categorias || [], incluye: r.incluye || '', excluye: r.excluye || '', tipoDefecto: r.tipo_defecto || 'COMPARTIDO', sugerirPorNombre: !!r.sugerir_por_nombre, color: r.color || 'a', estado: r.estado || 'abierto', abiertoEl: r.abierto_el, cerradoEl: r.cerrado_el, orden: r.orden || 0});
+const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo: c.porMes ? 'mensual' : 'proyecto', personas: c.personas, categorias: c.categorias, incluye: c.incluye, excluye: c.excluye, tipo_defecto: c.tipoDefecto, sugerir_por_nombre: c.sugerirPorNombre, color: c.color, estado: c.estado, abierto_el: c.abiertoEl || null, cerrado_el: c.cerradoEl || null, orden: c.orden || 0});
+const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha ? String(m.fecha).slice(0, 10) : null});
+
+function derive() {
+  const txs = [];
+  for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
+    const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
+    txs.push({id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)});
+  }
+  txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
+  const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') asig.set(m.tx_id, m);
+  D = {txs, byId: new Map(txs.map(t => [t.id, t])), asig};
+}
+function applies(c, t) {
+  const cat = (t.cat || '').trim();
+  if (cerrado(c)) return false;
+  const cats = (c.categorias || []).filter(Boolean);
+  if (esProy(c) && !c.incluye) return false;
+  if (!cats.length && !esProy(c)) return false;
+  if (cats.length && !cats.some(p => cat.startsWith(p))) return false;
+  const hay = (t.det + ' ' + t.nota + ' ' + t.sub).toUpperCase();
+  if (c.incluye && !hay.includes(c.incluye.toUpperCase())) return false;
+  if (c.excluye && t.det.toUpperCase().includes(c.excluye.toUpperCase())) return false;
+  return true;
+}
+const sugerido = t => proyectos().find(c => applies(c, t)) || familiares().find(c => applies(c, t));
+function tipoSugerido(c, t) {
+  if (!c) return '';
+  if (c.sugerirPorNombre) { const d = t.det.toUpperCase(); const p = (c.personas || []).find(p => d.includes(p.toUpperCase()) || d.includes(p.split(' ')[0].toUpperCase())); if (p) return p; }
+  if (t.code === 0) return (c.personas || [])[0] || '';
+  return c.tipoDefecto || 'COMPARTIDO';
+}
+function estadoTx(t) {
+  if (D.asig.has(t.id)) return 'asignado';
+  if (S.ign.has(t.id)) return 'noaplica';
+  if (t.code === 3) return 'traslado';
+  if (t.fecha > hoy()) return 'futuro';
+  if (t.fecha < (S.aj.inicio || '0000')) return 'anterior';
+  return sugerido(t) ? 'pendiente' : 'otro';
+}
+const bandeja = () => esAdmin() ? D.txs.filter(t => estadoTx(t) === 'pendiente') : [];
+const porValidar = () => [...S.movs.values()].filter(m => m.estado === 'pendiente');
+function hoja(controlId, mes) {
+  const rows = [...S.movs.values()].filter(m => m.control === controlId && m.mes === mes);
+  const ord = (a, b) => (a.fecha || '') < (b.fecha || '') ? -1 : (a.fecha || '') > (b.fecha || '') ? 1 : (a.creado_el < b.creado_el ? -1 : 1);
+  return {control: controlId, mes, egresos: rows.filter(r => r.lado === 'egreso').sort(ord), ingresos: rows.filter(r => r.lado === 'ingreso').sort(ord)};
+}
+const mesesDe = id => [...new Set([...S.movs.values()].filter(m => m.control === id).map(m => m.mes))].sort().reverse();
+
+/* ================= base de datos ================= */
+function errMsg(e) {
+  const m = (e && (e.message || e.error_description || e.msg)) || String(e);
+  if (/row-level security/i.test(m)) return 'No tienes permiso para hacer ese cambio.';
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Sin conexión con la base de datos. Revisa tu internet.';
+  if (/JWT expired/i.test(m)) return 'Tu sesión expiró. Vuelve a entrar.';
+  return m;
+}
+async function q(promesa, okMsg) {
+  const {data, error} = await promesa;
+  if (error) { toast(errMsg(error)); throw error; }
+  if (okMsg) toast(okMsg);
+  return data;
+}
+async function todo(tabla, orden) {
+  const out = [];
+  for (let a = 0; ; a += 1000) {
+    let qq = sb.from(tabla).select('*'); if (orden) qq = qq.order(orden);
+    const {data, error} = await qq.range(a, a + 999);
+    if (error) throw error;
+    out.push(...data); if (data.length < 1000) break;
+  }
+  return out;
+}
+async function cargarTodo() {
+  const {data: u} = await sb.auth.getUser();
+  const uid = u && u.user && u.user.id;
+  const {data: me, error} = await sb.from('perfiles').select('*').eq('id', uid).maybeSingle();
+  if (error) throw error;
+  S.me = me || {id: uid, email: u.user.email, activo: false, rol: 'usuario'};
+  if (!S.me.activo) return;
+  const [ctr, movs] = await Promise.all([todo('controles', 'orden'), todo('movimientos', 'creado_el')]);
+  S.ctrls = ctr.map(fromC); S.movs = new Map(movs.map(m => [m.id, normMov(m)]));
+  if (esAdmin()) {
+    const [tx, ign, aj, pf, ac] = await Promise.all([todo('tx_mes', 'mes'), todo('ignorados'), todo('ajustes'), todo('perfiles', 'creado_el'), todo('accesos')]);
+    S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
+    S.aj = Object.fromEntries(aj.map(a => [a.clave, a.valor])); S.perfiles = pf; S.accesos = ac;
+    if (!S.aj.inicio) S.aj.inicio = hoy().slice(0, 8) + '01';
+  } else {
+    S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
+    S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
+  }
+}
+const guardarAjuste = (clave, valor) => { S.aj[clave] = valor; return q(sb.from('ajustes').upsert({clave, valor})); };
+const guardarControl = async c => { const r = await q(sb.from('controles').upsert(toC(c)).select()); return r; };
+async function insertarMovs(rows, okMsg) {
+  const data = await q(sb.from('movimientos').insert(rows).select(), okMsg);
+  (data || []).forEach(m => S.movs.set(m.id, normMov(m))); derive(); render(); return data;
+}
+async function actualizarMov(id, campos, okMsg) {
+  const data = await q(sb.from('movimientos').update(campos).eq('id', id).select(), okMsg);
+  if (data && data[0]) S.movs.set(id, normMov(data[0])); else toast('No se aplicó el cambio: no tienes permiso sobre esa fila.');
+  derive(); render(); return data;
+}
+async function borrarMov(id, okMsg) { await q(sb.from('movimientos').delete().eq('id', id), okMsg); S.movs.delete(id); derive(); render(); }
+
+/* ================= arranque y sesión ================= */
+async function init() {
+  if (!CFG.supabaseUrl || !CFG.supabaseAnonKey) return renderSetup();
+  if (!window.supabase || !window.supabase.createClient) return fatal('No se pudo cargar la conexión con la base de datos. Revisa tu internet y recarga la página.');
+  sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {auth: {persistSession: true, autoRefreshToken: true, detectSessionInUrl: true}});
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') { S.recuperando = true; renderAuth(); return; }
+    if (ev === 'SIGNED_OUT' || !session) { S.me = null; renderAuth(); return; }
+    if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && !S.recuperando && (!S.me || S.me.id !== session.user.id)) arrancar();
+  });
+}
+let arrancando = false;
+async function arrancar() {
+  if (arrancando) return; arrancando = true;
+  $('#topbar').hidden = false; app().innerHTML = '<div class="loading">Cargando tus datos…</div>';
+  try { await cargarTodo(); derive(); route(); render(); if (esAdmin()) detectarServidor(); }
+  catch (e) { fatal(errMsg(e)); }
+  finally { arrancando = false; }
+}
+function fatal(msg) { app().innerHTML = `<div class="empty"><b>No se puede abrir la plataforma</b>${esc(msg)}<div style="margin-top:12px"><button class="btn" data-act="recargar">Reintentar</button></div></div>`; }
+window.addEventListener('focus', () => { if (S.me && S.me.activo && !document.querySelector('input:focus,select:focus') && !$('#modalRoot').innerHTML && Date.now() - (S._ultimaCarga || 0) > 60000) { S._ultimaCarga = Date.now(); cargarTodo().then(() => { derive(); render(); }).catch(() => {}); } });
+
+function renderSetup() {
+  $('#topbar').hidden = true;
+  app().innerHTML = `<div class="auth"><div class="panel"><div class="bd stack">
+    <div><div class="eyebrow">Configuración inicial</div><h1>Conecta tu base de datos</h1></div>
+    <p class="small muted" style="margin:0">Copia estos dos datos de tu proyecto de Supabase (Project Settings → API). Lo ideal es escribirlos en <span class="mono">config.js</span> del repositorio para que todos los usuarios entren directo; esto los guarda solo en este navegador.</p>
+    <div class="form-grid" style="grid-template-columns:1fr"><label>Project URL<input id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off"></label>
+    <label>Clave anon public<input id="sbKey" placeholder="eyJhbGciOi…" autocomplete="off"></label></div>
+    <div><button class="btn pri" data-act="guardarSetup">Conectar</button></div></div></div></div>`;
+}
+function renderAuth() {
+  $('#topbar').hidden = true; S.me = null;
+  const v = S.recuperando ? 'nueva' : S.authView;
+  const titulo = {login: 'Entrar', registro: 'Crear cuenta', olvido: 'Recuperar contraseña', nueva: 'Nueva contraseña'}[v];
+  app().innerHTML = `<div class="auth"><div class="brand-auth"><b>Control de Gastos</b><span>Gastos familiares y proyectos compartidos</span></div>
+  <div class="panel"><form class="bd stack" id="authForm" data-v="${v}" novalidate>
+    <h1>${titulo}</h1>
+    ${v === 'registro' ? '<label class="fld">Tu nombre<input id="aNombre" autocomplete="name" required></label>' : ''}
+    ${v !== 'nueva' ? '<label class="fld">Correo<input id="aEmail" type="email" autocomplete="email" required></label>' : ''}
+    ${v === 'login' || v === 'registro' || v === 'nueva' ? `<label class="fld">${v === 'nueva' ? 'Nueva contraseña' : 'Contraseña'}<input id="aPass" type="password" autocomplete="${v === 'login' ? 'current-password' : 'new-password'}" minlength="8" required></label>` : ''}
+    <div id="authMsg" class="small" role="status"></div>
+    <button class="btn pri" type="submit" style="justify-content:center;padding:10px">${{login: 'Entrar', registro: 'Crear cuenta', olvido: 'Enviar enlace', nueva: 'Guardar contraseña'}[v]}</button>
+    <div class="row small" style="justify-content:space-between">
+      ${v === 'login' ? '<a href="#" data-auth="registro">Crear una cuenta</a><a href="#" data-auth="olvido">Olvidé mi contraseña</a>' : v === 'nueva' ? '' : '<a href="#" data-auth="login">Volver a entrar</a>'}
+    </div></form></div>
+    ${v === 'registro' ? '<p class="note" style="text-align:center">Después de confirmar tu correo, el administrador te da acceso a los controles que te corresponden.</p>' : ''}</div>`;
+  const f = $('#aEmail') || $('#aPass'); f && f.focus();
+}
+async function enviarAuth(form) {
+  const v = form.dataset.v; const msg = $('#authMsg'); const btn = form.querySelector('[type=submit]');
+  const email = $('#aEmail') && $('#aEmail').value.trim(); const pass = $('#aPass') && $('#aPass').value;
+  if ((v === 'login' || v === 'registro' || v === 'olvido') && !/^\S+@\S+\.\S+$/.test(email || '')) { msg.innerHTML = '<span class="neg">Escribe un correo válido.</span>'; return; }
+  if ((v === 'registro' || v === 'nueva') && (pass || '').length < 8) { msg.innerHTML = '<span class="neg">La contraseña debe tener al menos 8 caracteres.</span>'; return; }
+  btn.disabled = true; msg.textContent = 'Un momento…';
+  const volver = location.origin + location.pathname;
+  try {
+    if (v === 'login') {
+      const {error} = await sb.auth.signInWithPassword({email, password: pass});
+      if (error) msg.innerHTML = `<span class="neg">${/confirm/i.test(error.message) ? 'Primero confirma tu correo con el enlace que te enviamos.' : 'Correo o contraseña incorrectos.'}</span>`;
+    } else if (v === 'registro') {
+      const {data, error} = await sb.auth.signUp({email, password: pass, options: {data: {nombre: $('#aNombre').value.trim()}, emailRedirectTo: volver}});
+      if (error) msg.innerHTML = `<span class="neg">${esc(errMsg(error))}</span>`;
+      else if (!data.session) msg.innerHTML = '<span class="pos">Listo. Te enviamos un correo para confirmar tu cuenta; ábrelo y luego entra aquí.</span>';
+    } else if (v === 'olvido') {
+      const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: volver});
+      msg.innerHTML = error ? `<span class="neg">${esc(errMsg(error))}</span>` : '<span class="pos">Si el correo tiene cuenta, te llegará un enlace para crear una contraseña nueva.</span>';
+    } else if (v === 'nueva') {
+      const {error} = await sb.auth.updateUser({password: pass});
+      if (error) msg.innerHTML = `<span class="neg">${esc(errMsg(error))}</span>`;
+      else { S.recuperando = false; toast('Contraseña actualizada'); history.replaceState(null, '', location.pathname); arrancar(); }
+    }
+  } finally { btn.disabled = false; }
+}
+
+/* ================= navegación ================= */
+function route() {
+  const h = (location.hash || '').slice(1);
+  const ok = id => { const c = ctrlById(id); return !!c; };
+  if ((h.startsWith('c-') || h.startsWith('p-')) && ok(h.slice(2))) S.view = h;
+  else if (['inicio', 'proyectos'].includes(h)) S.view = h;
+  else if (esAdmin() && ['bandeja', 'validar', 'movimientos', 'usuarios', 'ajustes'].includes(h)) S.view = h;
+  else S.view = 'inicio';
+}
+window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return; route(); S.sel.clear(); render(); window.scrollTo(0, 0); });
+
+function renderTabs() {
+  const a = esAdmin(); const nb = bandeja().length, nv = porValidar().length;
+  const items = [['inicio', 'Inicio']];
+  if (a) items.push(['bandeja', `Bandeja ${nb ? `<span class="count">${nb}</span>` : ''}`], ['validar', `Por validar ${nv ? `<span class="count warn-bg">${nv}</span>` : ''}`]);
+  familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
+  if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
+  if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
+  const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
+  $('#tabs').innerHTML = items.map(([h, l]) => `<a href="#${h}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`).join('');
+  $('#btnSync').hidden = !a;
+  const ls = S.aj.ultimaSync;
+  $('#syncMeta').textContent = a ? (ls ? `Sincronizado: ${new Date(ls.at).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}` : 'Sin sincronizar') : '';
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><button class="btn sm ghost" data-act="salir">Salir</button>`;
+}
+function render() {
+  if (!S.me) return renderAuth();
+  if (!S.me.activo) return renderEspera();
+  $('#topbar').hidden = false;
+  route(); renderTabs();
+  const keep = window.scrollY; let html;
+  if (S.view === 'inicio') html = vInicio();
+  else if (S.view === 'bandeja') html = vBandeja();
+  else if (S.view === 'validar') html = vValidar();
+  else if (S.view === 'movimientos') html = vMovimientos();
+  else if (S.view === 'usuarios') html = vUsuarios();
+  else if (S.view === 'ajustes') html = vAjustes();
+  else if (S.view === 'proyectos') html = vProyectos();
+  else html = vControl(ctrlById(S.view.slice(2)));
+  app().innerHTML = html;
+  window.scrollTo(0, keep);
+  const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
+}
+function renderEspera() {
+  $('#topbar').hidden = false; $('#tabs').innerHTML = ''; $('#btnSync').hidden = true; $('#syncMeta').textContent = '';
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.email || '')}</b></span><button class="btn sm ghost" data-act="salir">Salir</button>`;
+  app().innerHTML = `<div class="auth"><div class="panel"><div class="bd stack"><div class="eyebrow">Cuenta creada</div><h1>Tu cuenta espera acceso</h1>
+    <p class="small" style="margin:0">El administrador tiene que activarla y elegir qué controles y proyectos puedes ver. Cuando lo haga, vuelve a abrir esta página.</p>
+    <div><button class="btn" data-act="recargar">Revisar de nuevo</button></div></div></div></div>`;
+}
+
+/* ================= componentes ================= */
+function ctrlSelect(sel, attrs) {
+  const fam = familiares(), pr = proyectos().filter(c => !cerrado(c));
+  const o = c => `<option value="${c.id}" ${sel === c.id ? 'selected' : ''}>${esc(c.corto || c.nombre)}</option>`;
+  return `<select ${attrs}><optgroup label="Controles">${fam.map(o).join('')}</optgroup>${pr.length ? `<optgroup label="Proyectos abiertos">${pr.map(o).join('')}</optgroup>` : ''}${sel ? '' : '<option value="" selected>Elegir…</option>'}</select>`;
+}
+function tipoOptions(c, sel, lado) {
+  const ps = (c && c.personas) || [];
+  const opts = lado === 'ingreso' ? [...ps, 'COMPARTIDO'] : ['COMPARTIDO', ...ps];
+  if (sel && !opts.includes(sel)) opts.push(sel);
+  return opts.map(o => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('');
+}
+function mesOptions(sel) {
+  const s = new Set(D.txs.map(t => t.mes)); s.add(hoy().slice(0, 7)); if (sel) s.add(sel);
+  return [...s].sort().reverse().map(m => `<option value="${m}" ${m === sel ? 'selected' : ''}>${mesLargo(m)}</option>`).join('');
+}
+function asignarCells(t) {
+  const c = sugerido(t) || null;
+  const lado = t.code === 0 ? 'ingreso' : 'egreso';
+  return `<td>${ctrlSelect(c ? c.id : '', 'class="in" data-f="ctrl" aria-label="Control o proyecto"')}</td>
+    <td><select class="in" data-f="tipo" aria-label="Tipo">${tipoOptions(c, tipoSugerido(c, t), lado)}</select></td>
+    <td><select class="in" data-f="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(t.mes)}</select></td>
+    <td style="white-space:nowrap"><button class="btn sm pri" data-act="asignar" data-id="${esc(t.id)}">Asignar</button> <button class="btn sm ghost" data-act="ignorar" data-id="${esc(t.id)}" title="No va en ningún control">No aplica</button></td>`;
+}
+function txCells(t) {
+  const ing = t.code === 0;
+  return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
+    <td class="desc"><div>${esc(t.det || '(sin detalle)')}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
+    <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
+    <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}</td>`;
+}
+function resumen(c, h) {
+  const val = r => r.estado === 'valido';
+  const eg = h.egresos.filter(val), ing = h.ingresos.filter(val);
+  const sum = (a, f) => a.filter(f).reduce((s, r) => s + (+r.valor || 0), 0);
+  const ps = [...(c.personas || [])];
+  eg.concat(ing).forEach(r => { if (r.tipo && r.tipo !== 'COMPARTIDO' && !ps.includes(r.tipo)) ps.push(r.tipo); });
+  const comp = -sum(eg, r => r.tipo === 'COMPARTIDO') + sum(ing, r => r.tipo === 'COMPARTIDO');
+  const n = Math.max(1, (c.personas || []).length || ps.length);
+  const per = ps.map(p => { const g = -sum(eg, r => r.tipo === p); const pagar = comp / n + g; const aporte = sum(ing, r => r.tipo === p); return {p, g, pagar, aporte, saldo: pagar + aporte}; });
+  const todas = h.egresos.concat(h.ingresos);
+  return {comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
+    pendientes: todas.filter(r => r.estado === 'pendiente').length, pendienteValor: h.egresos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.valor, 0)};
+}
+function mesActualDe(c) {
+  if (!c.porMes) return 'general';
+  return S.mesSel[c.id] || hoy().slice(0, 7);
+}
+
+/* ================= vista: inicio ================= */
+function vInicio() {
+  const a = esAdmin(); const yo = (S.me.persona || '').toUpperCase();
+  const visibles = abiertos();
+  const tarjeta = c => {
+    const mes = c.porMes ? hoy().slice(0, 7) : 'general';
+    const R = resumen(c, hoja(c.id, mes)); const mio = R.per.find(x => x.p.toUpperCase() === yo);
+    return `<a class="panel card-link" href="${hrefC(c)}" data-act="irMes" data-c="${c.id}" data-m="${mes}"><div class="bd stack" style="gap:8px">
+      <div class="row" style="justify-content:space-between"><span class="chip"><span class="dot ${colorClass(c)}"></span>${esProy(c) ? 'Proyecto' : esc(mesLargo(mes))}</span>${R.pendientes ? `<span class="chip warn">${R.pendientes} por validar</span>` : ''}</div>
+      <h2>${esc(c.nombre)}</h2>
+      <div class="row small" style="gap:18px"><div><div class="eyebrow">Egresos</div><div class="num" style="text-align:left">${L(R.egreso)}</div></div>
+        ${esProy(c) ? `<div><div class="eyebrow">Ingresos</div><div class="num" style="text-align:left">${L(R.ingreso)}</div></div>` : ''}
+        ${mio && c.porMes ? `<div><div class="eyebrow">Tu saldo</div><div class="num ${mio.saldo < -0.004 ? 'neg' : 'pos'}" style="text-align:left">${L(mio.saldo)}</div></div>` : ''}</div>
+      <div class="note">${mio && c.porMes ? (mio.saldo < -0.004 ? `Te falta aportar ${L(-mio.saldo)} este mes.` : 'Estás al día este mes.') : 'Abre para ver el detalle o registrar un gasto.'}</div>
+    </div></a>`;
+  };
+  const sinTx = a && !D.txs.length;
+  return `<div class="stack">
+    <div><div class="eyebrow">Inicio</div><h1>Hola, ${esc((S.me.nombre || S.me.email || '').split(' ')[0])}</h1>
+    <div class="note">${a ? 'Tienes el control completo: sincroniza, asigna, valida lo que registren los demás y administra los accesos.' : 'Aquí ves los controles y proyectos que compartes. Puedes registrar gastos e ingresos; quedan por validar hasta que el administrador los revise.'}</div></div>
+    ${a ? `<div class="kpis"><a class="kpi" href="#bandeja"><div class="eyebrow">En la bandeja</div><div class="v">${bandeja().length}</div></a><a class="kpi" href="#validar"><div class="eyebrow">Por validar</div><div class="v ${porValidar().length ? 'warn-t' : ''}">${porValidar().length}</div></a>
+      <a class="kpi" href="#usuarios"><div class="eyebrow">Cuentas esperando acceso</div><div class="v">${S.perfiles.filter(p => !p.activo).length}</div></a><a class="kpi" href="#proyectos"><div class="eyebrow">Proyectos abiertos</div><div class="v">${proyectos().filter(c => !cerrado(c)).length}</div></a></div>` : ''}
+    ${sinTx ? `<div class="panel"><div class="bd row" style="justify-content:space-between"><div><h2>Primer paso: sincroniza con Registro Contable</h2><div class="note">Trae los movimientos de la app para empezar a asignarlos.</div></div><button class="btn pri" data-act="sync">Sincronizar</button></div></div>` : ''}
+    ${visibles.length ? `<div class="cards">${visibles.map(tarjeta).join('')}</div>` : `<div class="panel"><div class="empty"><b>Todavía no tienes controles asignados</b>${a ? 'Crea proyectos o revisa los controles en Ajustes.' : 'Pídele al administrador que te dé acceso.'}</div></div>`}
+  </div>`;
+}
+
+/* ================= vista: bandeja (admin) ================= */
+function vBandeja() {
+  if (!D.txs.length) return `<div class="panel"><div class="empty"><b>Aún no hay movimientos de la app</b>Sincroniza con Registro Contable para traerlos.<div style="margin-top:12px"><button class="btn pri" data-act="sync">Sincronizar</button></div></div></div>`;
+  const f = S.filtros; const qq = f.q.toUpperCase();
+  const lista = D.txs.filter(t => {
+    const e = estadoTx(t);
+    if (!(e === 'pendiente' || (f.todos && e === 'otro'))) return false;
+    if (f.ctrl) { const s = sugerido(t); if (f.ctrl === '_none' ? s : (!s || s.id !== f.ctrl)) return false; }
+    if (f.mes && t.mes !== f.mes) return false;
+    if (qq && !(t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)) return false;
+    return true;
+  }).sort((a, b) => a.fecha < b.fecha ? -1 : 1);
+  const porCtrl = {}; bandeja().forEach(t => { const s = sugerido(t); porCtrl[s.id] = (porCtrl[s.id] || 0) + 1; });
+  const total = lista.length; const shown = lista.slice(0, S.limite);
+  const meses = [...new Set(D.txs.filter(t => estadoTx(t) === 'pendiente').map(t => t.mes))].sort().reverse();
+  return `<div class="stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><div class="eyebrow">Bandeja de entrada</div><h1>${bandeja().length ? `${bandeja().length} movimientos por asignar` : 'Todo está asignado'}</h1>
+      <div class="note">Movimientos de la app desde ${fFecha(S.aj.inicio)} que coinciden con las reglas de algún control y todavía no están en ninguno.</div></div>
+      <div class="row small">${abiertos().map(c => `<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)} · ${porCtrl[c.id] || 0}</span>`).join('')}</div>
+    </div>
+    <div class="panel">
+      <div class="hd filters">
+        <input type="search" id="fq" placeholder="Buscar comercio, categoría o cuenta" value="${esc(f.q)}" aria-label="Buscar">
+        <select id="fctrl" aria-label="Control sugerido"><option value="">Todos los controles</option>${abiertos().map(c => `<option value="${c.id}" ${f.ctrl === c.id ? 'selected' : ''}>${esc(c.corto || c.nombre)}</option>`).join('')}<option value="_none" ${f.ctrl === '_none' ? 'selected' : ''}>Sin sugerencia</option></select>
+        <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>
+        <label class="small row" style="gap:6px"><input type="checkbox" id="ftodos" ${f.todos ? 'checked' : ''}> Incluir movimientos sin sugerencia</label>
+      </div>
+      ${total ? `<div class="tbl-wrap"><table>
+        <thead><tr><th><input type="checkbox" id="selAll" aria-label="Seleccionar todo"></th><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th class="num">Monto</th><th>Control</th><th>Tipo</th><th>Mes</th><th></th></tr></thead>
+        <tbody>${shown.map(t => `<tr data-tx="${esc(t.id)}"><td><input type="checkbox" data-sel="${esc(t.id)}" ${S.sel.has(t.id) ? 'checked' : ''} aria-label="Seleccionar"></td>${txCells(t)}${asignarCells(t)}</tr>`).join('')}</tbody></table></div>
+        ${total > shown.length ? `<div class="bd"><button class="btn" data-act="mas">Mostrar ${Math.min(300, total - shown.length)} más (${total - shown.length} restantes)</button></div>` : ''}`
+      : `<div class="empty"><b>No hay movimientos con estos filtros</b>Cuando sincronices, aquí aparecen los nuevos registros de la app.</div>`}
+    </div>
+    ${S.sel.size ? `<div class="bulk" role="region" aria-label="Acciones para la selección"><b>${S.sel.size} seleccionados</b>
+      ${ctrlSelect((familiares()[0] || {}).id, 'id="bCtrl" aria-label="Control o proyecto"')}
+      <select id="bTipo" aria-label="Tipo">${tipoOptions(familiares()[0], 'COMPARTIDO', 'egreso')}</select>
+      <span class="small">Mes: el de cada movimiento</span>
+      <button class="btn sm" data-act="bulkAsignar">Asignar selección</button><button class="btn sm" data-act="bulkIgnorar">Marcar como no aplica</button><button class="btn sm" data-act="bulkClear">Quitar selección</button></div>` : ''}
+  </div>`;
+}
+
+/* ================= vista: por validar (admin) ================= */
+function candidatos(m) {
+  const v = Math.abs(m.valor);
+  return D.txs.filter(t => !D.asig.has(t.id) && !S.ign.has(t.id) && t.code !== 3 && m.fecha && (
+    (cents(t.monto) === cents(v) && dias(t.fecha, m.fecha) <= 20) || (dias(t.fecha, m.fecha) <= 3 && Math.abs(t.monto - v) <= 0.05 * v)))
+    .sort((a, b) => (cents(a.monto) === cents(v) ? 0 : 1) - (cents(b.monto) === cents(v) ? 0 : 1) || dias(a.fecha, m.fecha) - dias(b.fecha, m.fecha)).slice(0, 5);
+}
+function vValidarFila(m, conControl) {
+  const c = ctrlById(m.control);
+  const cand = S.ligarAbierto === m.id ? candidatos(m) : null;
+  return `<tr data-mov="${esc(m.id)}">
+    ${conControl ? `<td><a href="${c ? hrefC(c) : '#'}" class="chip" style="text-decoration:none"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)}</a><div class="cat">${esc(mesLargo(m.mes))}</div></td>` : ''}
+    <td class="mono small">${fFecha(m.fecha)}</td><td class="small">${esc(nombreDe(m.creado_por))}<div class="cat">${new Date(m.creado_el).toLocaleDateString('es-HN')}</div></td>
+    <td class="small">${m.lado === 'ingreso' ? 'Ingreso' : 'Egreso'} · ${esc(m.tipo)}</td><td class="desc small">${esc(m.descripcion || m.detalle)}</td><td class="num">${L(m.valor)}</td>
+    <td style="white-space:nowrap"><button class="btn sm pri" data-act="aprobar">Aprobar manual</button> <button class="btn sm" data-act="ligar">${cand ? 'Ocultar' : 'Ligar a la app'}</button> <button class="btn sm ghost danger" data-act="rechazar">Rechazar</button></td></tr>
+    ${cand ? `<tr class="addrow"><td colspan="${conControl ? 7 : 6}"><div class="stack" style="gap:6px"><div class="small"><b>Registros de la app que podrían ser este movimiento</b> (mismo monto en ±20 días, o monto parecido en ±3 días):</div>
+      ${cand.length ? cand.map(t => `<div class="row small" style="gap:10px"><span class="mono">${fFecha(t.fecha)}</span><span style="flex:1;min-width:180px">${esc(t.det)} <span class="cat">${esc(t.cuenta)}</span></span><span class="num">${L(t.monto)}</span><button class="btn sm pri" data-act="ligarTx" data-tx="${esc(t.id)}">Ligar</button></div>`).join('') : '<div class="small muted">No encontré registros parecidos sin asignar. Puedes aprobarlo como manual.</div>'}</div></td></tr>` : ''}
+    ${S.rechazoAbierto === m.id ? `<tr class="addrow"><td colspan="${conControl ? 7 : 6}"><div class="row"><input class="in" id="notaRechazo" style="max-width:none;flex:1" placeholder="Motivo (lo verá quien lo registró)"><button class="btn sm danger" data-act="confirmarRechazo">Rechazar</button></div></td></tr>` : ''}`;
+}
+function vValidar() {
+  const ps = porValidar().sort((a, b) => a.creado_el < b.creado_el ? -1 : 1);
+  return `<div class="stack"><div><div class="eyebrow">Por validar</div><h1>${ps.length ? `${ps.length} registros esperan tu revisión` : 'No hay nada por validar'}</h1>
+    <div class="note">Lo que registran los demás no cuenta en los saldos hasta que lo apruebes. Ligarlo a un registro de la app evita contarlo dos veces.</div></div>
+    <div class="panel">${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Fecha</th><th>Registró</th><th>Tipo</th><th>Descripción</th><th class="num">Valor</th><th></th></tr></thead><tbody>${ps.map(m => vValidarFila(m, true)).join('')}</tbody></table></div>` : '<div class="empty">Cuando alguien registre un gasto o ingreso, aparecerá aquí.</div>'}</div></div>`;
+}
+
+/* ================= vista: control / proyecto ================= */
+function vControl(c) {
+  const a = esAdmin();
+  const mes = mesActualDe(c);
+  const meses = new Set(mesesDe(c.id)); if (c.porMes) meses.add(mes);
+  const h = hoja(c.id, mes); const R = resumen(c, h);
+  const pend = a ? bandeja().filter(t => { const s = sugerido(t); return s && s.id === c.id && (!c.porMes || t.mes === mes); }).length : 0;
+  return `<div class="stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div><div class="eyebrow">${esProy(c) ? '<a href="#proyectos" class="muted small" style="text-decoration:none">← Proyectos</a> ' : ''}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(esProy(c) ? 'Proyecto' : c.nombre)}</span> ${esProy(c) ? `<span class="chip ${cerrado(c) ? '' : 'app'}">${cerrado(c) ? 'Cerrado el ' + fFecha(c.cerradoEl) : 'Abierto'}</span>` : ''}</div>
+      <h1>${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>
+      ${pend ? `<div class="note"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</a></div>` : ''}</div>
+      <div class="row"><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
+      ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}">Reabrir proyecto</button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : 'Cerrar proyecto'}</button>`) : ''}</div>
+    </div>
+    ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
+    ${c.porMes ? `<div class="months" role="group" aria-label="Meses">${[...meses].sort().reverse().map(m => `<button data-act="mes" data-c="${c.id}" data-m="${m}" aria-pressed="${m === mes}">${mesLargo(m)}</button>`).join('')}
+      <label class="small muted row" style="gap:6px">Otro mes <input type="month" class="in" id="otroMes" data-c="${c.id}"></label></div>` : ''}
+    <div class="kpis">
+      <div class="kpi"><div class="eyebrow">Ingreso</div><div class="v">${L(R.ingreso)}</div></div>
+      <div class="kpi"><div class="eyebrow">Egreso</div><div class="v">${L(-R.egreso)}</div></div>
+      <div class="kpi"><div class="eyebrow">Saldo</div><div class="v ${R.ingreso - R.egreso < 0 ? 'neg' : ''}">${L(R.ingreso - R.egreso)}</div></div>
+      <div class="kpi"><div class="eyebrow">Por validar</div><div class="v ${R.pendientes ? 'warn-t' : ''}">${R.pendientes}</div></div>
+    </div>
+    ${vDistribucion(c, R)}
+    ${tablaFilas(c, h, 'egreso')}${tablaFilas(c, h, 'ingreso')}
+    ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
+}
+function vDistribucion(c, R) {
+  if (!c.porMes) return `<div class="panel"><div class="hd"><h2>Resumen del proyecto</h2></div><div class="bd"><table class="dist">
+      <tr><td>Ingresos</td><td class="num">${L(R.ingreso)}</td></tr><tr><td>Egresos</td><td class="num">${L(-R.egreso)}</td></tr>
+      <tr class="tot"><td>Saldo</td><td class="num ${R.ingreso - R.egreso < 0 ? 'neg' : 'pos'}">${L(R.ingreso - R.egreso)}</td></tr></table>
+      <p class="note">Por TIPO: ${R.per.map(x => `${esc(x.p)} ${L(-x.g)}`).join(' · ') || '—'}${R.pendientes ? ` · ${R.pendientes} registros por validar no cuentan todavía` : ''}</p></div></div>`;
+  return `<div class="dist-grid"><div class="panel"><div class="hd"><h2>Resumen de distribución</h2></div><div class="tbl-wrap"><table class="dist">
+    <thead><tr><th>Descripción</th><th class="num">Valor</th></tr></thead><tbody>
+    <tr><td>COMPARTIDO</td><td class="num">${L(R.comp)}</td></tr>
+    ${R.per.map(x => `<tr><td>${esc(x.p)}</td><td class="num">${L(x.g)}</td></tr>`).join('')}
+    <tr class="tot"><td>Saldo</td><td class="num">${L(R.comp + R.per.reduce((s, x) => s + x.g, 0))}</td></tr></tbody></table></div></div>
+    <div class="panel"><div class="hd"><h2>Distribución por persona</h2></div><div class="tbl-wrap"><table class="dist">
+    <thead><tr><th>Persona</th><th class="num">Total a pagar</th><th class="num">Saldo</th></tr></thead><tbody>
+    ${R.per.map(x => `<tr><td>${esc(x.p)}<div class="note">${x.saldo < -0.004 ? `Le falta aportar ${L(-x.saldo)}` : x.saldo > 0.004 ? `Tiene ${L(x.saldo)} a favor` : 'Al día'}</div></td><td class="num">${L(x.pagar)}</td><td class="num ${x.saldo < -0.004 ? 'neg' : 'pos'}">${L(x.saldo)}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Agrega las personas de este control en Ajustes.</td></tr>'}
+    <tr class="tot"><td>Saldo total</td><td></td><td class="num">${L(R.per.reduce((s, x) => s + x.saldo, 0))}</td></tr></tbody></table></div>
+    <div class="bd note">Compartido dividido entre ${R.n} ${R.n === 1 ? 'persona' : 'personas'}, más lo individual de cada quien. Saldo = total a pagar + lo que aportó.${R.pendientes ? ` No incluye ${R.pendientes} registros por validar.` : ''}</div></div></div>`;
+}
+function origenChip(r) {
+  if (r.estado === 'pendiente') return `<span class="chip warn" title="Registró ${esc(nombreDe(r.creado_por))}">Por validar</span>`;
+  if (r.estado === 'rechazado') return `<span class="chip bad" title="${esc(r.nota)}">Rechazado</span>`;
+  if (r.tx_id) {
+    if (!esAdmin()) return '<span class="chip app">App</span>';
+    const t = D.byId.get(r.tx_id);
+    if (!t) return S.tx.has((r.fecha || '').slice(0, 7)) ? '<span class="chip bad" title="El registro ya no aparece en la app">Borrado en la app</span>' : '<span class="chip app">App</span>';
+    if (cents(t.monto) !== cents(r.valor)) return `<span class="chip warn" title="Monto en la app">App: ${L(t.monto)}</span>`;
+    return `<span class="chip app" title="${esc(t.cuenta)}">App</span>`;
+  }
+  return `<span class="chip">${r.origen === 'usuario' ? 'Validado' : 'Manual'}</span>`;
+}
+function tablaFilas(c, h, lado) {
+  const a = esAdmin(); const ro = cerrado(c);
+  const rows = lado === 'egreso' ? h.egresos : h.ingresos;
+  const eg = lado === 'egreso'; const fam = c.porMes;
+  const total = rows.filter(r => r.estado === 'valido').reduce((s, r) => s + r.valor, 0);
+  const puedeEditar = r => !ro && (a || (r.creado_por === S.me.id && r.estado === 'pendiente'));
+  const puedeBorrar = r => !ro && (a || (r.creado_por === S.me.id && r.estado !== 'valido'));
+  const fechaDef = c.porMes && h.mes !== 'general' ? (hoy().slice(0, 7) === h.mes ? hoy() : h.mes + '-01') : hoy();
+  const cols = 6 + (eg && fam ? 1 : 0);
+  return `<div class="panel"><div class="hd"><h2>${eg ? 'Detalle egreso' : 'Detalle ingreso'}</h2><span class="muted small">${rows.length} filas · ${L(total)} validado</span></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>${eg ? 'Tipo' : 'Persona'}</th>${eg && fam ? '<th>Categoría</th>' : ''}<th>Descripción</th><th class="num">Valor</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${rows.map(r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}">
+    <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
+    <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado)}</select></td>
+    ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
+    <td class="desc small">${esc(r.descripcion || r.detalle)}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
+    <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}></td>
+    <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && D.byId.get(r.tx_id) && cents(D.byId.get(r.tx_id).monto) !== cents(r.valor) ? ' <button class="btn sm ghost" data-act="usarMonto">Usar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
+    <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`).join('')}
+  ${ro ? '' : `<tr class="addrow" data-c="${c.id}" data-m="${esc(h.mes)}" data-lado="${lado}"><td><input type="date" class="in" data-new="fecha" aria-label="Fecha" value="${fechaDef}"></td>
+    <td><select class="in" data-new="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}">${tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || (c.personas || [])[0] || 'COMPARTIDO'), lado)}</select></td>
+    ${eg && fam ? '<td></td>' : ''}<td><input class="in" style="max-width:none;width:100%" data-new="desc" placeholder="${eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'}" aria-label="Descripción"></td>
+    <td class="num"><input class="in num" data-new="valor" inputmode="decimal" placeholder="0.00" aria-label="Valor"></td>
+    <td colspan="2"><button class="btn sm ${a ? '' : 'pri'}" data-act="agregar">${a ? 'Agregar' : 'Registrar'}</button></td></tr>`}
+  </tbody></table></div>
+  ${rows.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno manual en la última fila.' : `Registra un ${eg ? 'gasto' : 'ingreso'} en la última fila; quedará por validar.`}</div>`}</div>`;
+}
+
+/* ================= vista: proyectos ================= */
+function totProy(c) {
+  const h = hoja(c.id, 'general'); const R = resumen(c, h);
+  const fechas = h.egresos.concat(h.ingresos).map(r => r.fecha).filter(Boolean).sort();
+  const pend = bandeja().filter(t => { const s = sugerido(t); return s && s.id === c.id; }).length;
+  return {R, desde: fechas[0], hasta: fechas[fechas.length - 1], pend, filas: R.filas};
+}
+function vProyectos() {
+  const a = esAdmin();
+  const ab = proyectos().filter(c => !cerrado(c)), ce = proyectos().filter(cerrado);
+  const fila = c => { const x = totProy(c); return `<tr><td><a href="${hrefC(c)}" style="color:inherit;font-weight:600">${esc(c.nombre)}</a>${a ? (c.incluye ? `<div class="cat">Clave en la app: ${esc(c.incluye)}</div>` : '<div class="cat">Sin clave: se asigna a mano</div>') : ''}</td>
+    <td class="small mono">${x.desde ? fFecha(x.desde) + ' – ' + fFecha(cerrado(c) ? c.cerradoEl : x.hasta) : '—'}</td>
+    <td class="num">${L(x.R.ingreso)}</td><td class="num">${L(x.R.egreso)}</td><td class="num ${x.R.ingreso - x.R.egreso < 0 ? 'neg' : ''}">${L(x.R.ingreso - x.R.egreso)}</td>
+    <td>${cerrado(c) ? `<span class="chip">Cerrado ${fFecha(c.cerradoEl)}</span>` : x.R.pendientes ? `<span class="chip warn">${x.R.pendientes} por validar</span>` : x.pend ? `<span class="chip warn">${x.pend} en bandeja</span>` : '<span class="chip app">Al día</span>'}</td>
+    <td><a class="btn sm" href="${hrefC(c)}">Abrir</a></td></tr>`; };
+  const tabla = (lista, vacio) => lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Proyecto</th><th>Periodo</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(fila).join('')}</tbody></table></div>` : `<div class="empty">${vacio}</div>`;
+  return `<div class="stack">
+    <div><div class="eyebrow">Proyectos</div><h1>${ab.length} ${ab.length === 1 ? 'proyecto abierto' : 'proyectos abiertos'}</h1>
+      <div class="note">Cada proyecto lleva sus egresos e ingresos en una sola hoja, de principio a fin. Al cerrarlo deja de recibir movimientos y queda su saldo final.</div></div>
+    ${a ? `<div class="panel"><div class="hd"><h2>Nuevo proyecto</h2></div><div class="bd form-grid">
+      <label>Nombre<input id="npNombre" placeholder="Ej.: Techo casa de mis papás"></label>
+      <label>Personas (TIPO), separadas por coma<input id="npPersonas" placeholder="Ej.: EDITH RUEDA, JONATHAN CANALES"></label>
+      <label>Clave en el detalle de la app (opcional)<input id="npClave" placeholder="Ej.: PTECHO"></label>
+      <div class="note" style="align-self:end">Con clave, la bandeja sugiere el proyecto cuando el detalle de la app la trae (ej. <span class="mono">PTECHO | FERRETERIA…</span>). Para que alguien más lo vea, dale acceso en Usuarios.</div>
+      <div><button class="btn pri" data-act="nuevoProy">Crear proyecto</button></div></div></div>` : ''}
+    <div class="panel"><div class="hd"><h2>Abiertos</h2></div>${tabla(ab, a ? '<b>No hay proyectos abiertos</b>Crea uno arriba.' : 'No tienes proyectos abiertos.')}</div>
+    <div class="panel"><div class="hd"><h2>Cerrados</h2><span class="muted small">${ce.length}</span></div>${tabla(ce, 'No hay proyectos cerrados.')}</div>
+  </div>`;
+}
+function vConfigProy(c) {
+  const vacio = !totProy(c).filas;
+  const conAcceso = S.accesos.filter(x => x.control === c.id).map(x => nombreDe(x.usuario));
+  return `<div class="panel" data-cid="${c.id}"><div class="hd"><h2>Datos del proyecto</h2><span class="note">Acceso: ${conAcceso.length ? esc(conAcceso.join(', ')) : 'solo tú'} · <a href="#usuarios">cambiar</a></span></div><div class="bd form-grid">
+    <label>Nombre<input data-cf="nombre" value="${esc(c.nombre)}"></label>
+    <label>Personas (TIPO), separadas por coma<input data-cf="personas" value="${esc((c.personas || []).join(', '))}"></label>
+    <label>TIPO por defecto<input data-cf="tipoDefecto" value="${esc(c.tipoDefecto || '')}"></label>
+    <label>Clave en el detalle de la app<input data-cf="incluye" value="${esc(c.incluye || '')}" placeholder="Sin clave: se asigna a mano"></label>
+    <label>Limitar a categorías de la app (opcional)<input data-cf="categorias" value="${esc((c.categorias || []).join(', '))}" placeholder="Ej.: 6., 7."></label>
+    <label>Color<select data-cf="color">${['a', 'b', 'c', 'd', 'e'].map(x => `<option value="${x}" ${c.color === x ? 'selected' : ''}>${{a: 'Verde', b: 'Morado', c: 'Naranja', d: 'Ámbar', e: 'Gris'}[x]}</option>`).join('')}</select></label>
+    ${vacio ? `<div><button class="btn sm danger" data-act="eliminarProy" data-c="${c.id}">${S.confirmElim === c.id ? '¿Eliminar? Confirmar' : 'Eliminar proyecto vacío'}</button></div>` : ''}
+  </div></div>`;
+}
+
+/* ================= vista: movimientos (admin) ================= */
+const EST = {asignado: ['Asignado', 'app'], pendiente: ['Pendiente', 'warn'], noaplica: ['No aplica', ''], traslado: ['Traslado', ''], futuro: ['Programado', ''], anterior: ['Antes del inicio', ''], otro: ['Sin control', '']};
+function vMovimientos() {
+  const f = S.filtros; const qq = f.q.toUpperCase();
+  const all = D.txs; const cnt = {}; all.forEach(t => { const e = estadoTx(t); cnt[e] = (cnt[e] || 0) + 1; });
+  let lista = all.filter(t => (!f.estado || estadoTx(t) === f.estado) && (!f.mes || t.mes === f.mes) && (!qq || (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)));
+  const total = lista.length; lista = lista.slice(0, S.limite);
+  const meses = [...new Set(all.map(t => t.mes))].sort().reverse();
+  return `<div class="stack">
+    <div><div class="eyebrow">Todo lo sincronizado</div><h1>${all.length} movimientos de la app</h1>
+      <div class="note">${Object.entries(EST).map(([k, v]) => `${v[0]}: ${cnt[k] || 0}`).join(' · ')}</div></div>
+    <div class="panel"><div class="hd filters">
+      <input type="search" id="fq" placeholder="Buscar" value="${esc(f.q)}" aria-label="Buscar">
+      <select id="fest" aria-label="Estado"><option value="">Todos los estados</option>${Object.entries(EST).map(([k, v]) => `<option value="${k}" ${f.estado === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+      <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select></div>
+    ${total ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${lista.map(t => { const e = estadoTx(t); const m = D.asig.get(t.id); const c = m && ctrlById(m.control);
+        return `<tr data-tx="${esc(t.id)}">${txCells(t)}<td>${m ? `<span class="chip app"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)} · ${m.mes === 'general' ? 'proyecto' : mesLargo(m.mes)}</span>` : `<span class="chip ${EST[e][1]}">${EST[e][0]}</span>`}${e === 'noaplica' ? `<div class="note">${esc(S.ign.get(t.id).motivo || '')}</div>` : ''}</td>
+        <td style="white-space:nowrap">${m ? `<a class="btn sm ghost" href="${c ? hrefC(c) : '#'}" data-act="irMes" data-c="${esc(m.control)}" data-m="${esc(m.mes)}">Ver</a>` : e === 'noaplica' ? `<button class="btn sm" data-act="restaurar" data-id="${esc(t.id)}">Devolver a la bandeja</button>` : (e === 'pendiente' ? '<a class="btn sm ghost" href="#bandeja">Ir a la bandeja</a>' : `<button class="btn sm" data-act="asignarOtro" data-id="${esc(t.id)}">Asignar…</button>`)}</td></tr>`; }).join('')}
+    </tbody></table></div>${total > lista.length ? `<div class="bd"><button class="btn" data-act="mas">Mostrar más (${total - lista.length} restantes)</button></div>` : ''}`
+    : '<div class="empty"><b>Sin resultados</b>Cambia los filtros o sincroniza.</div>'}</div></div>`;
+}
+
+/* ================= vista: usuarios (admin) ================= */
+function vUsuarios() {
+  const personas = [...new Set(S.ctrls.flatMap(c => c.personas || []))];
+  const ordenados = [...S.perfiles].sort((a, b) => (a.activo === b.activo ? 0 : a.activo ? 1 : -1) || (a.creado_el < b.creado_el ? -1 : 1));
+  const tiene = (u, c) => S.accesos.some(x => x.usuario === u && x.control === c);
+  const fila = p => {
+    const yo = p.id === S.me.id; const admin = p.rol === 'admin';
+    return `<div class="panel ${p.activo ? '' : 'nuevo'}" data-uid="${p.id}"><div class="hd"><h2>${esc(p.nombre || p.email)}${yo ? ' <span class="chip">Tú</span>' : ''}</h2><span class="muted small">${esc(p.email)}</span>
+      <span style="margin-left:auto" class="chip ${p.activo ? 'app' : 'warn'}">${p.activo ? (admin ? 'Administrador' : 'Activo') : 'Esperando acceso'}</span></div>
+      <div class="bd stack">
+        <div class="form-grid">
+          <label>Nombre<input data-uf="nombre" value="${esc(p.nombre)}"></label>
+          <label>Aparece en TIPO como<input data-uf="persona" list="dlPersonas" value="${esc(p.persona)}" placeholder="Ej.: ELBA KATTAN"></label>
+          ${yo ? '' : `<label>Rol<select data-uf="rol"><option value="usuario" ${!admin ? 'selected' : ''}>Usuario</option><option value="admin" ${admin ? 'selected' : ''}>Administrador (ve todo)</option></select></label>
+          <label class="chk"><input type="checkbox" data-uf="activo" ${p.activo ? 'checked' : ''}> Cuenta activa</label>`}
+        </div>
+        ${admin ? '<div class="note">Los administradores ven y editan todo.</div>' : `<div><div class="eyebrow" style="margin-bottom:6px">Puede ver y registrar en</div>
+          <div class="row" style="gap:6px 16px">${familiares().map(c => `<label class="small row" style="gap:6px"><input type="checkbox" data-acc="${c.id}" ${tiene(p.id, c.id) ? 'checked' : ''}><span class="dot ${colorClass(c)}" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span>${esc(c.nombre)}</label>`).join('')}</div>
+          ${proyectos().length ? `<div class="row" style="gap:6px 16px;margin-top:8px">${proyectos().map(c => `<label class="small row" style="gap:6px"><input type="checkbox" data-acc="${c.id}" ${tiene(p.id, c.id) ? 'checked' : ''}>Proyecto: ${esc(c.nombre)}${cerrado(c) ? ' (cerrado)' : ''}</label>`).join('')}</div>` : ''}</div>`}
+      </div></div>`;
+  };
+  const url = location.origin + location.pathname;
+  return `<div class="stack"><div><div class="eyebrow">Usuarios</div><h1>Quién ve qué</h1>
+    <div class="note">Cada persona crea su cuenta con su correo en la página de entrada. Aparece aquí como "Esperando acceso": actívala, indica cómo aparece en TIPO y marca qué controles y proyectos puede ver.</div></div>
+    <div class="panel"><div class="bd row"><div style="flex:1;min-width:220px"><b class="small">Enlace para invitar</b><div class="mono small" id="invUrl">${esc(url)}</div></div><button class="btn sm" data-act="copiarInv">Copiar enlace</button></div></div>
+    <datalist id="dlPersonas">${personas.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+    ${ordenados.map(fila).join('')}</div>`;
+}
+
+/* ================= vista: ajustes (admin) ================= */
+function vAjustes() {
+  return `<div class="stack">
+    <div><div class="eyebrow">Ajustes</div><h1>Controles y sincronización</h1></div>
+    <div class="panel"><div class="hd"><h2>General</h2></div><div class="bd form-grid">
+      <label>Mostrar en la bandeja movimientos desde<input type="date" id="cfgInicio" value="${esc(S.aj.inicio || '')}"></label>
+      <div class="note" style="align-self:end">Lo anterior a esa fecha no aparece como pendiente.</div></div></div>
+    ${familiares().map(c => `<div class="panel" data-cid="${c.id}"><div class="hd"><span class="dot ${colorClass(c)}" style="width:10px;height:10px;border-radius:50%;display:inline-block"></span><h2>${esc(c.nombre)}</h2></div><div class="bd form-grid">
+      <label>Nombre<input data-cf="nombre" value="${esc(c.nombre)}"></label>
+      <label>Nombre corto (pestaña)<input data-cf="corto" value="${esc(c.corto || '')}"></label>
+      <label>Personas (separadas por coma)<input data-cf="personas" value="${esc((c.personas || []).join(', '))}"></label>
+      <label>TIPO por defecto<input data-cf="tipoDefecto" value="${esc(c.tipoDefecto || '')}"></label>
+      <label>Categorías de la app (inicio, separadas por coma)<input data-cf="categorias" value="${esc((c.categorias || []).join(', '))}"></label>
+      <label>Solo si el detalle contiene<input data-cf="incluye" value="${esc(c.incluye || '')}"></label>
+      <label>Excluir si el detalle contiene<input data-cf="excluye" value="${esc(c.excluye || '')}"></label>
+      <label>Color<select data-cf="color">${['a', 'b', 'c', 'd', 'e'].map(x => `<option value="${x}" ${c.color === x ? 'selected' : ''}>${{a: 'Verde', b: 'Morado', c: 'Naranja', d: 'Ámbar', e: 'Gris'}[x]}</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" data-cf="sugerirPorNombre" ${c.sugerirPorNombre ? 'checked' : ''}> Sugerir TIPO si el detalle trae el nombre de una persona</label>
+    </div></div>`).join('')}
+    <div class="panel"><div class="hd"><h2>Nuevo control mensual</h2><span class="note">Para un proyecto usa la pestaña Proyectos.</span></div><div class="bd row">
+      <input class="in" id="nuevoNombre" placeholder="Ej.: Gastos Casa Playa" style="max-width:280px"><button class="btn" data-act="nuevoCtrl">Crear</button></div></div>
+    <div class="panel"><div class="hd"><h2>Sincronización</h2><span class="chip ${HELPER !== null ? 'app' : ''}">${HELPER !== null ? 'Servidor local activo' : 'Con favorito'}</span></div><div class="bd stack">
+      ${HELPER !== null ? '<p class="small" style="margin:0">El servidor local de tu Mac lee el portal directamente: solo pega la dirección del iPhone y presiona Sincronizar.</p>' : '<p class="small" style="margin:0">Sin el servidor local, la sincronización usa el favorito. Con el servidor local (ver README) basta con pegar la dirección.</p>'}
+      <details ${HELPER !== null ? '' : 'open'}><summary class="small muted">Favorito para sincronizar sin servidor</summary><div class="stack" style="margin-top:10px">${vBookmarklet()}</div></details></div></div>
+    <div class="panel"><div class="hd"><h2>Respaldo</h2></div><div class="bd row"><button class="btn" data-act="respaldo">Descargar respaldo (.json)</button><span class="note">Incluye controles, movimientos asignados, accesos y lo sincronizado. Supabase además guarda copias diarias en planes de pago.</span></div></div>
+  </div>`;
+}
+
+/* ================= sincronización (admin) ================= */
+const BM = `javascript:(async()=>{try{if(window.__cgRun)return;window.__cgRun=1;var y=new Date().getFullYear(),s=(y-1)+'-01-01',e=y+'-12-31';var t=await(await fetch('/moneyBook/getDataByPeriod?startDate='+s+'&endDate='+e+'&mbid=1&assetId=')).text();var d=new DOMParser().parseFromString(t,'text/xml');var g=function(r,n){var x=r.getElementsByTagName(n)[0];return x?x.textContent:''};var rows=[].slice.call(d.getElementsByTagName('row')).map(function(r){return[g(r,'id'),g(r,'mbDate'),+g(r,'inOutCode'),g(r,'payType'),g(r,'inOutType'),g(r,'mbCategory'),g(r,'subCategory'),g(r,'mbContent'),g(r,'mbDetailContent'),+g(r,'mbCash')]});var p=JSON.stringify({v:1,src:'registro-contable',at:new Date().toISOString(),desde:s,hasta:e,rows:rows});var o=document.createElement('div');o.style.cssText='position:fixed;inset:0;z-index:999999;background:rgba(10,16,13,.6);display:flex;align-items:center;justify-content:center;font:15px -apple-system,Helvetica,sans-serif';o.innerHTML='<div style="background:#fff;color:#18211D;padding:26px;border-radius:12px;max-width:420px;text-align:center"><div style="font-size:19px;font-weight:700">'+rows.length+' movimientos listos</div><p style="color:#5D6B64">Cópialos y pégalos en Control de Gastos.</p><button id="cg-c" style="font-size:16px;padding:11px 20px;background:#1E6A50;color:#fff;border:0;border-radius:8px;cursor:pointer;font-weight:700">Copiar datos</button> <button id="cg-f" style="font-size:14px;padding:10px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer">Descargar archivo</button><p id="cg-m" style="color:#1E6A50;font-weight:600;min-height:20px"></p><button id="cg-x" style="font-size:13px;border:0;background:none;color:#5D6B64;cursor:pointer">Cerrar</button><textarea id="cg-t" style="position:fixed;left:-9999px;top:0"></textarea></div>';document.body.appendChild(o);var ta=o.querySelector('#cg-t');ta.value=p;o.querySelector('#cg-x').onclick=function(){o.remove();window.__cgRun=0};o.querySelector('#cg-c').onclick=function(){ta.focus();ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(_){}o.querySelector('#cg-m').textContent=ok?'Copiado. Vuelve a Control de Gastos y pega (Cmd+V).':'No se pudo copiar. Usa Descargar archivo.'};o.querySelector('#cg-f').onclick=function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([p],{type:'application/json'}));a.download='registro-contable-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();o.querySelector('#cg-m').textContent='Archivo descargado. Súbelo en Control de Gastos.'}}catch(err){window.__cgRun=0;alert('No se pudo leer Registro Contable. Abre esta página en el portal de la app (con el servicio Wi-Fi activo). Detalle: '+err)}})();`;
+function vBookmarklet() {
+  return `<p class="small" style="margin:0">Se configura una sola vez. Arrastra este botón a tu barra de favoritos de Safari o Chrome:</p>
+    <div><a class="bm" href="${esc(BM)}" draggable="true" onclick="return false">Enviar a Control de Gastos</a></div>
+    <p class="small muted" style="margin:0">Si no te deja arrastrarlo: copia el código, crea un favorito cualquiera, edítalo y pega el código en su dirección (URL).</p>
+    <div class="row"><button class="btn sm" data-act="copiarBM">Copiar código</button></div>
+    <code class="blk" id="bmCode">${esc(BM)}</code>`;
+}
+function normPortal(v) { v = (v || '').trim(); if (!v) return ''; if (!/^https?:\/\//i.test(v)) v = 'http://' + v; try { const u = new URL(v); return u.protocol + '//' + u.host; } catch (_) { return ''; } }
+function portalActual() { return normPortal(S.aj.portal || lsGet('portal') || ''); }
+function urlDatos(base) { const y = new Date().getFullYear(); return `${base}/moneyBook/getDataByPeriod?startDate=${y - 1}-01-01&endDate=${y}-12-31&mbid=1&assetId=`; }
+function pintarEnlaces() {
+  const base = portalActual();
+  [['#lnkPortal', base], ['#lnkDatos', base && urlDatos(base)]].forEach(([s, u]) => { const a = $(s); if (a) { a.href = u || '#'; a.style.opacity = u ? 1 : .45; a.style.pointerEvents = u ? '' : 'none'; } });
+}
+let HELPER = null;
+async function detectarServidor() {
+  const probar = async base => { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 1500);
+    try { const r = await fetch(base + '/api/ping', {signal: ac.signal, cache: 'no-store'}); if (!r.ok) return false; const j = await r.json(); return !!j.ok; } catch (_) { return false; } finally { clearTimeout(t); } };
+  if (/^https?:$/.test(location.protocol) && await probar('')) HELPER = '';
+  else if (location.protocol === 'https:' && await probar('http://localhost:8765')) HELPER = 'http://localhost:8765';
+  if (S.view === 'ajustes') render();
+}
+function abrirSync(auto) {
+  const base = portalActual();
+  const directo = HELPER !== null;
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="syncT">
+    <div class="hd"><h2 id="syncT" style="margin-right:auto">Sincronizar con Registro Contable</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd">
+      <label for="portalIn" class="small" style="font-weight:600">${directo ? '' : '1. '}Dirección que te muestra la app en el iPhone</label>
+      <div class="row" style="gap:8px">
+        <input id="portalIn" class="in mono" style="max-width:none;flex:1;min-width:200px;padding:9px 10px;font-size:15px" placeholder="http://192.168.1.164:8888" value="${esc(base)}" inputmode="url" autocomplete="off">
+        ${directo ? '<button id="btnSyncDirecto" class="btn pri" data-act="syncDirecto">Sincronizar</button>' : `<a id="lnkPortal" class="btn pri" target="_blank" rel="noopener" href="${esc(base || '#')}">Abrir portal</a>`}
+      </div>
+      <div class="note">En el iPhone: abre Registro Contable, activa el servicio Wi‑Fi y deja el teléfono desbloqueado en esa pantalla, en el mismo Wi‑Fi que esta computadora.</div>
+      ${directo ? '' : `<div class="small"><b>2.</b> En la pestaña del portal toca el favorito <b>Enviar a Control de Gastos</b> y luego <b>Copiar datos</b>.</div>
+      <div class="small"><b>3.</b> Regresa aquí y pega (Cmd+V):</div>
+      <div class="drop" id="drop"><textarea class="paste" id="pasteBox" placeholder="Pega aquí los datos copiados (Cmd+V)" aria-label="Datos copiados"></textarea>
+        <div class="small" style="margin-top:8px">o <label class="btn sm" style="display:inline-block">Subir archivo<input type="file" id="fileIn" accept=".json,.xml,application/json,text/xml" hidden></label></div></div>`}
+      <div id="syncMsg" class="small" role="status"></div>
+      ${directo ? '' : `<div class="note">Para que baste con pegar la dirección, abre la plataforma con el servidor local de tu Mac (ver README).</div>
+      <details><summary class="small muted">¿No tienes el favorito o no funciona?</summary><div class="stack" style="margin-top:10px">
+        <p class="small" style="margin:0"><b>Sin favorito:</b> abre <a id="lnkDatos" target="_blank" rel="noopener" href="#">los datos del portal</a>, guárdalos con Cmd+S y súbelos con "Subir archivo", o selecciona todo, copia y pega aquí.</p>${vBookmarklet()}</div></details>`}
+    </div></div></div>`;
+  pintarEnlaces();
+  if (directo && auto && base) syncDirecto(); else setTimeout(() => { const i = directo || !base ? $('#portalIn') : $('#pasteBox'); i && i.focus(); }, 50);
+}
+function xmlAPayload(txt) {
+  const i = txt.search(/<\?xml|<dataset/i); if (i < 0) return null;
+  const d = new DOMParser().parseFromString(txt.slice(i), 'text/xml');
+  if (d.getElementsByTagName('parsererror').length) return null;
+  const g = (r, n) => { const x = r.getElementsByTagName(n)[0]; return x ? x.textContent : ''; };
+  const rows = [...d.getElementsByTagName('row')].map(r => [g(r, 'id'), g(r, 'mbDate'), +g(r, 'inOutCode'), g(r, 'payType'), g(r, 'inOutType'), g(r, 'mbCategory'), g(r, 'subCategory'), g(r, 'mbContent'), g(r, 'mbDetailContent'), +g(r, 'mbCash')]).filter(r => r[0] && r[1]);
+  if (!rows.length) return null;
+  const f = rows.map(r => r[1]).sort();
+  return {v: 1, src: 'registro-contable', at: new Date().toISOString(), desde: f[0], hasta: f[f.length - 1], rows};
+}
+async function syncDirecto() {
+  const msg = $('#syncMsg'); const base = portalActual(); const btn = $('#btnSyncDirecto');
+  if (!base) { msg.innerHTML = '<span class="neg">Pega primero la dirección que muestra la app.</span>'; $('#portalIn').focus(); return; }
+  const y = new Date().getFullYear(); const desde = `${y - 1}-01-01`, hasta = `${y}-12-31`;
+  if (btn) btn.disabled = true; msg.textContent = 'Leyendo el portal del iPhone…';
+  try {
+    const r = await fetch(`${HELPER}/api/portal?base=${encodeURIComponent(base)}&desde=${desde}&hasta=${hasta}`, {cache: 'no-store'});
+    const txt = await r.text();
+    if (!r.ok) { let m = 'No se pudo leer el portal.'; try { m = JSON.parse(txt).error || m; } catch (_) {} msg.innerHTML = `<span class="neg">${esc(m)}</span>`; return; }
+    const p = xmlAPayload(txt); if (!p) { msg.innerHTML = '<span class="neg">El portal respondió, pero no traía movimientos.</span>'; return; }
+    p.desde = desde; p.hasta = hasta; await procesarPayload(JSON.stringify(p));
+  } catch (e) { msg.innerHTML = '<span class="neg">No pude comunicarme con el servidor local. ¿Sigue abierta la ventana de "Control de Gastos" en tu Mac?</span>'; }
+  finally { if (btn) btn.disabled = false; }
+}
+async function procesarPayload(txt) {
+  const msg = $('#syncMsg');
+  let p = null; try { p = JSON.parse(txt); } catch (_) { p = xmlAPayload(txt); }
+  if (!p || p.src !== 'registro-contable' || !Array.isArray(p.rows)) { msg.innerHTML = '<span class="neg">Eso no parece venir del portal. Vuelve a copiar los datos desde Registro Contable.</span>'; return; }
+  msg.textContent = `Procesando ${p.rows.length} movimientos…`;
+  const antes = new Set(D.byId.keys());
+  const porMes = new Map();
+  for (const r of p.rows) { if (!r[0] || !r[1]) continue; const m = r[1].slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(r); }
+  const desde = (p.desde || '').slice(0, 7), hasta = (p.hasta || '').slice(0, 7);
+  for (const m of S.tx.keys()) if (m >= desde && m <= hasta && !porMes.has(m)) porMes.set(m, []);
+  const cambios = [];
+  for (const [m, rows] of porMes) { rows.sort((a, b) => a[0] < b[0] ? -1 : 1); const prev = S.tx.get(m); if (!prev || JSON.stringify(prev.rows) !== JSON.stringify(rows)) cambios.push({mes: m, rows, n: rows.length, sincronizado: p.at}); }
+  try {
+    for (let i = 0; i < cambios.length; i += 4) { const lote = cambios.slice(i, i + 4); await q(sb.from('tx_mes').upsert(lote)); lote.forEach(c => S.tx.set(c.mes, c)); msg.textContent = `Guardando meses… ${Math.min(i + 4, cambios.length)} de ${cambios.length}`; }
+    await guardarAjuste('ultimaSync', {at: new Date().toISOString(), n: p.rows.length, desde: p.desde, hasta: p.hasta});
+  } catch (e) { msg.innerHTML = `<span class="neg">Se interrumpió la sincronización: ${esc(errMsg(e))}</span>`; return; }
+  derive(); render();
+  const nuevos = D.txs.filter(t => !antes.has(t.id)).length;
+  msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${antes.size ? `${nuevos} nuevos.` : ''} ${cambios.length} meses actualizados. <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
+}
+
+/* ================= acciones ================= */
+async function asignar(ids, ctrlId, tipo, mesFijo) {
+  const c = ctrlById(ctrlId); if (!c) return toast('Elige un control o proyecto.'); if (cerrado(c)) return toast('Ese proyecto está cerrado.');
+  const rows = ids.map(id => D.byId.get(id)).filter(t => t && !D.asig.has(t.id)).map(t => ({
+    control: c.id, mes: c.porMes ? (mesFijo || t.mes) : 'general', lado: t.code === 0 ? 'ingreso' : 'egreso', fecha: t.fecha, tipo,
+    cat: t.code === 0 ? '' : t.sub, sub: t.code === 0 ? '' : t.nota, descripcion: t.det, detalle: '', valor: t.monto, tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString()}));
+  if (!rows.length) return;
+  ids.forEach(id => S.sel.delete(id));
+  await insertarMovs(rows, `${rows.length === 1 ? 'Asignado' : rows.length + ' asignados'} a ${c.corto || c.nombre}`).catch(() => {});
+}
+async function ignorar(ids) {
+  const rows = ids.map(id => ({tx_id: id, motivo: 'Marcado como no aplica'}));
+  await q(sb.from('ignorados').upsert(rows), ids.length === 1 ? 'Marcado como no aplica' : `${ids.length} marcados como no aplica`).catch(() => null);
+  rows.forEach(r => S.ign.set(r.tx_id, r)); ids.forEach(id => S.sel.delete(id)); derive(); render();
+}
+async function exportar(c) {
+  toast('Preparando Excel…');
+  try {
+    if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(s); });
+    const wb = new ExcelJS.Workbook();
+    const meses = mesesDe(c.id).sort(); if (!meses.length) return toast('Este control todavía no tiene movimientos.');
+    for (const m of meses) (c.porMes ? hojaFamiliar : hojaProyecto)(wb, c, hoja(c.id, m));
+    const buf = await wb.xlsx.writeBuffer();
+    descargar(c.nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_') + '.xlsx', new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  } catch (e) { toast('No se pudo exportar: ' + (e && e.message || e)); }
+}
+function descargar(nombre, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+const MONEYF = '_-"L"* #,##0.00_-;\\-"L"* #,##0.00_-;_-"L"* "-"??_-;_-@_-';
+function estiloHdr(cell) { cell.font = {bold: true, name: 'Calibri', size: 12}; cell.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFE2EFDA'}}; cell.border = {bottom: {style: 'thin'}}; }
+function fechaX(s) { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+function hojaFamiliar(wb, c, h0) {
+  const h = {egresos: h0.egresos.filter(r => r.estado === 'valido'), ingresos: h0.ingresos.filter(r => r.estado === 'valido')};
+  const ws = wb.addWorksheet(mesHoja(h0.mes));
+  ws.columns = [{width: 3}, {width: 13}, {width: 20}, {width: 30}, {width: 32}, {width: 50}, {width: 15}, {width: 16}, {width: 13}, {width: 22}, {width: 15}];
+  ws.getCell('B1').value = 'DETALLE EGRESO'; ws.getCell('I1').value = 'DETALLE INGRESO';
+  ws.getCell('B1').font = ws.getCell('I1').font = {bold: true, size: 14, name: 'Calibri'};
+  ws.getCell('B2').value = MES[+h0.mes.slice(5) - 1]; ws.getCell('C2').value = +h0.mes.slice(0, 4);
+  ['FECHA', 'TIPO', 'CATEGORIAS', 'SUBCATEGORIAS', 'DESCRIPCION', 'VALOR', 'ID APP', 'FECHA', 'DESCRIPCION', 'VALOR'].forEach((t, i) => { const cell = ws.getCell(3, i + 2); cell.value = t; estiloHdr(cell); });
+  const n = Math.max(h.egresos.length, h.ingresos.length, 1) + 5; const f0 = 4, f1 = f0 + n - 1;
+  h.egresos.forEach((r, i) => { const R = f0 + i; ws.getCell(R, 2).value = fechaX(r.fecha); ws.getCell(R, 3).value = r.tipo; ws.getCell(R, 4).value = r.cat; ws.getCell(R, 5).value = r.sub; ws.getCell(R, 6).value = r.descripcion; ws.getCell(R, 7).value = +r.valor; ws.getCell(R, 8).value = r.tx_id || null; });
+  h.ingresos.forEach((r, i) => { const R = f0 + i; ws.getCell(R, 9).value = fechaX(r.fecha); ws.getCell(R, 10).value = r.tipo; ws.getCell(R, 11).value = +r.valor; });
+  for (let R = f0; R <= f1; R++) { ws.getCell(R, 2).numFmt = ws.getCell(R, 9).numFmt = 'dd/mm/yyyy'; ws.getCell(R, 7).numFmt = ws.getCell(R, 11).numFmt = MONEYF; ws.getCell(R, 8).font = {color: {argb: 'FF808080'}, size: 9}; }
+  const R_ = resumen(c, h0); const T = f1 + 1;
+  const G = `$G$${f0}:$G$${f1}`, C = `$C$${f0}:$C$${f1}`, K = `$K$${f0}:$K$${f1}`, J = `$J$${f0}:$J$${f1}`;
+  ws.getCell(T, 6).value = 'TOTAL'; ws.getCell(T, 7).value = {formula: `SUM(G${f0}:G${f1})`, result: R_.egreso};
+  ws.getCell(T, 10).value = 'TOTAL'; ws.getCell(T, 11).value = {formula: `SUM(K${f0}:K${f1})`, result: R_.ingreso};
+  [ws.getCell(T, 6), ws.getCell(T, 7), ws.getCell(T, 10), ws.getCell(T, 11)].forEach(x => { x.font = {bold: true}; x.border = {top: {style: 'thin'}}; });
+  ws.getCell(T, 7).numFmt = ws.getCell(T, 11).numFmt = MONEYF;
+  const A = T + 2; ws.getCell(A, 2).value = 'RESUMEN'; ws.getCell(A, 6).value = 'RESUMEN DISTIBUCION'; ws.getCell(A, 9).value = 'DISTIBUCION';
+  [2, 6, 9].forEach(col => ws.getCell(A, col).font = {bold: true});
+  [[2, 'DESCRIPCION'], [3, 'VALOR'], [6, 'DESCRIPCION'], [7, 'VALOR'], [9, 'DESCRIPCION'], [10, 'TOTAL A PAGAR'], [11, 'SALDO']].forEach(([col, t]) => { const x = ws.getCell(A + 1, col); x.value = t; estiloHdr(x); });
+  const B = A + 2; const np = R_.per.length;
+  ws.getCell(B, 2).value = 'INGRESO'; ws.getCell(B, 3).value = {formula: `K${T}`, result: R_.ingreso};
+  ws.getCell(B + 1, 2).value = 'EGRESO'; ws.getCell(B + 1, 3).value = {formula: `-G${T}`, result: -R_.egreso};
+  ws.getCell(B + 2, 2).value = 'SALDO'; ws.getCell(B + 2, 3).value = {formula: `SUM(C${B}:C${B + 1})`, result: R_.ingreso - R_.egreso};
+  ws.getCell(B, 6).value = 'COMPARTIDO'; ws.getCell(B, 7).value = {formula: `-SUMIFS(${G},${C},F${B})+SUMIFS(${K},${J},F${B})`, result: R_.comp};
+  R_.per.forEach((x, i) => {
+    const r = B + 1 + i; ws.getCell(r, 6).value = x.p; ws.getCell(r, 7).value = {formula: `-SUMIFS(${G},${C},F${r})`, result: x.g};
+    const qq = B + i; ws.getCell(qq, 9).value = x.p;
+    ws.getCell(qq, 10).value = {formula: `+(G${B}/${R_.n})+G${r}`, result: x.pagar};
+    ws.getCell(qq, 11).value = {formula: `+J${qq}+SUMIFS(${K},${J},I${qq})`, result: x.saldo};
+  });
+  const sg = B + 1 + np; ws.getCell(sg, 6).value = 'SALDO'; ws.getCell(sg, 7).value = {formula: `SUM(G${B}:G${sg - 1})`, result: R_.comp + R_.per.reduce((s, x) => s + x.g, 0)};
+  const st = B + Math.max(np, 1) + 1; ws.getCell(st, 10).value = 'SALDO TOTAL'; ws.getCell(st, 11).value = {formula: np ? `SUM(K${B}:K${B + np - 1})` : '0', result: R_.per.reduce((s, x) => s + x.saldo, 0)};
+  for (let r = B; r <= Math.max(sg, st, B + 2); r++) [3, 7, 10, 11].forEach(col => ws.getCell(r, col).numFmt = MONEYF);
+  [ws.getCell(B + 2, 2), ws.getCell(sg, 6), ws.getCell(st, 10)].forEach(x => x.font = {bold: true});
+  ws.views = [{state: 'frozen', ySplit: 3}];
+}
+function hojaProyecto(wb, c, h0) {
+  const h = {egresos: h0.egresos.filter(r => r.estado === 'valido'), ingresos: h0.ingresos.filter(r => r.estado === 'valido')};
+  const ws = wb.addWorksheet((c.corto || c.nombre).replace(/[\\/?*[\]:]/g, '').slice(0, 28) || 'Proyecto');
+  ws.columns = [{width: 3}, {width: 13}, {width: 20}, {width: 50}, {width: 15}, {width: 16}, {width: 13}, {width: 26}, {width: 15}];
+  ws.getCell('B1').value = 'DETALLE EGRESO'; ws.getCell('G1').value = 'DETALLE INGRESO';
+  ws.getCell('B1').font = ws.getCell('G1').font = {bold: true, size: 14};
+  ['FECHA', 'TIPO', 'DESCRIPCION', 'VALOR', 'ID APP', 'FECHA', 'DESCRIPCION', 'VALOR'].forEach((t, i) => { const x = ws.getCell(2, i + 2); x.value = t; estiloHdr(x); });
+  const n = Math.max(h.egresos.length, h.ingresos.length, 1) + 5; const f0 = 3, f1 = f0 + n - 1;
+  h.egresos.forEach((r, i) => { const R = f0 + i; ws.getCell(R, 2).value = fechaX(r.fecha); ws.getCell(R, 3).value = r.tipo; ws.getCell(R, 4).value = r.descripcion; ws.getCell(R, 5).value = +r.valor; ws.getCell(R, 6).value = r.tx_id || null; });
+  h.ingresos.forEach((r, i) => { const R = f0 + i; ws.getCell(R, 7).value = fechaX(r.fecha); ws.getCell(R, 8).value = r.tipo + (r.descripcion ? ' · ' + r.descripcion : ''); ws.getCell(R, 9).value = +r.valor; });
+  for (let R = f0; R <= f1; R++) { ws.getCell(R, 2).numFmt = ws.getCell(R, 7).numFmt = 'dd/mm/yyyy'; ws.getCell(R, 5).numFmt = ws.getCell(R, 9).numFmt = MONEYF; ws.getCell(R, 6).font = {color: {argb: 'FF808080'}, size: 9}; }
+  const R_ = resumen(c, h0); const T = f1 + 1;
+  ws.getCell(T, 4).value = 'TOTAL'; ws.getCell(T, 5).value = {formula: `SUM(E${f0}:E${f1})`, result: R_.egreso};
+  ws.getCell(T, 8).value = 'TOTAL'; ws.getCell(T, 9).value = {formula: `SUM(I${f0}:I${f1})`, result: R_.ingreso};
+  ws.getCell(T + 2, 4).value = 'SALDO (INGRESO - EGRESO)'; ws.getCell(T + 2, 5).value = {formula: `I${T}-E${T}`, result: R_.ingreso - R_.egreso};
+  [T, T + 2].forEach(r => { ws.getCell(r, 4).font = {bold: true}; ws.getCell(r, 5).numFmt = MONEYF; ws.getCell(r, 9).numFmt = MONEYF; });
+  ws.views = [{state: 'frozen', ySplit: 2}];
+}
+const movDe = el => { const tr = el.closest('[data-mov]'); return tr && S.movs.get(tr.dataset.mov); };
+
+document.addEventListener('submit', e => { if (e.target.id === 'authForm') { e.preventDefault(); enviarAuth(e.target); } });
+document.addEventListener('click', async e => {
+  const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') $('#modalRoot').innerHTML = ''; return; }
+  if (act === 'recargar') return location.reload();
+  if (act === 'salir') { await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
+  if (act === 'guardarSetup') { const u = $('#sbUrl').value.trim().replace(/\/$/, ''), k = $('#sbKey').value.trim(); if (!/^https:\/\/.+/.test(u) || k.length < 20) return toast('Revisa la URL y la clave.'); lsSet('cg-sb-url', u); lsSet('cg-sb-key', k); return location.reload(); }
+  if (act === 'sync') return abrirSync(true);
+  if (act === 'syncDirecto') return syncDirecto();
+  if (act === 'mas') { S.limite += 300; return render(); }
+  if (act === 'asignar') { const tr = b.closest('tr'); const ctrl = $('[data-f=ctrl]', tr).value; const c = ctrlById(ctrl); return asignar([b.dataset.id], ctrl, $('[data-f=tipo]', tr).value, c && c.porMes ? $('[data-f=mes]', tr).value : null); }
+  if (act === 'ignorar') return ignorar([b.dataset.id]);
+  if (act === 'bulkAsignar') return asignar([...S.sel], $('#bCtrl').value, $('#bTipo').value, null);
+  if (act === 'bulkIgnorar') return ignorar([...S.sel]);
+  if (act === 'bulkClear') { S.sel.clear(); return render(); }
+  if (act === 'restaurar') { await q(sb.from('ignorados').delete().eq('tx_id', b.dataset.id), 'Devuelto a la bandeja').catch(() => null); S.ign.delete(b.dataset.id); derive(); return render(); }
+  if (act === 'asignarOtro') { const tr = b.closest('tr'); const t = D.byId.get(b.dataset.id); b.parentElement.innerHTML = ''; tr.insertAdjacentHTML('afterend', `<tr class="addrow"><td colspan="6"><table><tr data-tx="${esc(t.id)}">${asignarCells(t)}</tr></table></td></tr>`); return; }
+  if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
+  if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
+  if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
+  if (act === 'export') return exportar(ctrlById(b.dataset.c));
+  if (act === 'copiarBM' || act === 'copiarInv') { const txt = act === 'copiarBM' ? BM : $('#invUrl').textContent; try { await navigator.clipboard.writeText(txt); toast('Copiado'); } catch (_) { toast('Selecciona el texto y cópialo con Cmd+C'); } return; }
+  if (act === 'respaldo') {
+    const datos = {exportado: new Date().toISOString(), controles: S.ctrls.map(toC), movimientos: [...S.movs.values()], accesos: S.accesos, perfiles: S.perfiles, ignorados: [...S.ign.values()], ajustes: S.aj, tx_mes: [...S.tx.values()]};
+    return descargar('control-gastos-respaldo-' + hoy() + '.json', new Blob([JSON.stringify(datos)], {type: 'application/json'}));
+  }
+  if (act === 'quitar') {
+    const m = movDe(b); if (!m) return;
+    if (S.confirmK !== m.id) { S.confirmK = m.id; clearTimeout(S.confirmT); S.confirmT = setTimeout(() => { S.confirmK = null; render(); }, 4000); return render(); }
+    S.confirmK = null; return borrarMov(m.id, m.tx_id ? 'Quitado. El movimiento volvió a la bandeja.' : 'Fila borrada').catch(() => {});
+  }
+  if (act === 'usarMonto') { const m = movDe(b); const t = m && D.byId.get(m.tx_id); if (t) return actualizarMov(m.id, {valor: t.monto}, 'Monto actualizado').catch(() => {}); return; }
+  if (act === 'agregar') {
+    const tr = b.closest('tr'); const c = ctrlById(tr.dataset.c); if (!c || cerrado(c)) return;
+    const v = parseFloat(($('[data-new=valor]', tr).value || '').replace(/[^0-9.\-]/g, '')); if (!isFinite(v) || v === 0) return toast('Escribe un valor.');
+    const fecha = $('[data-new=fecha]', tr).value || null; const desc = $('[data-new=desc]', tr).value.trim();
+    if (!esAdmin() && !desc) return toast('Escribe una descripción para que se pueda validar.');
+    const mes = c.porMes ? (fecha && fecha.slice(0, 7) !== tr.dataset.m && tr.dataset.m !== 'general' ? tr.dataset.m : tr.dataset.m) : 'general';
+    const row = {control: c.id, mes, lado: tr.dataset.lado, fecha, tipo: $('[data-new=tipo]', tr).value, descripcion: desc, valor: v};
+    if (esAdmin()) Object.assign(row, {estado: 'valido', origen: 'manual', validado_por: S.me.id, validado_el: new Date().toISOString()});
+    else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
+    return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
+  }
+  if (act === 'aprobar') { const m = movDe(b); return actualizarMov(m.id, {estado: 'valido', validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Aprobado como manual').catch(() => {}); }
+  if (act === 'ligar') { const m = movDe(b); S.ligarAbierto = S.ligarAbierto === m.id ? null : m.id; S.rechazoAbierto = null; return render(); }
+  if (act === 'ligarTx') {
+    const m = movDe(b.closest('tr').previousElementSibling) || S.movs.get(S.ligarAbierto); const t = D.byId.get(b.dataset.tx); if (!m || !t) return;
+    S.ligarAbierto = null;
+    return actualizarMov(m.id, {estado: 'valido', tx_id: t.id, cat: m.cat || (m.lado === 'egreso' ? t.sub : ''), sub: m.sub || (m.lado === 'egreso' ? t.nota : ''), validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Validado y ligado a la app').catch(() => {});
+  }
+  if (act === 'rechazar') { const m = movDe(b); S.rechazoAbierto = S.rechazoAbierto === m.id ? null : m.id; S.ligarAbierto = null; render(); const i = $('#notaRechazo'); i && i.focus(); return; }
+  if (act === 'confirmarRechazo') { const m = S.movs.get(S.rechazoAbierto); if (!m) return; S.rechazoAbierto = null; return actualizarMov(m.id, {estado: 'rechazado', nota: $('#notaRechazo').value.trim(), validado_por: S.me.id, validado_el: new Date().toISOString()}, 'Rechazado').catch(() => {}); }
+  if (act === 'nuevoProy') {
+    const nom = $('#npNombre').value.trim(); if (!nom) return toast('Escribe el nombre del proyecto.');
+    const personas = $('#npPersonas').value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+    const id = 'P' + Date.now().toString(36).toUpperCase(); const colores = ['c', 'b', 'd', 'a', 'e'];
+    const c = {id, nombre: nom, corto: nom, personas, porMes: false, categorias: [], incluye: $('#npClave').value.trim().toUpperCase(), excluye: '', tipoDefecto: personas[0] || 'COMPARTIDO', sugerirPorNombre: false, color: colores[proyectos().length % colores.length], estado: 'abierto', abiertoEl: hoy(), orden: 100 + proyectos().length};
+    await guardarControl(c).then(() => { S.ctrls.push(c); derive(); location.hash = 'p-' + id; toast('Proyecto creado'); }).catch(() => {}); return;
+  }
+  if (act === 'cerrarProy') {
+    const c = ctrlById(b.dataset.c); if (!c) return;
+    if (S.confirmCierre !== c.id) { S.confirmCierre = c.id; clearTimeout(S.confirmT2); S.confirmT2 = setTimeout(() => { S.confirmCierre = null; render(); }, 5000); return render(); }
+    S.confirmCierre = null; const prev = {...c}; c.estado = 'cerrado'; c.cerradoEl = hoy();
+    return guardarControl(c).then(() => { derive(); render(); toast('Proyecto cerrado'); }).catch(() => { Object.assign(c, prev); render(); });
+  }
+  if (act === 'reabrir') { const c = ctrlById(b.dataset.c); c.estado = 'abierto'; c.cerradoEl = null; return guardarControl(c).then(() => { derive(); render(); toast('Proyecto reabierto'); }).catch(() => {}); }
+  if (act === 'eliminarProy') {
+    const c = ctrlById(b.dataset.c); if (!c || totProy(c).filas) return;
+    if (S.confirmElim !== c.id) { S.confirmElim = c.id; return render(); }
+    S.confirmElim = null; await q(sb.from('controles').delete().eq('id', c.id), 'Proyecto eliminado').catch(() => null);
+    S.ctrls = S.ctrls.filter(x => x.id !== c.id); location.hash = 'proyectos'; return;
+  }
+  if (act === 'nuevoCtrl') {
+    const nom = $('#nuevoNombre').value.trim(); if (!nom) return toast('Escribe un nombre.');
+    let id = nom.toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'CTRL'; while (ctrlById(id)) id += '2';
+    const c = {id, nombre: nom, corto: nom, personas: [], porMes: true, categorias: [], incluye: '', excluye: '', tipoDefecto: 'COMPARTIDO', sugerirPorNombre: false, color: 'd', estado: 'abierto', orden: 10 + familiares().length};
+    return guardarControl(c).then(() => { S.ctrls.push(c); render(); toast('Control creado. Ajusta sus reglas abajo.'); }).catch(() => {});
+  }
+});
+document.addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
+  if (t.id === 'fmes') { S.filtros.mes = t.value; S.limite = 300; return render(); }
+  if (t.id === 'fest') { S.filtros.estado = t.value; S.limite = 300; return render(); }
+  if (t.id === 'ftodos') { S.filtros.todos = t.checked; return render(); }
+  if (t.id === 'otroMes' && t.value) { S.mesSel[t.dataset.c] = t.value; lsSet('mes-' + t.dataset.c, t.value); return render(); }
+  if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
+  if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
+  if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); return; }
+  if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso'); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (t.dataset.edit) {
+    const m = movDe(t); if (!m) return;
+    if (t.dataset.edit === 'valor') { const v = parseFloat(t.value.replace(/[^0-9.\-]/g, '')); if (!isFinite(v)) { t.value = (+m.valor).toFixed(2); return toast('Valor no válido'); } return actualizarMov(m.id, {valor: v}).catch(() => {}); }
+    return actualizarMov(m.id, {tipo: t.value}).catch(() => {});
+  }
+  if (t.id === 'cfgInicio') { await guardarAjuste('inicio', t.value).catch(() => {}); derive(); return render(); }
+  if (t.dataset.cf) {
+    const c = ctrlById(t.closest('[data-cid]').dataset.cid); if (!c) return; const f = t.dataset.cf; const prev = JSON.stringify(c);
+    if (f === 'personas' || f === 'categorias') c[f] = t.value.split(',').map(x => f === 'personas' ? x.trim().toUpperCase() : x.trim()).filter(Boolean);
+    else if (t.type === 'checkbox') c[f] = t.checked; else c[f] = t.value.trim();
+    return guardarControl(c).then(() => { derive(); render(); toast('Guardado'); }).catch(() => { Object.assign(c, JSON.parse(prev)); render(); });
+  }
+  if (t.dataset.uf || t.dataset.acc) {
+    const uid = t.closest('[data-uid]').dataset.uid; const p = S.perfiles.find(x => x.id === uid);
+    if (t.dataset.acc) {
+      const c = t.dataset.acc;
+      if (t.checked) await q(sb.from('accesos').insert({usuario: uid, control: c}), 'Acceso dado').then(() => S.accesos.push({usuario: uid, control: c})).catch(() => { t.checked = false; });
+      else await q(sb.from('accesos').delete().eq('usuario', uid).eq('control', c), 'Acceso quitado').then(() => { S.accesos = S.accesos.filter(x => !(x.usuario === uid && x.control === c)); }).catch(() => { t.checked = true; });
+      return;
+    }
+    const f = t.dataset.uf; const val = t.type === 'checkbox' ? t.checked : f === 'persona' ? t.value.trim().toUpperCase() : t.value.trim();
+    const data = await q(sb.from('perfiles').update({[f]: val}).eq('id', uid).select(), 'Guardado').catch(() => null);
+    if (data && data[0]) Object.assign(p, data[0]); return render();
+  }
+  if (t.id === 'portalIn') { const v = normPortal(t.value); if (t.value.trim() && !v) return toast('Esa dirección no es válida. Cópiala tal cual aparece en la app.'); t.value = v; lsSet('portal', v); pintarEnlaces(); guardarAjuste('portal', v).catch(() => {}); return; }
+  if (t.id === 'fileIn' && t.files[0]) procesarPayload(await t.files[0].text());
+});
+let qT;
+document.addEventListener('input', e => {
+  if (e.target.id === 'fq') { S.filtros.q = e.target.value; clearTimeout(qT); qT = setTimeout(() => { S._focusQ = true; S.limite = 300; render(); }, 250); }
+  if (e.target.id === 'portalIn') { const v = normPortal(e.target.value); lsSet('portal', v); S.aj.portal = v; pintarEnlaces(); }
+});
+document.addEventListener('paste', e => {
+  if (e.target.id === 'portalIn') { setTimeout(() => { e.target.dispatchEvent(new Event('change', {bubbles: true})); if (HELPER !== null && portalActual()) syncDirecto(); }, 0); return; }
+  if (e.target.id !== 'pasteBox') return; e.preventDefault();
+  const txt = (e.clipboardData || window.clipboardData).getData('text'); e.target.value = txt.slice(0, 200) + (txt.length > 200 ? '…' : '');
+  procesarPayload(txt);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
+  if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
+  if (e.key === 'Enter' && e.target.closest && e.target.closest('.addrow') && e.target.matches('input')) { e.preventDefault(); const bb = e.target.closest('tr').querySelector('[data-act=agregar]'); bb && bb.click(); }
+});
+document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('on'); } });
+document.addEventListener('drop', async e => { const d = e.target.closest && e.target.closest('#drop'); if (!d) return; e.preventDefault(); d.classList.remove('on'); const f = e.dataTransfer.files[0]; if (f) procesarPayload(await f.text()); });
+$('#btnSync').addEventListener('click', () => abrirSync(true));
+init().catch(e => fatal(e && e.message || String(e)));
+})();
+
+</script>
+</body>
+</html>
