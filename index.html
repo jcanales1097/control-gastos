@@ -111,6 +111,8 @@ input.in.num{width:110px}
 .dist tr.sub .linkish{color:var(--muted)}
 .dist tr.sub.on td{background:rgba(30,106,80,.12);color:var(--fg)}
 .chart-box{position:relative;padding:4px 14px 10px}
+.fx{display:block;font-size:11px;color:var(--muted);font-family:var(--f-num);white-space:nowrap}
+.chip.fxc{background:var(--warn-soft);color:var(--warn);font-family:var(--f-num);font-size:10.5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
 .chart-box svg{display:block;width:100%;overflow:visible}
 .chart-box .gl{stroke:var(--line);stroke-width:1}
 .chart-box .zl{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
@@ -258,7 +260,11 @@ function derive() {
   const txs = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
     const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
-    txs.push({id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)});
+    const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)};
+    t.montoApp = t.monto; const fx = S.mon && S.mon.get(id);
+    if (fx && fx.moneda && fx.moneda !== 'HNL' && +fx.original) { t.moneda = fx.moneda; t.original = Math.abs(+fx.original); t.monto = Math.abs(+fx.hnl); t.tasa = Math.round(t.monto / t.original * 10000) / 10000; }
+    else if (/\$\s*$/.test((cuenta || '').trim())) t.sinTasa = true;
+    txs.push(t);
   }
   txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
   const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') { if (!asig.has(m.tx_id)) asig.set(m.tx_id, []); asig.get(m.tx_id).push(m); }
@@ -367,6 +373,7 @@ async function cargarTodo() {
     S.aj = Object.fromEntries(aj.map(a => [a.clave, a.valor])); S.perfiles = pf; S.accesos = ac;
     if (!S.aj.inicio) S.aj.inicio = hoy().slice(0, 8) + '01';
     try { S.hist = new Map((await todo('tx_hist')).map(x => [x.tx_id, x])); } catch (e) { S.hist = null; }
+    try { S.mon = new Map((await todo('tx_moneda')).map(x => [x.tx_id, x])); } catch (e) { S.mon = null; }
   } else {
     S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
@@ -544,7 +551,7 @@ function txCells(t) {
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
     <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button></div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
-    <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
+    <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${fxTxt(t)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
 function resumen(c, h) {
   const val = r => r.estado === 'valido';
@@ -554,7 +561,7 @@ function resumen(c, h) {
   eg.concat(ing).forEach(r => { if (r.tipo && r.tipo !== 'COMPARTIDO' && !ps.includes(r.tipo)) ps.push(r.tipo); });
   const comp = -sum(eg, r => r.tipo === 'COMPARTIDO') + sum(ing, r => r.tipo === 'COMPARTIDO');
   const n = Math.max(1, personasDe(c, h.mes).length || ps.length);
-  const per = ps.map(p => { const g = -sum(eg, r => r.tipo === p); const pagar = comp / n + g; const aporte = sum(ing, r => r.tipo === p); return {p, g, pagar, aporte, saldo: pagar + aporte}; });
+  const per = ps.map(p => { const g = -sum(eg, r => r.tipo === p); const r2 = x => Math.sign(x) * Math.round(Math.abs(x) * 100 + 1e-6) / 100; const pagar = r2(comp / n + g); const aporte = r2(sum(ing, r => r.tipo === p)); return {p, g, pagar, aporte, saldo: r2(pagar + aporte)}; });
   const todas = h.egresos.concat(h.ingresos);
   return {comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
     pendientes: todas.filter(r => r.estado === 'pendiente').length, pendienteValor: h.egresos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.valor, 0)};
@@ -867,7 +874,7 @@ function tablaFilas(c, h, lado) {
     <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado, h.mes)}</select></td>
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
     <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
-    <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}></td>
+    <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}>${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
     <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
     <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`).join('')}
   ${ro ? '' : `<tr class="addrow" data-c="${c.id}" data-m="${esc(h.mes)}" data-lado="${lado}"><td><input type="date" class="in" data-new="fecha" aria-label="Fecha" value="${fechaDef}"></td>
@@ -977,7 +984,7 @@ function abrirDetalle(id) {
         ${fila('Cuenta', esc((t && t.cuenta) || m.app_cuenta))}${fila('Categoría', esc((t && t.cat) || m.app_categoria))}
         ${t ? fila('Subcategoría', esc(t.sub)) + fila('Contenido', esc(t.nota)) + fila('Tipo en la app', esc(t.tipoMov)) : fila('Subcategoría', esc(m.cat)) + fila('Contenido', esc(m.sub))}
         ${fila('Detalle', esc((t && t.det) || m.app_detalle))}${fila('Fecha en la app', fFecha((t && t.fecha) || m.app_fecha))}
-        ${fila('Monto total en la app', `<span class="num">${L((t && t.monto) || m.app_monto || m.valor)}</span>`)}${a ? fila('ID en la app', `<span class="mono small">${esc(m.tx_id)}</span>`) : ''}
+        ${fila('Monto total en la app', `<span class="num">${L((t && t.monto) || m.app_monto || m.valor)}</span>`)}${a && t ? fxFilas(t, fila) : ''}${a ? fila('ID en la app', `<span class="mono small">${esc(m.tx_id)}</span>`) : ''}
       </tbody></table>` : ''}
       ${cb ? `<div class="panel"><div class="bd small">${cb.tipo === 'eliminado' ? 'Este registro ya no aparece en la app.' : cb.tipo === 'duplicado' ? `Esta fila es un duplicado: el registro se asignó más de una vez (suma ${L(cb.total)}, en la app ${L(cb.t.monto)}).` : cb.tipo === 'excedido' ? `Las partes suman ${L(cb.total)} y en la app el registro es de ${L(cb.t.monto)}.` : 'Cambió en la app: ' + cb.d.map(([k, x, y]) => `${k} ${esc(x)} → ${esc(y)}`).join(' · ')} <a href="#cambios" data-act="cerrarModal">Revisar en Cambios</a></div></div>` : ''}
       ${ps.length > 1 ? `<div class="eyebrow">Repartido en ${ps.length} partes</div><table class="dist"><tbody>${ps.map(p => { const pc = ctrlById(p.control); return `<tr><td>${esc(pc ? pc.nombre : p.control)} · ${esc(mesLargo(p.mes))} · ${esc(p.tipo)}</td><td class="num">${L(p.valor)}</td></tr>`; }).join('')}</tbody></table>` : ''}
@@ -1214,7 +1221,8 @@ function abrirSync(auto) {
       ${directo ? '' : `<div class="small"><b>2.</b> En la pestaña del portal toca el favorito <b>Enviar a Control de Gastos</b> y luego <b>Copiar datos</b>.</div>
       <div class="small"><b>3.</b> Regresa aquí y pega (Cmd+V):</div>
       <div class="drop" id="drop"><textarea class="paste" id="pasteBox" placeholder="Pega aquí los datos copiados (Cmd+V)" aria-label="Datos copiados"></textarea>
-        <div class="small" style="margin-top:8px">o <label class="btn sm" style="display:inline-block">Subir archivo<input type="file" id="fileIn" accept=".json,.xml,application/json,text/xml" hidden></label></div></div>`}
+        <div class="small" style="margin-top:8px">o <label class="btn sm" style="display:inline-block">Subir archivo<input type="file" id="fileIn" accept=".json,.xml,.xlsx,application/json,text/xml" hidden></label></div>
+        <div class="note" style="margin-top:8px">¿Registros en dólares? Exporta el Excel desde Registro Contable (botón Excel del portal) y súbelo aquí con "Subir archivo": la plataforma toma el monto original, la moneda y el valor en lempiras de cada registro.</div></div>`}
       <div id="syncMsg" class="small" role="status"></div>
       ${directo ? '' : `<div class="note">Para que baste con pegar la dirección, abre la plataforma con el servidor local de tu Mac (ver README).</div>
       <details><summary class="small muted">¿No tienes el favorito o no funciona?</summary><div class="stack" style="margin-top:10px">
@@ -1275,6 +1283,39 @@ async function procesarPayload(txt) {
 }
 
 /* ================= historial de sincronización ================= */
+const fmtTasa = v => (+v).toLocaleString('es-HN', {minimumFractionDigits: 2, maximumFractionDigits: 4});
+const fmtOrig = (m, v) => `${m === 'USD' ? '$' : m + ' '}${(+v).toLocaleString('es-HN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+const fxTxt = t => t && t.moneda ? `<span class="fx" title="Monto original ${fmtOrig(t.moneda, t.original)} a una tasa de ${fmtTasa(t.tasa)}"><span class="chip fxc">${esc(t.moneda)}</span> ${fmtOrig(t.moneda, t.original)} × ${fmtTasa(t.tasa)}</span>` : t && t.sinTasa && S.mon ? '<span class="fx" title="Cuenta en dólares sin datos de moneda. Sube el Excel de Registro Contable en Sincronizar.">$ sin tasa</span>' : '';
+const fxFilas = (t, fila) => t && t.moneda ? fila('Moneda', `<span class="chip fxc" style="margin:0">${esc(t.moneda)}</span>`) + fila('Monto original', `<span class="num">${fmtOrig(t.moneda, t.original)}</span>`) + fila('Tasa de cambio', `<span class="num">${fmtTasa(t.tasa)}</span>`) + fila('Valor en lempiras', `<b class="num">${L(t.monto)}</b>`) + (cents(t.montoApp) !== cents(t.monto) && cents(t.montoApp) !== cents(t.original) ? fila('Importe en el portal', `<span class="num">${t.montoApp.toFixed(2)}</span>`) : '') : t && t.sinTasa ? fila('Moneda', S.mon ? 'Cuenta en dólares: falta subir el Excel de Registro Contable para conocer el monto original y la tasa' : 'Cuenta en dólares') : '';
+async function importarMonedas(file, msg) {
+  if (!S.mon) { msg.innerHTML = '<span class="neg">Primero corre en Supabase el SQL de monedas (tabla tx_moneda).</span>'; return; }
+  msg.textContent = 'Leyendo Excel…';
+  if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el lector de Excel')); document.head.appendChild(s); });
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); const ws = wb.worksheets[0];
+  const val = c => { const v = c && c.value; return v && typeof v === 'object' && !(v instanceof Date) ? (v.result ?? v.text ?? (v.richText ? v.richText.map(x => x.text).join('') : '')) : v; };
+  const hdr = []; ws.getRow(1).eachCell({includeEmpty: true}, (c, i) => { hdr[i] = String(val(c) || '').trim(); });
+  const col = n => hdr.findIndex(h => h && h.toLowerCase() === n.toLowerCase());
+  const iImp = col('Importe'), iMon = col('Moneda'), iDesc = col('Descripción'), iNota = col('Nota');
+  if (iImp < 0 || iMon < 0 || iDesc < 0) { msg.innerHTML = '<span class="neg">Ese Excel no tiene las columnas Importe, Moneda y Descripción. Usa el Excel que exporta Registro Contable.</span>'; return; }
+  const iF = 1, iCta = 2, iHnl = iNota > 0 ? iNota + 1 : 6, iCtaM = iMon + 1;
+  const norm = x => String(x || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const fecha = v => v instanceof Date ? v.toISOString().slice(0, 10) : typeof v === 'number' ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : String(v || '').slice(0, 10);
+  const idx = new Map(); D.txs.forEach(t => { const k = t.fecha + '|' + norm(t.cuenta) + '|' + norm(t.det); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(t); });
+  const usados = new Set(); const filas = []; let leidas = 0, extranjeras = 0, sinPar = 0;
+  ws.eachRow((row, n) => { if (n === 1) return; leidas++;
+    const mon = String(val(row.getCell(iMon)) || '').trim().toUpperCase(); if (!mon || mon === 'HNL') return; extranjeras++;
+    const imp = Math.abs(+val(row.getCell(iImp)) || 0), hnl = Math.abs(+val(row.getCell(iHnl)) || 0), ctaM = Math.abs(+val(row.getCell(iCtaM)) || 0);
+    const k = fecha(val(row.getCell(iF))) + '|' + norm(val(row.getCell(iCta))) + '|' + norm(val(row.getCell(iDesc)));
+    const cand = (idx.get(k) || []).filter(t => !usados.has(t.id));
+    const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 ? cand[0] : null);
+    if (!t || !imp || !hnl) { sinPar++; return; }
+    usados.add(t.id); filas.push({tx_id: t.id, moneda: mon, original: imp, hnl, actualizado: new Date().toISOString()});
+  });
+  for (let i = 0; i < filas.length; i += 500) { const lote = filas.slice(i, i + 500); msg.textContent = `Guardando monedas… ${Math.min(i + 500, filas.length)} de ${filas.length}`; await q(sb.from('tx_moneda').upsert(lote)); lote.forEach(x => S.mon.set(x.tx_id, x)); }
+  derive(); render();
+  const nc = cambios().length;
+  msg.innerHTML = `<b class="pos">Listo.</b> ${leidas} filas leídas del Excel, ${extranjeras} en otra moneda. ${filas.length} quedaron con su monto original y su tasa${sinPar ? `; ${sinPar} no se encontraron entre lo sincronizado (sincroniza ese periodo primero)` : ''}.${nc ? ` <a href="#cambios" data-act="cerrarModal">Revisar ${nc} en Cambios</a>` : ''}`;
+}
 const CAMPOS_TX = [['monto', 'Monto', v => L(v)], ['fecha', 'Fecha', v => fFecha(v)], ['det', 'Detalle'], ['cuenta', 'Cuenta'], ['cat', 'Categoría'], ['sub', 'Subcategoría'], ['nota', 'Contenido'], ['tipoMov', 'Tipo en la app']];
 function difTx(o, t) { return CAMPOS_TX.filter(([k]) => k === 'monto' ? cents(o.monto) !== cents(t.monto) : (o[k] || '') !== (t[k] || '')).map(([k, n, f]) => [n, f ? f(o[k]) : (o[k] || ''), f ? f(t[k]) : (t[k] || '')]); }
 async function registrarHistorial(prevTx, at, desde, hasta, msg) {
@@ -1313,7 +1354,7 @@ function abrirDetalleTx(id) {
       <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${t.code === 0 ? 'Ingreso' : t.code === 3 ? 'Traslado' : 'Egreso'}</span></div>
       <div class="eyebrow">En Registro Contable</div>
       <table class="dist"><tbody>
-        ${fila('Fecha', fFecha(t.fecha))}${fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fila('Cuenta', esc(t.cuenta))}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
+        ${fila('Fecha', fFecha(t.fecha))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta))}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
       </tbody></table>
       <div class="eyebrow">En la plataforma</div>
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
@@ -1386,7 +1427,7 @@ function hojaFamiliar(wb, c, h0) {
   R_.per.forEach((x, i) => {
     const r = B + 1 + i; ws.getCell(r, 6).value = x.p; ws.getCell(r, 7).value = {formula: `-SUMIFS(${G},${C},F${r})`, result: x.g};
     const qq = B + i; ws.getCell(qq, 9).value = x.p;
-    ws.getCell(qq, 10).value = {formula: `+(G${B}/${R_.n})+G${r}`, result: x.pagar};
+    ws.getCell(qq, 10).value = {formula: `ROUND((G${B}/${R_.n})+G${r},2)`, result: x.pagar};
     ws.getCell(qq, 11).value = {formula: `+J${qq}+SUMIFS(${K},${J},I${qq})`, result: x.saldo};
   });
   const sg = B + 1 + np; ws.getCell(sg, 6).value = 'SALDO'; ws.getCell(sg, 7).value = {formula: `SUM(G${B}:G${sg - 1})`, result: R_.comp + R_.per.reduce((s, x) => s + x.g, 0)};
@@ -1596,7 +1637,7 @@ document.addEventListener('change', async e => {
     if (data && data[0]) Object.assign(p, data[0]); return render();
   }
   if (t.id === 'portalIn') { const v = normPortal(t.value); if (t.value.trim() && !v) return toast('Esa dirección no es válida. Cópiala tal cual aparece en la app.'); t.value = v; lsSet('portal', v); pintarEnlaces(); guardarAjuste('portal', v).catch(() => {}); return; }
-  if (t.id === 'fileIn' && t.files[0]) procesarPayload(await t.files[0].text());
+  if (t.id === 'fileIn' && t.files[0]) { const f = t.files[0]; if (/\.xlsx$/i.test(f.name)) { const msg = $('#syncMsg'); try { await importarMonedas(f, msg); } catch (e) { msg.innerHTML = `<span class="neg">No se pudo leer el Excel: ${esc(errMsg(e))}</span>`; } t.value = ''; return; } procesarPayload(await f.text()); }
 });
 let qT;
 document.addEventListener('input', e => {
