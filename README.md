@@ -8,7 +8,7 @@ Plataforma web para llevar los gastos de la familia, de los padres y de proyecto
 - **Sincroniza** los movimientos de la app desde el portal Wi‑Fi del iPhone. Cada uno conserva su ID de la app.
 - **Bandeja:** asigna cada movimiento a un control o proyecto, con su TIPO (compartido o de quién es) y su mes, o lo marca como "no aplica".
 - **Dividir:** reparte un movimiento entre varios controles o proyectos (por ejemplo L 5,000: L 3,000 a un proyecto y L 2,000 a Familia). Lo que quede sin repartir sigue en la bandeja.
-- **Cambios:** al sincronizar, detecta los movimientos ya asignados que se modificaron o se borraron en la app. Para cada uno decides: aplicar el cambio, mantener tu fila, quitarla o conservarla como manual.
+- **Cambios:** al sincronizar, detecta los movimientos ya asignados que se modificaron o se borraron en la app. Para cada uno decides: aplicar el cambio, mantener tu fila, quitarla o conservarla como manual. También marca los registros asignados más de una vez (duplicados) para quitarlos; la base de datos no deja asignar un registro por más de su monto.
 - **Participantes por mes:** en cada mes de Familia o Padres eliges quién participa (por ejemplo, Jennifer solo en un mes). Solo ellos aparecen en TIPO y en la distribución de ese mes.
 - **Por validar:** revisa lo que registran los demás. Puede ligarlo a un registro de la app (te sugiere los que coinciden por monto y fecha), aprobarlo como manual o rechazarlo con un motivo.
 - **Usuarios:** activa cuentas, indica cómo aparece cada persona en TIPO y marca qué controles y proyectos puede ver.
