@@ -584,6 +584,9 @@ function vBandeja() {
     if (!(e === 'pendiente' || (f.todos && e === 'otro'))) return false;
     if (f.ctrl) { const s = sugerido(t); if (f.ctrl === '_none' ? s : (!s || s.id !== f.ctrl)) return false; }
     if (f.mes && t.mes !== f.mes) return false;
+    if (f.hasta && t.fecha > f.hasta) return false;
+    if (f.cat && t.cat !== f.cat) return false;
+    if (f.subc && t.sub !== f.subc) return false;
     if (f.nat && (f.nat === 'ingreso' ? t.code !== 0 : t.code === 0)) return false;
     if (f.cuenta && t.cuenta !== f.cuenta) return false;
     if (qq && !(t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)) return false;
@@ -592,9 +595,13 @@ function vBandeja() {
   const porCtrl = {}; bandeja().forEach(t => { const s = sugerido(t); const k = s ? s.id : "_none"; porCtrl[k] = (porCtrl[k] || 0) + 1; });
   const total = lista.length; const shown = lista.slice(0, S.limite);
   const meses = [...new Set(D.txs.filter(t => estadoTx(t) === 'pendiente').map(t => t.mes))].sort().reverse();
-  const cuentas = [...new Set(D.txs.filter(t => { const e = estadoTx(t); return e === 'pendiente' || (f.todos && e === 'otro'); }).map(t => t.cuenta).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  const cand = D.txs.filter(t => { const e = estadoTx(t); return e === 'pendiente' || (f.todos && e === 'otro'); });
+  const ordN = (a, b) => a.localeCompare(b, 'es', {numeric: true});
+  const catsB = [...new Set(cand.map(t => t.cat).filter(Boolean))].sort(ordN); if (f.cat && !catsB.includes(f.cat)) catsB.unshift(f.cat);
+  const subsB = [...new Set(cand.filter(t => !f.cat || t.cat === f.cat).map(t => t.sub).filter(Boolean))].sort(ordN); if (f.subc && !subsB.includes(f.subc)) subsB.unshift(f.subc);
+  const cuentas = [...new Set(cand.filter(t => (!f.cat || t.cat === f.cat) && (!f.subc || t.sub === f.subc)).map(t => t.cuenta).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
   if (f.cuenta && !cuentas.includes(f.cuenta)) cuentas.unshift(f.cuenta);
-  const hayFiltro = f.q || f.ctrl || f.mes || f.nat || f.cuenta;
+  const hayFiltro = f.q || f.ctrl || f.mes || f.nat || f.cuenta || f.hasta || f.cat || f.subc;
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><div class="eyebrow">Bandeja de entrada</div><h1>${bandeja().length ? `${bandeja().length} movimientos por asignar` : 'Todo está asignado'}</h1>
@@ -606,6 +613,10 @@ function vBandeja() {
         <input type="search" id="fq" placeholder="Buscar comercio, categoría o cuenta" value="${esc(f.q)}" aria-label="Buscar">
         <select id="fctrl" aria-label="Control sugerido"><option value="">Todos los controles</option>${abiertos().map(c => `<option value="${c.id}" ${f.ctrl === c.id ? 'selected' : ''}>${esc(c.corto || c.nombre)}</option>`).join('')}<option value="_none" ${f.ctrl === '_none' ? 'selected' : ''}>Sin sugerencia</option></select>
         <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>
+        <label class="small row" style="gap:6px">Desde <input type="date" class="in" id="bDesde" value="${esc(S.aj.inicio || '')}" aria-label="Mostrar movimientos desde"></label>
+        <label class="small row" style="gap:6px">Hasta <input type="date" class="in" id="bHasta" value="${esc(f.hasta || '')}" aria-label="Mostrar movimientos hasta"></label>
+        <select id="fcat" aria-label="Categoría"><option value="">Todas las categorías</option>${catsB.map(x => `<option value="${esc(x)}" ${f.cat === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+        <select id="fsubc" aria-label="Subcategoría"><option value="">Todas las subcategorías</option>${subsB.map(x => `<option value="${esc(x)}" ${f.subc === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
         <select id="fnat" aria-label="Naturaleza"><option value="">Ingresos y egresos</option><option value="egreso" ${f.nat === 'egreso' ? 'selected' : ''}>Solo egresos</option><option value="ingreso" ${f.nat === 'ingreso' ? 'selected' : ''}>Solo ingresos</option></select>
         <select id="fcuenta" aria-label="Cuenta"><option value="">Todas las cuentas</option>${cuentas.map(c => `<option value="${esc(c)}" ${f.cuenta === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
         ${hayFiltro ? '<button class="btn sm ghost" data-act="limpiarFiltros">Quitar filtros</button>' : ''}
@@ -1255,7 +1266,7 @@ document.addEventListener('click', async e => {
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
   if (act === 'limpiarMov') { S.fmov = {cat: '', sub: '', cuenta: ''}; Object.assign(S.filtros, {q: '', estado: '', mes: ''}); S.limite = 300; return render(); }
   if (act === 'limpiarFtab') { if (S.ftab) delete S.ftab[b.dataset.k]; return render(); }
-  if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: ''}); S.limite = 300; return render(); }
+  if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: '', hasta: '', cat: '', subc: ''}); S.limite = 300; return render(); }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
   if (act === 'export') return exportar(ctrlById(b.dataset.c));
   if (act === 'copiarBM' || act === 'copiarInv') { const txt = act === 'copiarBM' ? BM : $('#invUrl').textContent; try { await navigator.clipboard.writeText(txt); toast('Copiado'); } catch (_) { toast('Selecciona el texto y cópialo con Cmd+C'); } return; }
@@ -1358,6 +1369,10 @@ document.addEventListener('change', async e => {
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
   if (t.dataset.ftab === 'sub' || t.dataset.ftab === 'cuenta') { const k = t.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {[t.dataset.ftab]: t.value}); return render(); }
   if (t.dataset.fmov) { S.fmov = S.fmov || {cat: '', sub: '', cuenta: ''}; S.fmov[t.dataset.fmov] = t.value; if (t.dataset.fmov === 'cat') S.fmov.sub = ''; S.limite = 300; return render(); }
+  if (t.id === 'bDesde' && t.value) { await guardarAjuste('inicio', t.value).catch(() => {}); S.limite = 300; derive(); render(); return toast('La bandeja ahora muestra desde ' + fFecha(t.value)); }
+  if (t.id === 'fcat') { S.filtros.cat = t.value; S.filtros.subc = ''; S.limite = 300; return render(); }
+  if (t.id === 'fsubc') { S.filtros.subc = t.value; S.limite = 300; return render(); }
+  if (t.id === 'bHasta') { S.filtros.hasta = t.value; S.limite = 300; return render(); }
   if (t.id === 'fnat') { S.filtros.nat = t.value; S.limite = 300; return render(); }
   if (t.id === 'fcuenta') { S.filtros.cuenta = t.value; S.limite = 300; return render(); }
   if (t.id === 'fmes') { S.filtros.mes = t.value; S.limite = 300; return render(); }
