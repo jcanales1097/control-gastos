@@ -687,9 +687,27 @@ function vControl(c) {
       <div class="kpi"><div class="eyebrow">Saldo</div><div class="v ${R.ingreso - R.egreso < 0 ? 'neg' : ''}">${L(R.ingreso - R.egreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Por validar</div><div class="v ${R.pendientes ? 'warn-t' : ''}">${R.pendientes}</div></div>
     </div>
-    ${vDistribucion(c, R)}
+    ${vDistribucion(c, R)}${!c.porMes ? vPorMes(c, h) : ''}
     ${tablaFilas(c, h, 'egreso')}${tablaFilas(c, h, 'ingreso')}
     ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
+}
+function porMesProy(h) {
+  const val = r => r.estado === 'valido'; const g = new Map();
+  const add = (r, k) => { const m = (r.fecha || '').slice(0, 7) || 'sin-fecha'; if (!g.has(m)) g.set(m, {mes: m, ing: 0, eg: 0, n: 0}); const x = g.get(m); x[k] += +r.valor || 0; x.n++; };
+  h.egresos.filter(val).forEach(r => add(r, 'eg')); h.ingresos.filter(val).forEach(r => add(r, 'ing'));
+  let acc = 0; return [...g.values()].sort((a, b) => a.mes < b.mes ? -1 : 1).map(x => { acc += x.ing - x.eg; return Object.assign(x, {saldo: x.ing - x.eg, acum: acc}); });
+}
+function vPorMes(c, h) {
+  const l = porMesProy(h); if (!l.length) return '';
+  const sel = ((S.ftab || {})[c.id + '|egreso'] || {}).mes || '';
+  const nom = m => m === 'sin-fecha' ? 'Sin fecha' : mesLargo(m);
+  const tI = l.reduce((a, x) => a + x.ing, 0), tE = l.reduce((a, x) => a + x.eg, 0);
+  return `<div class="panel"><div class="hd"><h2>Resumen por mes</h2><span class="note">${l.length} ${l.length === 1 ? 'mes' : 'meses'} · toca un mes para ver solo sus filas</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Mes</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo del mes</th><th class="num">Saldo acumulado</th><th class="num">Filas</th></tr></thead><tbody>
+    ${l.map(x => `<tr ${sel === x.mes ? 'style="background:var(--accent-soft,rgba(30,106,80,.12))"' : ''}><td><button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}">${esc(nom(x.mes))}</button></td>
+      <td class="num pos">${L(x.ing)}</td><td class="num">${L(-x.eg)}</td><td class="num ${x.saldo < 0 ? 'neg' : 'pos'}">${L(x.saldo)}</td><td class="num ${x.acum < 0 ? 'neg' : 'pos'}">${L(x.acum)}</td><td class="num small muted">${x.n}</td></tr>`).join('')}
+    <tr class="tot"><td><b>Total</b></td><td class="num"><b>${L(tI)}</b></td><td class="num"><b>${L(-tE)}</b></td><td class="num ${tI - tE < 0 ? 'neg' : 'pos'}"><b>${L(tI - tE)}</b></td><td></td><td></td></tr>
+    </tbody></table></div></div>`;
 }
 function vDistribucion(c, R) {
   if (!c.porMes) return `<div class="panel"><div class="hd"><h2>Resumen del proyecto</h2></div><div class="bd"><table class="dist">
@@ -724,13 +742,14 @@ function tablaFilas(c, h, lado) {
   const a = esAdmin(); const ro = cerrado(c);
   const todas = lado === 'egreso' ? h.egresos : h.ingresos;
   const eg = lado === 'egreso'; const fam = c.porMes;
-  const fk = c.id + '|' + lado; const F = (S.ftab || {})[fk] || {q: '', sub: '', cuenta: ''};
+  const fk = c.id + '|' + lado; const F = (S.ftab || {})[fk] || {q: '', sub: '', cuenta: '', mes: ''};
+  const mesesT = fam ? [] : [...new Set(todas.map(r => (r.fecha || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   const subs = [...new Set(todas.map(subDe).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'es', {numeric: true}));
   const ctas = [...new Set(todas.map(cuentaDe))].sort((x, y) => x.localeCompare(y, 'es'));
   const qq = (F.q || '').trim().toUpperCase();
-  const rows = todas.filter(r => (!F.sub || subDe(r) === F.sub) && (!F.cuenta || cuentaDe(r) === F.cuenta)
+  const rows = todas.filter(r => (!F.mes || (r.fecha || '').slice(0, 7) === F.mes) && (!F.sub || subDe(r) === F.sub) && (!F.cuenta || cuentaDe(r) === F.cuenta)
     && (!qq || [r.descripcion, r.detalle, r.cat, r.sub, r.tipo, cuentaDe(r), fFecha(r.fecha), (+r.valor || 0).toFixed(2)].join(' ').toUpperCase().includes(qq)));
-  const filtrado = F.q || F.sub || F.cuenta;
+  const filtrado = F.q || F.sub || F.cuenta || F.mes;
   const total = rows.filter(r => r.estado === 'valido').reduce((s, r) => s + r.valor, 0);
   const puedeEditar = r => !ro && (a || (r.creado_por === S.me.id && r.estado === 'pendiente'));
   const puedeBorrar = r => !ro && (a || (r.creado_por === S.me.id && r.estado !== 'valido'));
@@ -739,6 +758,7 @@ function tablaFilas(c, h, lado) {
   return `<div class="panel"><div class="hd"><h2>${eg ? 'Detalle egreso' : 'Detalle ingreso'}</h2><span class="muted small">${filtrado ? `${rows.length} de ${todas.length} filas` : `${rows.length} filas`} · ${L(total)} validado</span></div>
   ${todas.length ? `<div class="filters">
     <input type="search" data-ftab="q" data-k="${esc(fk)}" value="${esc(F.q || '')}" placeholder="Buscar en ${eg ? 'egresos' : 'ingresos'}" aria-label="Buscar en ${eg ? 'egresos' : 'ingresos'}">
+    ${fam ? '' : `<select data-ftab="mes" data-k="${esc(fk)}" aria-label="Mes"><option value="">Todos los meses</option>${mesesT.map(m => `<option value="${m}" ${F.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>`}
     <select data-ftab="sub" data-k="${esc(fk)}" aria-label="Subcategoría"><option value="">Todas las subcategorías</option>${subs.map(x => `<option value="${esc(x)}" ${F.sub === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
     <select data-ftab="cuenta" data-k="${esc(fk)}" aria-label="Cuenta"><option value="">Todas las cuentas</option>${ctas.map(x => `<option value="${esc(x)}" ${F.cuenta === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
     ${filtrado ? `<button class="btn sm ghost" data-act="limpiarFtab" data-k="${esc(fk)}">Quitar filtros</button>` : ''}
@@ -901,7 +921,11 @@ async function exportarPDF(c, mes) {
       tabla({head: [['Descripción', 'Valor']], body: [['COMPARTIDO', L(R.comp)], ...R.per.map(x => [x.p, L(x.g)])], foot: [['SALDO', L(R.comp + R.per.reduce((s, x) => s + x.g, 0))]], columnStyles: der([1])});
       titulo(`Distribución por persona (compartido entre ${R.n})`);
       tabla({head: [['Persona', 'Total a pagar', 'Aportó', 'Saldo', 'Situación']], body: R.per.map(x => [x.p, L(x.pagar), L(x.aporte), L(x.saldo), x.saldo < -0.004 ? `Le falta ${L(-x.saldo)}` : x.saldo > 0.004 ? `A favor ${L(x.saldo)}` : 'Al día']), columnStyles: der([1, 2, 3])});
-    } else if (R.per.length) { titulo('Egresos por TIPO'); tabla({head: [['TIPO', 'Egresos']], body: R.per.map(x => [x.p, L(-x.g)]), columnStyles: der([1])}); }
+    } else {
+      const pm = porMesProy(h);
+      if (pm.length) { titulo('Resumen por mes'); tabla({head: [['Mes', 'Ingresos', 'Egresos', 'Saldo del mes', 'Saldo acumulado']], body: pm.map(x => [x.mes === 'sin-fecha' ? 'Sin fecha' : mesLargo(x.mes), L(x.ing), L(-x.eg), L(x.saldo), L(x.acum)]), foot: [['Total', L(R.ingreso), L(-R.egreso), L(R.ingreso - R.egreso), '']], columnStyles: der([1, 2, 3, 4])}); }
+    }
+    if (!c.porMes && R.per.length) { titulo('Egresos por TIPO'); tabla({head: [['TIPO', 'Egresos']], body: R.per.map(x => [x.p, L(-x.g)]), columnStyles: der([1])}); }
     const eg = h.egresos.filter(val), ing = h.ingresos.filter(val);
     titulo(`Detalle de egresos (${eg.length})`);
     tabla({head: [['Fecha', 'TIPO', 'Categoría', 'Descripción', 'Valor']], body: eg.length ? eg.map(r => [fFecha(r.fecha), r.tipo, [r.cat, r.sub].filter(Boolean).join(' / '), r.descripcion || r.detalle, L(r.valor)]) : [['', '', '', 'Sin egresos', '']], foot: [['', '', '', 'Total', L(R.egreso)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 86}, 2: {cellWidth: 118}, 4: {halign: 'right', cellWidth: 72}}});
@@ -1265,6 +1289,7 @@ document.addEventListener('click', async e => {
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
   if (act === 'limpiarMov') { S.fmov = {cat: '', sub: '', cuenta: ''}; Object.assign(S.filtros, {q: '', estado: '', mes: ''}); S.limite = 300; return render(); }
+  if (act === 'proyMes') { const id = b.dataset.c, m = b.dataset.m; S.ftab = S.ftab || {}; const ya = (S.ftab[id + '|egreso'] || {}).mes === m; ['egreso', 'ingreso'].forEach(l => { S.ftab[id + '|' + l] = Object.assign({q: '', sub: '', cuenta: '', mes: ''}, S.ftab[id + '|' + l], {mes: ya ? '' : (m === 'sin-fecha' ? '' : m)}); }); render(); if (!ya) { const el = document.querySelector('[data-ftab=mes]'); if (el) el.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); } return; }
   if (act === 'limpiarFtab') { if (S.ftab) delete S.ftab[b.dataset.k]; return render(); }
   if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: '', hasta: '', cat: '', subc: ''}); S.limite = 300; return render(); }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
@@ -1367,7 +1392,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
-  if (t.dataset.ftab === 'sub' || t.dataset.ftab === 'cuenta') { const k = t.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {[t.dataset.ftab]: t.value}); return render(); }
+  if (t.dataset.ftab === 'sub' || t.dataset.ftab === 'cuenta' || t.dataset.ftab === 'mes') { const k = t.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {[t.dataset.ftab]: t.value}); return render(); }
   if (t.dataset.fmov) { S.fmov = S.fmov || {cat: '', sub: '', cuenta: ''}; S.fmov[t.dataset.fmov] = t.value; if (t.dataset.fmov === 'cat') S.fmov.sub = ''; S.limite = 300; return render(); }
   if (t.id === 'bDesde' && t.value) { await guardarAjuste('inicio', t.value).catch(() => {}); S.limite = 300; derive(); render(); return toast('La bandeja ahora muestra desde ' + fFecha(t.value)); }
   if (t.id === 'fcat') { S.filtros.cat = t.value; S.filtros.subc = ''; S.limite = 300; return render(); }
