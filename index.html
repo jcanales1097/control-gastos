@@ -103,6 +103,13 @@ input.in.num{width:110px}
 .dist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
 .dist td,.dist th{padding:7px 10px}
 .dist tr.tot td{font-weight:700;border-top:2px solid var(--fg)}
+.dist .exp{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.dist .exp::before{content:'';width:0;height:0;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;opacity:.6}
+.dist .exp[aria-expanded="true"]::before{transform:rotate(90deg)}
+.dist tr.sub td{font-size:12.5px;color:var(--muted);padding-top:4px;padding-bottom:4px;border-top:0}
+.dist tr.sub td:first-child{padding-left:30px}
+.dist tr.sub .linkish{color:var(--muted)}
+.dist tr.sub.on td{background:rgba(30,106,80,.12);color:var(--fg)}
 .note{font-size:12px;color:var(--muted)}
 .bulk{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .bulk select{background:var(--bg);color:var(--fg);border:0}
@@ -687,7 +694,7 @@ function vControl(c) {
       <div class="kpi"><div class="eyebrow">Saldo</div><div class="v ${R.ingreso - R.egreso < 0 ? 'neg' : ''}">${L(R.ingreso - R.egreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Por validar</div><div class="v ${R.pendientes ? 'warn-t' : ''}">${R.pendientes}</div></div>
     </div>
-    ${vDistribucion(c, R)}${!c.porMes ? vPorMes(c, h) : ''}
+    ${c.porMes ? vDistribucion(c, R) : vResumenProy(c, R, h)}
     ${tablaFilas(c, h, 'egreso')}${tablaFilas(c, h, 'ingreso')}
     ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
 }
@@ -696,6 +703,20 @@ function porMesProy(h) {
   const add = (r, k) => { const m = (r.fecha || '').slice(0, 7) || 'sin-fecha'; if (!g.has(m)) g.set(m, {mes: m, ing: 0, eg: 0, n: 0}); const x = g.get(m); x[k] += +r.valor || 0; x.n++; };
   h.egresos.filter(val).forEach(r => add(r, 'eg')); h.ingresos.filter(val).forEach(r => add(r, 'ing'));
   let acc = 0; return [...g.values()].sort((a, b) => a.mes < b.mes ? -1 : 1).map(x => { acc += x.ing - x.eg; return Object.assign(x, {saldo: x.ing - x.eg, acum: acc}); });
+}
+function vResumenProy(c, R, h) {
+  const l = porMesProy(h); S.expProy = S.expProy || {}; if (!S.expProy[c.id]) { try { S.expProy[c.id] = JSON.parse(lsGet('exp-' + c.id) || '{}') || {}; } catch (_) { S.expProy[c.id] = {}; } } const E = S.expProy[c.id];
+  const sel = ((S.ftab || {})[c.id + '|egreso'] || {}).mes || '';
+  const nom = m => m === 'sin-fecha' ? 'Sin fecha' : mesLargo(m);
+  const todo = l.length && E.ing && E.eg && E.saldo;
+  const fila = (k, titulo, valor, cls, subs) => `<tr class="${k === 'saldo' ? 'tot' : ''}"><td>${l.length ? `<button class="exp" data-act="expProy" data-c="${c.id}" data-k="${k}" aria-expanded="${!!E[k]}">${titulo}</button>` : titulo}</td><td class="num ${cls}">${valor}</td></tr>
+    ${E[k] ? l.map(x => `<tr class="sub ${sel === x.mes ? 'on' : ''}"><td><button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}" title="Ver solo las filas de este mes">${esc(nom(x.mes))}</button></td><td class="num">${subs(x)}</td></tr>`).join('') : ''}`;
+  return `<div class="panel"><div class="hd"><h2>Resumen del proyecto</h2>${l.length > 0 ? `<span class="note">${l.length} ${l.length === 1 ? 'mes' : 'meses'}</span><button class="btn sm ghost" data-act="expProyTodo" data-c="${c.id}" style="margin-left:auto">${todo ? 'Contraer' : 'Expandir por mes'}</button>` : ''}</div><div class="bd"><table class="dist">
+      ${fila('ing', 'Ingresos', L(R.ingreso), '', x => L(x.ing))}
+      ${fila('eg', 'Egresos', L(-R.egreso), '', x => L(-x.eg))}
+      ${fila('saldo', 'Saldo', L(R.ingreso - R.egreso), R.ingreso - R.egreso < 0 ? 'neg' : 'pos', x => `<span class="${x.saldo < 0 ? 'neg' : 'pos'}">${L(x.saldo)}</span> <span class="muted">· acumulado ${L(x.acum)}</span>`)}
+    </table>
+    <p class="note">Por TIPO: ${R.per.map(x => `${esc(x.p)} ${L(-x.g)}`).join(' · ') || '—'}${R.pendientes ? ` · ${R.pendientes} registros por validar no cuentan todavía` : ''}${sel ? ` · Mostrando solo ${esc(nom(sel))} en las tablas <button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${sel}"><u>ver todo</u></button>` : ''}</p></div></div>`;
 }
 function vPorMes(c, h) {
   const l = porMesProy(h); if (!l.length) return '';
@@ -1289,7 +1310,8 @@ document.addEventListener('click', async e => {
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
   if (act === 'limpiarMov') { S.fmov = {cat: '', sub: '', cuenta: ''}; Object.assign(S.filtros, {q: '', estado: '', mes: ''}); S.limite = 300; return render(); }
-  if (act === 'proyMes') { const id = b.dataset.c, m = b.dataset.m; S.ftab = S.ftab || {}; const ya = (S.ftab[id + '|egreso'] || {}).mes === m; ['egreso', 'ingreso'].forEach(l => { S.ftab[id + '|' + l] = Object.assign({q: '', sub: '', cuenta: '', mes: ''}, S.ftab[id + '|' + l], {mes: ya ? '' : (m === 'sin-fecha' ? '' : m)}); }); render(); if (!ya) { const el = document.querySelector('[data-ftab=mes]'); if (el) el.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); } return; }
+  if (act === 'expProy' || act === 'expProyTodo') { const id = b.dataset.c; S.expProy = S.expProy || {}; const E = S.expProy[id] = S.expProy[id] || {}; if (act === 'expProy') E[b.dataset.k] = !E[b.dataset.k]; else { const v = !(E.ing && E.eg && E.saldo); E.ing = E.eg = E.saldo = v; } lsSet('exp-' + id, JSON.stringify(E)); return render(); }
+  if (act === 'proyMes') { const id = b.dataset.c, m = b.dataset.m; S.ftab = S.ftab || {}; const ya = (S.ftab[id + '|egreso'] || {}).mes === m; ['egreso', 'ingreso'].forEach(l => { S.ftab[id + '|' + l] = Object.assign({q: '', sub: '', cuenta: '', mes: ''}, S.ftab[id + '|' + l], {mes: ya ? '' : (m === 'sin-fecha' ? '' : m)}); }); render(); return; }
   if (act === 'limpiarFtab') { if (S.ftab) delete S.ftab[b.dataset.k]; return render(); }
   if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: '', hasta: '', cat: '', subc: ''}); S.limite = 300; return render(); }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
