@@ -1009,7 +1009,7 @@ async function exportarPDF(c, mes) {
     doc.text(`Generado el ${new Date().toLocaleString('es-HN', {dateStyle: 'long', timeStyle: 'short'})}`, W - M, y, {align: 'right'});
     y += 24;
     const titulo = t => { if (y > H - 110) { doc.addPage(); y = 50; } doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...tinta); doc.text(t, M, y); y += 7; };
-    const tabla = o => { doc.autoTable(Object.assign({startY: y, margin: {left: M, right: M}, styles: {font: 'helvetica', fontSize: 9, cellPadding: 4, textColor: tinta, lineColor: [215, 221, 214], lineWidth: 0.4}, headStyles: {fillColor: verde, textColor: 255, fontStyle: 'bold'}, footStyles: {fillColor: [235, 239, 234], textColor: tinta, fontStyle: 'bold'}, alternateRowStyles: {fillColor: [246, 248, 245]}}, o)); y = doc.lastAutoTable.finalY + 20; };
+    const tabla = o => { doc.autoTable(Object.assign({startY: y, margin: {left: M, right: M, bottom: 44}, showFoot: 'lastPage', showHead: 'everyPage', rowPageBreak: 'avoid', styles: {font: 'helvetica', fontSize: 9, cellPadding: 4, textColor: tinta, lineColor: [215, 221, 214], lineWidth: 0.4}, headStyles: {fillColor: verde, textColor: 255, fontStyle: 'bold'}, footStyles: {fillColor: [235, 239, 234], textColor: tinta, fontStyle: 'bold'}, alternateRowStyles: {fillColor: [246, 248, 245]}}, o)); y = doc.lastAutoTable.finalY + 20; };
     const der = cols => Object.fromEntries(cols.map(i => [i, {halign: 'right'}]));
     titulo('Resumen');
     tabla({head: [['Ingresos', 'Egresos', 'Saldo', 'Por validar']], body: [[L(R.ingreso), L(-R.egreso), L(R.ingreso - R.egreso), String(R.pendientes)]], columnStyles: der([0, 1, 2, 3])});
