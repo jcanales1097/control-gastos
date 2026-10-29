@@ -97,6 +97,8 @@ input.in.num{width:110px}
 .months{display:flex;gap:6px;flex-wrap:wrap}
 .months button{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:4px 11px;font-size:12.5px;font-weight:600}
 .months button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.mes-pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mes-pick select.in{width:auto;min-width:0;font-weight:600}
 .dist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start}
 .dist td,.dist th{padding:7px 10px}
 .dist tr.tot td{font-weight:700;border-top:2px solid var(--fg)}
@@ -515,6 +517,20 @@ function resumen(c, h) {
   return {comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
     pendientes: todas.filter(r => r.estado === 'pendiente').length, pendienteValor: h.egresos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.valor, 0)};
 }
+function vSelMes(c, mes, meses) {
+  const [y, mm] = mes.split('-').map(Number); const anioHoy = +hoy().slice(0, 4);
+  const anios = new Set([anioHoy - 1, anioHoy, anioHoy + 1, y]); [...meses].forEach(m => anios.add(+m.slice(0, 4))); [...S.tx.keys()].forEach(m => anios.add(+m.slice(0, 4)));
+  const conDatos = new Set(mesesDe(c.id));
+  const titulo = t => t.charAt(0) + t.slice(1).toLowerCase();
+  return `<div class="mes-pick" role="group" aria-label="Mes del control">
+    <button class="btn sm" data-act="mesPaso" data-c="${c.id}" data-d="-1" aria-label="Mes anterior">‹</button>
+    <select class="in" data-selmes="m" data-c="${c.id}" aria-label="Mes">${MES.map((n, i) => { const k = `${y}-${String(i + 1).padStart(2, '0')}`; return `<option value="${i + 1}" ${i + 1 === mm ? 'selected' : ''}>${titulo(n)}${conDatos.has(k) ? ' •' : ''}</option>`; }).join('')}</select>
+    <select class="in" data-selmes="y" data-c="${c.id}" aria-label="Año">${[...anios].filter(Boolean).sort((a, b) => b - a).map(a => `<option ${a === y ? 'selected' : ''}>${a}</option>`).join('')}</select>
+    <button class="btn sm" data-act="mesPaso" data-c="${c.id}" data-d="1" aria-label="Mes siguiente">›</button>
+    ${mes !== hoy().slice(0, 7) ? `<button class="btn sm ghost" data-act="mesHoy" data-c="${c.id}">Mes actual</button>` : ''}
+    <span class="note">• = meses con movimientos</span></div>`;
+}
+function irMes(id, m) { S.mesSel[id] = m; lsSet('mes-' + id, m); S.editPart = null; render(); }
 function mesActualDe(c) {
   if (!c.porMes) return 'general';
   return S.mesSel[c.id] || hoy().slice(0, 7);
@@ -631,8 +647,7 @@ function vControl(c) {
       ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}">Reabrir proyecto</button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : 'Cerrar proyecto'}</button>`) : ''}</div>
     </div>
     ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
-    ${c.porMes ? `<div class="months" role="group" aria-label="Meses">${[...meses].sort().reverse().map(m => `<button data-act="mes" data-c="${c.id}" data-m="${m}" aria-pressed="${m === mes}">${mesLargo(m)}</button>`).join('')}
-      <label class="small muted row" style="gap:6px">Otro mes <input type="month" class="in" id="otroMes" data-c="${c.id}"></label></div>
+    ${c.porMes ? `${vSelMes(c, mes, meses)}
     ${vParticipantes(c, mes)}` : ''}
     <div class="kpis">
       <div class="kpi"><div class="eyebrow">Ingreso</div><div class="v">${L(R.ingreso)}</div></div>
@@ -1183,6 +1198,8 @@ document.addEventListener('click', async e => {
   if (act === 'bulkClear') { S.sel.clear(); return render(); }
   if (act === 'restaurar') { await q(sb.from('ignorados').delete().eq('tx_id', b.dataset.id), 'Devuelto a la bandeja').catch(() => null); S.ign.delete(b.dataset.id); derive(); return render(); }
   if (act === 'asignarOtro') { const tr = b.closest('tr'); const t = D.byId.get(b.dataset.id); b.parentElement.innerHTML = ''; tr.insertAdjacentHTML('afterend', `<tr class="addrow"><td colspan="6"><table><tr data-tx="${esc(t.id)}">${asignarCells(t)}</tr></table></td></tr>`); return; }
+  if (act === 'mesPaso') { const c = ctrlById(b.dataset.c); const [y, m] = mesActualDe(c).split('-').map(Number); const d = new Date(y, m - 1 + (+b.dataset.d), 1); return irMes(c.id, `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
+  if (act === 'mesHoy') return irMes(b.dataset.c, hoy().slice(0, 7));
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
@@ -1281,6 +1298,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'fmes') { S.filtros.mes = t.value; S.limite = 300; return render(); }
   if (t.id === 'fest') { S.filtros.estado = t.value; S.limite = 300; return render(); }
   if (t.id === 'ftodos') { S.filtros.todos = t.checked; return render(); }
+  if (t.dataset.selmes) { const c = ctrlById(t.dataset.c); const w = t.closest('.mes-pick'); const y = $('[data-selmes=y]', w).value; const m = String($('[data-selmes=m]', w).value).padStart(2, '0'); return irMes(c.id, `${y}-${m}`); }
   if (t.id === 'otroMes' && t.value) { S.mesSel[t.dataset.c] = t.value; lsSet('mes-' + t.dataset.c, t.value); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
