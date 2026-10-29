@@ -956,16 +956,28 @@ const EST = {asignado: ['Asignado', 'app'], pendiente: ['Pendiente', 'warn'], no
 function vMovimientos() {
   const f = S.filtros; const qq = f.q.toUpperCase();
   const all = D.txs; const cnt = {}; all.forEach(t => { const e = estadoTx(t); cnt[e] = (cnt[e] || 0) + 1; });
-  let lista = all.filter(t => (!f.estado || estadoTx(t) === f.estado) && (!f.mes || t.mes === f.mes) && (!qq || (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)));
-  const total = lista.length; lista = lista.slice(0, S.limite);
+  const g = S.fmov || (S.fmov = {cat: '', sub: '', cuenta: ''}); const ord = (x, y) => x.localeCompare(y, 'es', {numeric: true});
+  const cats = [...new Set(all.map(t => t.cat).filter(Boolean))].sort(ord);
+  const subs = [...new Set(all.filter(t => !g.cat || t.cat === g.cat).map(t => t.sub).filter(Boolean))].sort(ord);
+  const ctas = [...new Set(all.filter(t => (!g.cat || t.cat === g.cat) && (!g.sub || t.sub === g.sub)).map(t => t.cuenta).filter(Boolean))].sort(ord);
+  if (g.cuenta && !ctas.includes(g.cuenta)) ctas.unshift(g.cuenta);
+  const hayF = f.q || f.estado || f.mes || g.cat || g.sub || g.cuenta;
+  let lista = all.filter(t => (!g.cat || t.cat === g.cat) && (!g.sub || t.sub === g.sub) && (!g.cuenta || t.cuenta === g.cuenta) && (!f.estado || estadoTx(t) === f.estado) && (!f.mes || t.mes === f.mes) && (!qq || (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)));
+  const total = lista.length; const suma = lista.reduce((a, t) => a + (t.code === 0 ? t.monto : t.code === 3 ? 0 : -t.monto), 0); lista = lista.slice(0, S.limite);
   const meses = [...new Set(all.map(t => t.mes))].sort().reverse();
+  const opt = (l, v, todos) => `<option value="">${todos}</option>` + l.map(x => `<option value="${esc(x)}" ${v === x ? 'selected' : ''}>${esc(x)}</option>`).join('');
   return `<div class="stack">
     <div><div class="eyebrow">Todo lo sincronizado</div><h1>${all.length} movimientos de la app</h1>
       <div class="note">${Object.entries(EST).map(([k, v]) => `${v[0]}: ${cnt[k] || 0}`).join(' · ')}</div></div>
     <div class="panel"><div class="hd filters">
       <input type="search" id="fq" placeholder="Buscar" value="${esc(f.q)}" aria-label="Buscar">
       <select id="fest" aria-label="Estado"><option value="">Todos los estados</option>${Object.entries(EST).map(([k, v]) => `<option value="${k}" ${f.estado === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
-      <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select></div>
+      <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>
+      <select data-fmov="cat" aria-label="Categoría">${opt(cats, g.cat, 'Todas las categorías')}</select>
+      <select data-fmov="sub" aria-label="Subcategoría">${opt(subs, g.sub, 'Todas las subcategorías')}</select>
+      <select data-fmov="cuenta" aria-label="Cuenta">${opt(ctas, g.cuenta, 'Todas las cuentas')}</select>
+      ${hayF ? '<button class="btn sm ghost" data-act="limpiarMov">Quitar filtros</button>' : ''}</div>
+    ${hayF && total ? `<div class="bd small muted">${total} ${total === 1 ? 'movimiento coincide' : 'movimientos coinciden'} · ingresos menos gastos ${L(suma)} (sin traslados)</div>` : ''}
     ${total ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
       ${lista.map(t => { const e = estadoTx(t); const pp = partes(t.id); const m = e === 'asignado' ? pp[0] : null; const c = m && ctrlById(m.control);
         return `<tr data-tx="${esc(t.id)}">${txCells(t)}<td>${m ? `<span class="chip app"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)} · ${m.mes === 'general' ? 'proyecto' : mesLargo(m.mes)}${pp.length > 1 ? ` · +${pp.length - 1} ${pp.length === 2 ? 'parte' : 'partes'}` : ''}</span>` : `<span class="chip ${EST[e][1]}">${EST[e][0]}${pp.length ? ' · repartido en parte' : ''}</span>`}${e === 'noaplica' ? `<div class="note">${esc(S.ign.get(t.id).motivo || '')}</div>` : ''}</td>
@@ -1241,6 +1253,7 @@ document.addEventListener('click', async e => {
   if (act === 'mesHoy') return irMes(b.dataset.c, hoy().slice(0, 7));
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
+  if (act === 'limpiarMov') { S.fmov = {cat: '', sub: '', cuenta: ''}; Object.assign(S.filtros, {q: '', estado: '', mes: ''}); S.limite = 300; return render(); }
   if (act === 'limpiarFtab') { if (S.ftab) delete S.ftab[b.dataset.k]; return render(); }
   if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: ''}); S.limite = 300; return render(); }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
@@ -1344,6 +1357,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
   if (t.dataset.ftab === 'sub' || t.dataset.ftab === 'cuenta') { const k = t.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {[t.dataset.ftab]: t.value}); return render(); }
+  if (t.dataset.fmov) { S.fmov = S.fmov || {cat: '', sub: '', cuenta: ''}; S.fmov[t.dataset.fmov] = t.value; if (t.dataset.fmov === 'cat') S.fmov.sub = ''; S.limite = 300; return render(); }
   if (t.id === 'fnat') { S.filtros.nat = t.value; S.limite = 300; return render(); }
   if (t.id === 'fcuenta') { S.filtros.cuenta = t.value; S.limite = 300; return render(); }
   if (t.id === 'fmes') { S.filtros.mes = t.value; S.limite = 300; return render(); }
