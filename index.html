@@ -111,6 +111,13 @@ input.in.num{width:110px}
 .dist tr.sub .linkish{color:var(--muted)}
 .dist tr.sub.on td{background:rgba(30,106,80,.12);color:var(--fg)}
 .chart-box{position:relative;padding:4px 14px 10px}
+.menu{position:relative;display:inline-block}
+.menu>summary{list-style:none;cursor:pointer}.menu>summary::-webkit-details-marker{display:none}
+.menu-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:240px;display:flex;flex-direction:column}
+.menu-pop button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:6px;font:inherit;cursor:pointer;color:var(--fg)}
+.menu-pop button:hover{background:var(--sunk)}
+.menu-pop .sep{height:1px;background:var(--line);margin:4px 2px}
+.menu-pop .eyebrow{padding:6px 10px 2px}
 .fx{display:block;font-size:11px;color:var(--muted);font-family:var(--f-num);white-space:nowrap}
 .chip.fxc{background:var(--warn-soft);color:var(--warn);font-family:var(--f-num);font-size:10.5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
 .chart-box svg{display:block;width:100%;overflow:visible}
@@ -712,7 +719,10 @@ function vControl(c) {
       <div><div class="eyebrow">${esProy(c) ? '<a href="#proyectos" class="muted small" style="text-decoration:none">← Proyectos</a> ' : ''}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(esProy(c) ? 'Proyecto' : c.nombre)}</span> ${esProy(c) ? `<span class="chip ${cerrado(c) ? '' : 'app'}">${cerrado(c) ? 'Cerrado el ' + fFecha(c.cerradoEl) : 'Abierto'}</span>` : ''}</div>
       <h1>${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>
       ${pend ? `<div class="note"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</a></div>` : ''}</div>
-      <div class="row"><button class="btn" data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte PDF</button><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
+      <div class="row"><details class="menu"><summary class="btn">Reporte PDF ▾</summary><div class="menu-pop">
+        <button data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte completo</button>
+        ${(() => { const ps = [...new Set([...personasDe(c, mes), ...R.per.map(x => x.p)])].filter(Boolean); return ps.length ? `<div class="sep"></div><div class="eyebrow">Solo para una persona</div>${ps.map(p => `<button data-act="pdf" data-c="${c.id}" data-m="${mes}" data-p="${esc(p)}">${esc(p)} <span class="muted small">· sus gastos y los compartidos</span></button>`).join('')}` : ''; })()}
+      </div></details><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
       ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}">Reabrir proyecto</button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : 'Cerrar proyecto'}</button>`) : ''}</div>
     </div>
     ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
@@ -1002,7 +1012,7 @@ function abrirDetalle(id) {
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const AUTOTABLE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
 function cargarScript(src) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de PDF. Revisa tu internet.')); document.head.appendChild(s); }); }
-async function exportarPDF(c, mes) {
+async function exportarPDF(c, mes, persona) {
   toast('Preparando PDF…');
   try {
     if (!window.jspdf) await cargarScript(JSPDF_URL);
@@ -1013,12 +1023,13 @@ async function exportarPDF(c, mes) {
     const verde = [30, 106, 80], gris = [93, 107, 100], tinta = [24, 33, 29];
     doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(...tinta); doc.text(c.nombre, M, y);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...gris); y += 17;
-    doc.text(c.porMes ? mesLargo(mes) : (cerrado(c) ? `Proyecto cerrado el ${fFecha(c.cerradoEl)}` : 'Proyecto abierto'), M, y);
+    doc.text((c.porMes ? mesLargo(mes) : (cerrado(c) ? `Proyecto cerrado el ${fFecha(c.cerradoEl)}` : 'Proyecto abierto')) + (persona ? ` · Reporte para ${persona}` : ''), M, y);
     doc.text(`Generado el ${new Date().toLocaleString('es-HN', {dateStyle: 'long', timeStyle: 'short'})}`, W - M, y, {align: 'right'});
     y += 24;
     const titulo = t => { if (y > H - 110) { doc.addPage(); y = 50; } doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...tinta); doc.text(t, M, y); y += 7; };
     const tabla = o => { doc.autoTable(Object.assign({startY: y, margin: {left: M, right: M, bottom: 44}, showFoot: 'lastPage', showHead: 'everyPage', rowPageBreak: 'avoid', styles: {font: 'helvetica', fontSize: 9, cellPadding: 4, textColor: tinta, lineColor: [215, 221, 214], lineWidth: 0.4}, headStyles: {fillColor: verde, textColor: 255, fontStyle: 'bold'}, footStyles: {fillColor: [235, 239, 234], textColor: tinta, fontStyle: 'bold'}, alternateRowStyles: {fillColor: [246, 248, 245]}}, o)); y = doc.lastAutoTable.finalY + 20; };
     const der = cols => Object.fromEntries(cols.map(i => [i, {halign: 'right'}]));
+    if (persona) return pdfPersona(doc, {c, mes, h, R, persona, val, titulo, tabla, der, W, H, M, gris, y: () => y});
     titulo('Resumen');
     tabla({head: [['Ingresos', 'Egresos', 'Saldo', 'Por validar']], body: [[L(R.ingreso), L(-R.egreso), L(R.ingreso - R.egreso), String(R.pendientes)]], columnStyles: der([0, 1, 2, 3])});
     if (c.porMes) {
@@ -1042,6 +1053,35 @@ async function exportarPDF(c, mes) {
     const base = c.nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_');
     descargar(`${base}${c.porMes ? '_' + mes : ''}.pdf`, doc.output('blob'));
   } catch (e) { toast('No se pudo generar el PDF: ' + (e && e.message || e)); }
+}
+function pdfPersona(doc, o) {
+  const {c, mes, h, R, persona, val, titulo, tabla, der, W, H, M, gris} = o;
+  const mio = r => r.tipo === persona || r.tipo === 'COMPARTIDO';
+  const eg = h.egresos.filter(r => val(r) && mio(r)), ing = h.ingresos.filter(r => val(r) && mio(r));
+  const sum = (l, f) => l.filter(f).reduce((a, r) => a + (+r.valor || 0), 0);
+  const egC = sum(eg, r => r.tipo === 'COMPARTIDO'), egP = sum(eg, r => r.tipo === persona), ingC = sum(ing, r => r.tipo === 'COMPARTIDO'), ingP = sum(ing, r => r.tipo === persona);
+  const x = R.per.find(z => z.p === persona);
+  if (c.porMes) {
+    titulo('Tu resumen del mes');
+    const filas = [['Gastos compartidos del mes', L(-egC)]];
+    if (ingC) filas.push(['Ingresos compartidos', L(ingC)]);
+    filas.push([`Tu parte del compartido (entre ${R.n})`, L(R.comp / R.n)], ['Tus gastos individuales', L(-egP)], ['Total a pagar', L(x ? x.pagar : R.comp / R.n - egP)], ['Lo que aportaste', L(x ? x.aporte : ingP)]);
+    const sal = x ? x.saldo : 0;
+    tabla({head: [['Concepto', 'Valor']], body: filas, foot: [[sal < -0.004 ? 'Te falta aportar' : sal > 0.004 ? 'Tienes a favor' : 'Saldo', L(Math.abs(sal) > 0.004 ? Math.abs(sal) : 0)]], columnStyles: der([1])});
+  } else {
+    titulo('Tu resumen del proyecto');
+    tabla({head: [['Concepto', 'Valor']], body: [['Egresos compartidos', L(-egC)], ['Tus egresos', L(-egP)], ['Ingresos compartidos', L(ingC)], ['Tus ingresos', L(ingP)]], foot: [['Total', L(ingC + ingP - egC - egP)]], columnStyles: der([1])});
+  }
+  titulo(`Detalle de egresos (${eg.length})`);
+  tabla({head: [['Fecha', 'TIPO', 'Categoría', 'Descripción', 'Valor']], body: eg.length ? eg.map(r => [fFecha(r.fecha), r.tipo, [r.cat, r.sub].filter(Boolean).join(' / '), r.descripcion || r.detalle, L(r.valor)]) : [['', '', '', 'Sin egresos', '']], foot: [['', '', '', 'Total', L(egC + egP)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 86}, 2: {cellWidth: 118}, 4: {halign: 'right', cellWidth: 72}}});
+  titulo(`Detalle de ingresos (${ing.length})`);
+  tabla({head: [['Fecha', 'Persona', 'Descripción', 'Valor']], body: ing.length ? ing.map(r => [fFecha(r.fecha), r.tipo, r.descripcion || r.detalle, L(r.valor)]) : [['', '', 'Sin ingresos', '']], foot: [['', '', 'Total', L(ingC + ingP)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 110}, 3: {halign: 'right', cellWidth: 72}}});
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...gris);
+  doc.text(`Incluye solo los gastos compartidos y los de ${persona}.${R.pendientes ? ` No incluye registros por validar.` : ''}`, M, Math.min(o.y() + 0, H - 40));
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gris); doc.text(`Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''} · ${persona} · página ${i} de ${n}`, W / 2, H - 22, {align: 'center'}); }
+  const limpio = t => t.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_');
+  descargar(`${limpio(c.nombre)}${c.porMes ? '_' + mes : ''}_${limpio(persona)}.pdf`, doc.output('blob'));
 }
 async function rellenarDatosApp() {
   const l = [...S.movs.values()].filter(m => m.tx_id && m.app_monto == null && D.byId.has(m.tx_id));
@@ -1457,6 +1497,7 @@ function hojaProyecto(wb, c, h0) {
 const movDe = el => { const tr = el.closest('[data-mov]'); return tr && S.movs.get(tr.dataset.mov); };
 
 document.addEventListener('submit', e => { if (e.target.id === 'authForm') { e.preventDefault(); enviarAuth(e.target); } });
+document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; }); }, true);
 document.addEventListener('click', async e => {
   const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -1518,7 +1559,7 @@ document.addEventListener('click', async e => {
   if (act === 'rpAgregar') { const t = S.rep.t; const resto = Math.round((t.monto - S.rep.partes.reduce((s, p) => s + (+p.valor || 0), 0)) * 100) / 100; const c = familiares()[0]; S.rep.partes.push({control: c.id, tipo: c.tipoDefecto || 'COMPARTIDO', mes: t.mes, valor: Math.max(resto, 0)}); return pintarReparto(); }
   if (act === 'rpQuitar') { const i = +b.closest('tr').dataset.i; const [p] = S.rep.partes.splice(i, 1); if (p && p.id) S.rep.borrar.push(p.id); return pintarReparto(); }
   if (act === 'rpGuardar') return guardarReparto();
-  if (act === 'pdf') return exportarPDF(ctrlById(b.dataset.c), b.dataset.m);
+  if (act === 'pdf') { const d = b.closest('details'); if (d) d.open = false; return exportarPDF(ctrlById(b.dataset.c), b.dataset.m, b.dataset.p || ''); }
   if (act === 'editPart') { S.editPart = b.dataset.c + '|' + b.dataset.m; S.partTmp = null; return render(); }
   if (act === 'partCancelar') { S.editPart = null; S.partTmp = null; return render(); }
   if (act === 'partAgregar') { const v = ($('#partNueva').value || '').trim().toUpperCase(); if (!v) return toast('Escribe el nombre.'); const sel = [...document.querySelectorAll('[data-part]:checked')].map(x => x.value); if (!sel.includes(v)) sel.push(v); S.partTmp = sel; return render(); }
