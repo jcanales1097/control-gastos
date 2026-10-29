@@ -736,12 +736,13 @@ function vResumenProy(c, R, h) {
   const verTabla = lsGet('tabla-' + c.id) === '1';
   const nota = `<p class="note" style="padding:0 14px 12px;margin:0">Por TIPO: ${R.per.map(x => `${esc(x.p)} ${L(-x.g)}`).join(' · ') || '—'}${R.pendientes ? ` · ${R.pendientes} registros por validar no cuentan todavía` : ''}${sel ? ` · Mostrando solo ${esc(mesLargo(sel))} en las tablas <button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${sel}"><u>ver todo</u></button>` : puntos.length ? ' · Toca un mes del gráfico para ver solo sus filas' : ''}</p>`;
   if (!puntos.length) return `<div class="panel"><div class="hd"><h2>Evolución del proyecto</h2></div><div class="bd note">Cuando el proyecto tenga movimientos validados, aquí verás sus ingresos, egresos y saldo mes a mes.</div></div>`;
-  const ult = puntos[puntos.length - 1];
+  const ult = puntos.find(x => x.mes === sel) || puntos[puntos.length - 1];
   const tabla = `<div class="tbl-wrap"><table><thead><tr><th>Mes</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo${modo === 'acum' ? ' acumulado' : ' del mes'}</th></tr></thead><tbody>
     ${puntos.map(x => `<tr><td><button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}">${esc(mesLargo(x.mes))}</button></td><td class="num">${L(x.i)}</td><td class="num">${L(-x.e)}</td><td class="num ${x.s < 0 ? 'neg' : 'pos'}">${L(x.s)}</td></tr>`).join('')}</tbody></table></div>`;
   return `<div class="panel"><div class="hd" style="flex-wrap:wrap;gap:10px"><h2>Evolución del proyecto</h2>
       <div class="seg" role="group" aria-label="Tipo de gráfico"><button data-act="grafModo" data-c="${c.id}" data-v="acum" aria-pressed="${modo === 'acum'}">Acumulado</button><button data-act="grafModo" data-c="${c.id}" data-v="mes" aria-pressed="${modo === 'mes'}">Por mes</button></div>
-      <button class="btn sm ghost" data-act="grafTabla" data-c="${c.id}" style="margin-left:auto">${verTabla ? 'Ver gráfico' : 'Ver tabla'}</button></div>
+      ${sel && !verTabla ? (() => { const k = puntos.findIndex(x => x.mes === sel); const ant = puntos[k - 1], sig = puntos[k + 1]; return `<span class="row small" style="gap:6px;margin-left:auto"><button class="btn sm" data-act="proyMes" data-c="${c.id}" data-m="${ant ? ant.mes : ''}" ${ant ? '' : 'disabled'} aria-label="Mes anterior">‹</button><b>${esc(mesLargo(sel))}</b><button class="btn sm" data-act="proyMes" data-c="${c.id}" data-m="${sig ? sig.mes : ''}" ${sig ? '' : 'disabled'} aria-label="Mes siguiente">›</button><button class="btn sm ghost" data-act="proyMes" data-c="${c.id}" data-m="${sel}">Ver todos los meses</button></span>`; })() : ''}
+      <button class="btn sm ghost" data-act="grafTabla" data-c="${c.id}" style="${sel && !verTabla ? '' : 'margin-left:auto'}">${verTabla ? 'Ver gráfico' : 'Ver tabla'}</button></div>
     ${verTabla ? tabla : `<div class="bd" style="padding-bottom:0"><div class="leg"><span><i style="background:var(--good)"></i>Ingresos ${L(ult.i)}</span><span><i style="background:var(--bad)"></i>Egresos ${L(ult.e)}</span><span><i style="background:var(--fg)"></i>Saldo ${L(ult.s)}</span><span class="note">${modo === 'acum' ? 'acumulado a ' : ''}${esc(mesLargo(ult.mes))}</span></div></div>
     <div class="chart-box" data-chart="${c.id}" data-sel="${sel}"></div>`}
     ${nota}</div>`;
@@ -761,9 +762,12 @@ const corto = v => { const a = Math.abs(v), sg = v < 0 ? '-' : ''; return a >= 1
 const mesCorto = m => { const [y, mm] = m.split('-'); return MES[+mm - 1].slice(0, 3).charAt(0) + MES[+mm - 1].slice(1, 3).toLowerCase() + ' ' + y.slice(2); };
 function dibujarGraficos() {
   document.querySelectorAll('[data-chart]').forEach(box => {
-    const c = ctrlById(box.dataset.chart); if (!c) return; const {puntos: P, modo} = serieProy(c, hoja(c.id, 'general'));
+    const c = ctrlById(box.dataset.chart); if (!c) return; const {puntos: TODO, modo} = serieProy(c, hoja(c.id, 'general'));
+    const s0 = TODO.findIndex(x => x.mes === box.dataset.sel); const zoom = s0 >= 0 && TODO.length > 3;
+    const P = zoom ? TODO.slice(Math.max(0, s0 - 1), s0 + 2) : TODO;
     const W = Math.max(300, box.clientWidth - 28), H = W < 560 ? 220 : 280, ml = 52, mr = 14, mt = 12, mb = 28;
-    const vals = P.flatMap(x => [x.i, x.e, x.s]); let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals); if (hi === lo) hi = lo + 1;
+    const vals = P.flatMap(x => [x.i, x.e, x.s]); let lo = zoom ? Math.min(...vals) : Math.min(0, ...vals), hi = zoom ? Math.max(...vals) : Math.max(0, ...vals);
+    if (zoom) { const pad = Math.max((hi - lo) * 0.12, Math.abs(hi) * 0.02, 1); lo -= pad; hi += pad; } if (hi === lo) hi = lo + 1;
     const paso = (() => { const raw = (hi - lo) / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; })();
     lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso;
     const n = P.length, iw = W - ml - mr, ih = H - mt - mb;
@@ -771,13 +775,14 @@ function dibujarGraficos() {
     const ticks = []; for (let v = lo; v <= hi + paso / 2; v += paso) ticks.push(v);
     const cada = Math.max(1, Math.ceil(n / Math.floor(iw / 62)));
     const linea = (k, cl) => { const pts = P.map((x, j) => [X(j), Y(x[k])]); return n > 1 ? `<path class="ln ${cl}" d="${curva(pts)}"/>` : ''; };
-    const puntos = (k, cl) => P.map((x, j) => (n <= 14 || j === n - 1) ? `<circle class="pt ${cl}" cx="${X(j).toFixed(1)}" cy="${Y(x[k]).toFixed(1)}" r="${j === n - 1 || n === 1 ? 4 : 3}"/>` : '').join('');
+    const puntos = (k, cl) => P.map((x, j) => (n <= 14 || j === n - 1) ? `<circle class="pt ${cl}" cx="${X(j).toFixed(1)}" cy="${Y(x[k]).toFixed(1)}" r="${zoom ? (x.mes === box.dataset.sel ? 5.5 : 4) : (j === n - 1 || n === 1 ? 4 : 3)}"/>` : '').join('');
     const bw = n === 1 ? iw : iw / (n - 1); const si = P.findIndex(x => x.mes === box.dataset.sel);
     box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Ingresos, egresos y saldo de ${esc(c.nombre)} por mes">
-      ${si >= 0 ? `<rect class="selb" x="${(X(si) - Math.min(bw, iw) / 2).toFixed(1)}" y="${mt}" width="${Math.min(bw, iw).toFixed(1)}" height="${ih}" rx="4"/>` : ''}
-      ${ticks.map(v => `<line class="${v === 0 && lo < 0 ? 'zl' : 'gl'}" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="ax" x="${ml - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${corto(v)}</text>`).join('')}
-      ${P.map((x, j) => j % cada === 0 || j === n - 1 ? `<text class="ax" x="${X(j).toFixed(1)}" y="${H - 8}" text-anchor="middle">${mesCorto(x.mes)}</text>` : '').join('')}
+      ${si >= 0 ? `<rect class="selb" x="${(X(si) - Math.min(bw * .5, 160) / 2).toFixed(1)}" y="${mt}" width="${Math.min(bw * .5, 160).toFixed(1)}" height="${ih}" rx="4"/>` : ''}
+      ${ticks.map(v => `<line class="${Math.abs(v) < paso / 1e6 && lo < 0 ? 'zl' : 'gl'}" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="ax" x="${ml - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${corto(v)}</text>`).join('')}
+      ${P.map((x, j) => j % cada === 0 || j === n - 1 ? `<text class="ax" x="${X(j).toFixed(1)}" y="${H - 8}" text-anchor="${zoom && n > 1 ? (j === 0 ? 'start' : j === n - 1 ? 'end' : 'middle') : 'middle'}" ${zoom && x.mes === box.dataset.sel ? 'style="fill:var(--fg);font-weight:600"' : ''}>${zoom ? esc(mesLargo(x.mes)) : mesCorto(x.mes)}</text>` : '').join('')}
       ${linea('i', 'i')}${linea('e', 'e')}${linea('s', 's')}${puntos('i', 'i')}${puntos('e', 'e')}${puntos('s', 's')}
+      ${zoom ? (() => { const j = P.findIndex(x => x.mes === box.dataset.sel), x = P[j]; const lab = [['i', x.i, 'var(--good)'], ['e', x.e, 'var(--bad)'], ['s', x.s, 'var(--fg)']].sort((a, b) => Y(a[1]) - Y(b[1])); let last = -99; return lab.map(([k, v, col]) => { let y = Y(v) + 4; if (y - last < 14) y = last + 14; last = y; const anchor = j === n - 1 ? 'end' : 'start', dx = j === n - 1 ? -10 : 10; return `<text x="${(X(j) + dx).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" style="font:600 11.5px var(--f-num);fill:var(--fg);paint-order:stroke;stroke:var(--panel);stroke-width:4px">${L(v)}</text>`; }).join(''); })() : ''}
       <line class="cross" x1="0" x2="0" y1="${mt}" y2="${mt + ih}" style="display:none"/>
       ${P.map((x, j) => `<rect class="hit" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}" data-j="${j}" x="${(X(j) - bw / 2).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}"><title>${esc(mesLargo(x.mes))}</title></rect>`).join('')}
     </svg><div class="chart-tip" hidden></div>`;
