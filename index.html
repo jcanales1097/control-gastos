@@ -575,7 +575,7 @@ function vBandeja() {
     if (qq && !(t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)) return false;
     return true;
   }).sort((a, b) => a.fecha < b.fecha ? -1 : 1);
-  const porCtrl = {}; bandeja().forEach(t => { const s = sugerido(t); porCtrl[s.id] = (porCtrl[s.id] || 0) + 1; });
+  const porCtrl = {}; bandeja().forEach(t => { const s = sugerido(t); const k = s ? s.id : "_none"; porCtrl[k] = (porCtrl[k] || 0) + 1; });
   const total = lista.length; const shown = lista.slice(0, S.limite);
   const meses = [...new Set(D.txs.filter(t => estadoTx(t) === 'pendiente').map(t => t.mes))].sort().reverse();
   return `<div class="stack">
