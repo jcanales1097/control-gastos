@@ -145,6 +145,11 @@ a.kpi:hover{background:var(--sunk)}
 tr.st-pendiente td{background:var(--warn-soft)}
 tr.st-rechazado td{opacity:.6}
 .panel.nuevo{border-color:var(--warn)}
+.linkish{background:none;border:0;padding:0;margin:0;color:inherit;text-align:left;cursor:pointer;font:inherit}
+.linkish:hover{color:var(--accent);text-decoration:underline}
+.count.bad-bg{background:var(--bad);color:var(--panel)}
+a.chip{text-decoration:none}
+.modal .dist th{position:static;font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);white-space:normal}
 #userBox{display:flex;align-items:center;gap:6px}
 .top .wrap{row-gap:8px}
 </style>
@@ -213,9 +218,9 @@ const abiertos = () => S.ctrls.filter(c => !cerrado(c));
 const hrefC = c => '#' + (esProy(c) ? 'p-' : 'c-') + c.id;
 const nombreDe = id => { if (S.me && id === S.me.id) return 'Tú'; const p = S.perfiles.find(x => x.id === id); return p ? (p.nombre || p.email) : 'Otro usuario'; };
 
-const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, porMes: r.tipo === 'mensual', personas: r.personas || [], categorias: r.categorias || [], incluye: r.incluye || '', excluye: r.excluye || '', tipoDefecto: r.tipo_defecto || 'COMPARTIDO', sugerirPorNombre: !!r.sugerir_por_nombre, color: r.color || 'a', estado: r.estado || 'abierto', abiertoEl: r.abierto_el, cerradoEl: r.cerrado_el, orden: r.orden || 0});
-const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo: c.porMes ? 'mensual' : 'proyecto', personas: c.personas, categorias: c.categorias, incluye: c.incluye, excluye: c.excluye, tipo_defecto: c.tipoDefecto, sugerir_por_nombre: c.sugerirPorNombre, color: c.color, estado: c.estado, abierto_el: c.abiertoEl || null, cerrado_el: c.cerradoEl || null, orden: c.orden || 0});
-const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha ? String(m.fecha).slice(0, 10) : null});
+const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, porMes: r.tipo === 'mensual', personas: r.personas || [], categorias: r.categorias || [], incluye: r.incluye || '', excluye: r.excluye || '', tipoDefecto: r.tipo_defecto || 'COMPARTIDO', sugerirPorNombre: !!r.sugerir_por_nombre, color: r.color || 'a', estado: r.estado || 'abierto', abiertoEl: r.abierto_el, cerradoEl: r.cerrado_el, orden: r.orden || 0, personasMes: r.personas_mes || {}});
+const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo: c.porMes ? 'mensual' : 'proyecto', personas: c.personas, categorias: c.categorias, incluye: c.incluye, excluye: c.excluye, tipo_defecto: c.tipoDefecto, sugerir_por_nombre: c.sugerirPorNombre, color: c.color, estado: c.estado, abierto_el: c.abiertoEl || null, cerrado_el: c.cerradoEl || null, orden: c.orden || 0, personas_mes: c.personasMes || {}});
+const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha ? String(m.fecha).slice(0, 10) : null, app_monto: m.app_monto == null ? null : +m.app_monto, app_fecha: m.app_fecha ? String(m.app_fecha).slice(0, 10) : null});
 
 function derive() {
   const txs = [];
@@ -224,9 +229,28 @@ function derive() {
     txs.push({id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)});
   }
   txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
-  const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') asig.set(m.tx_id, m);
+  const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') { if (!asig.has(m.tx_id)) asig.set(m.tx_id, []); asig.get(m.tx_id).push(m); }
   D = {txs, byId: new Map(txs.map(t => [t.id, t])), asig};
 }
+const partes = id => D.asig.get(id) || [];
+const asignado = id => partes(id).reduce((s, m) => s + (+m.valor || 0), 0);
+const restante = t => Math.round((t.monto - asignado(t.id)) * 100) / 100;
+const snapApp = t => ({app_monto: t.monto, app_fecha: t.fecha, app_detalle: t.det, app_cuenta: t.cuenta, app_categoria: t.cat});
+const personasDe = (c, mes) => { if (!c) return []; const pm = c.personasMes || {}; return c.porMes && mes && Array.isArray(pm[mes]) ? pm[mes] : (c.personas || []); };
+function cambioDe(m) {
+  if (!esAdmin() || !m.tx_id || m.estado === 'rechazado') return null;
+  const t = D.byId.get(m.tx_id);
+  if (!t) { const mes = (m.app_fecha || m.fecha || '').slice(0, 7); return S.tx.has(mes) ? {tipo: 'eliminado'} : null; }
+  if (m.app_monto == null) return null;
+  const d = [];
+  if (cents(t.monto) !== cents(m.app_monto)) d.push(['Monto', L(m.app_monto), L(t.monto)]);
+  if (m.app_fecha && t.fecha !== m.app_fecha) d.push(['Fecha', fFecha(m.app_fecha), fFecha(t.fecha)]);
+  if (m.app_detalle != null && t.det !== m.app_detalle) d.push(['Detalle', m.app_detalle, t.det]);
+  if (m.app_cuenta && t.cuenta !== m.app_cuenta) d.push(['Cuenta', m.app_cuenta, t.cuenta]);
+  if (m.app_categoria && t.cat !== m.app_categoria) d.push(['Categoría', m.app_categoria, t.cat]);
+  return d.length ? {tipo: 'modificado', d, t} : null;
+}
+const cambios = () => esAdmin() ? [...S.movs.values()].map(m => ({m, c: cambioDe(m)})).filter(x => x.c).sort((a, b) => (a.m.fecha || '') < (b.m.fecha || '') ? -1 : 1) : [];
 function applies(c, t) {
   const cat = (t.cat || '').trim();
   if (cerrado(c)) return false;
@@ -242,12 +266,12 @@ function applies(c, t) {
 const sugerido = t => proyectos().find(c => applies(c, t)) || familiares().find(c => applies(c, t));
 function tipoSugerido(c, t) {
   if (!c) return '';
-  if (c.sugerirPorNombre) { const d = t.det.toUpperCase(); const p = (c.personas || []).find(p => d.includes(p.toUpperCase()) || d.includes(p.split(' ')[0].toUpperCase())); if (p) return p; }
-  if (t.code === 0) return (c.personas || [])[0] || '';
+  if (c.sugerirPorNombre) { const d = t.det.toUpperCase(); const p = personasDe(c, t.mes).find(p => d.includes(p.toUpperCase()) || d.includes(p.split(' ')[0].toUpperCase())); if (p) return p; }
+  if (t.code === 0) return personasDe(c, t.mes)[0] || '';
   return c.tipoDefecto || 'COMPARTIDO';
 }
 function estadoTx(t) {
-  if (D.asig.has(t.id)) return 'asignado';
+  if (D.asig.has(t.id)) return restante(t) > 0.005 ? 'pendiente' : 'asignado';
   if (S.ign.has(t.id)) return 'noaplica';
   if (t.code === 3) return 'traslado';
   if (t.fecha > hoy()) return 'futuro';
@@ -334,7 +358,7 @@ let arrancando = false;
 async function arrancar() {
   if (arrancando) return; arrancando = true;
   $('#topbar').hidden = false; app().innerHTML = '<div class="loading">Cargando tus datos…</div>';
-  try { await cargarTodo(); derive(); route(); render(); if (esAdmin()) detectarServidor(); }
+  try { await cargarTodo(); derive(); route(); render(); if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); } }
   catch (e) { fatal(errMsg(e)); }
   finally { arrancando = false; }
 }
@@ -400,7 +424,7 @@ function route() {
   const ok = id => { const c = ctrlById(id); return !!c; };
   if ((h.startsWith('c-') || h.startsWith('p-')) && ok(h.slice(2))) S.view = h;
   else if (['inicio', 'proyectos'].includes(h)) S.view = h;
-  else if (esAdmin() && ['bandeja', 'validar', 'movimientos', 'usuarios', 'ajustes'].includes(h)) S.view = h;
+  else if (esAdmin() && ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes'].includes(h)) S.view = h;
   else S.view = 'inicio';
 }
 window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return; route(); S.sel.clear(); render(); window.scrollTo(0, 0); });
@@ -409,6 +433,7 @@ function renderTabs() {
   const a = esAdmin(); const nb = bandeja().length, nv = porValidar().length;
   const items = [['inicio', 'Inicio']];
   if (a) items.push(['bandeja', `Bandeja ${nb ? `<span class="count">${nb}</span>` : ''}`], ['validar', `Por validar ${nv ? `<span class="count warn-bg">${nv}</span>` : ''}`]);
+  const nc = a ? cambios().length : 0; if (nc || S.view === 'cambios') items.push(['cambios', `Cambios ${nc ? `<span class="count bad-bg">${nc}</span>` : ''}`]);
   familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
   if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
@@ -428,6 +453,7 @@ function render() {
   if (S.view === 'inicio') html = vInicio();
   else if (S.view === 'bandeja') html = vBandeja();
   else if (S.view === 'validar') html = vValidar();
+  else if (S.view === 'cambios') html = vCambios();
   else if (S.view === 'movimientos') html = vMovimientos();
   else if (S.view === 'usuarios') html = vUsuarios();
   else if (S.view === 'ajustes') html = vAjustes();
@@ -451,8 +477,8 @@ function ctrlSelect(sel, attrs) {
   const o = c => `<option value="${c.id}" ${sel === c.id ? 'selected' : ''}>${esc(c.corto || c.nombre)}</option>`;
   return `<select ${attrs}><optgroup label="Controles">${fam.map(o).join('')}</optgroup>${pr.length ? `<optgroup label="Proyectos abiertos">${pr.map(o).join('')}</optgroup>` : ''}${sel ? '' : '<option value="" selected>Elegir…</option>'}</select>`;
 }
-function tipoOptions(c, sel, lado) {
-  const ps = (c && c.personas) || [];
+function tipoOptions(c, sel, lado, mes) {
+  const ps = personasDe(c, mes);
   const opts = lado === 'ingreso' ? [...ps, 'COMPARTIDO'] : ['COMPARTIDO', ...ps];
   if (sel && !opts.includes(sel)) opts.push(sel);
   return opts.map(o => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('');
@@ -465,25 +491,25 @@ function asignarCells(t) {
   const c = sugerido(t) || null;
   const lado = t.code === 0 ? 'ingreso' : 'egreso';
   return `<td>${ctrlSelect(c ? c.id : '', 'class="in" data-f="ctrl" aria-label="Control o proyecto"')}</td>
-    <td><select class="in" data-f="tipo" aria-label="Tipo">${tipoOptions(c, tipoSugerido(c, t), lado)}</select></td>
+    <td><select class="in" data-f="tipo" aria-label="Tipo">${tipoOptions(c, tipoSugerido(c, t), lado, t.mes)}</select></td>
     <td><select class="in" data-f="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(t.mes)}</select></td>
-    <td style="white-space:nowrap"><button class="btn sm pri" data-act="asignar" data-id="${esc(t.id)}">Asignar</button> <button class="btn sm ghost" data-act="ignorar" data-id="${esc(t.id)}" title="No va en ningún control">No aplica</button></td>`;
+    <td style="white-space:nowrap"><button class="btn sm pri" data-act="asignar" data-id="${esc(t.id)}">Asignar</button> <button class="btn sm" data-act="dividir" data-id="${esc(t.id)}" title="Repartir entre varios controles o proyectos">Dividir</button> <button class="btn sm ghost" data-act="ignorar" data-id="${esc(t.id)}" title="No va en ningún control">No aplica</button></td>`;
 }
 function txCells(t) {
   const ing = t.code === 0;
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
     <td class="desc"><div>${esc(t.det || '(sin detalle)')}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
-    <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}</td>`;
+    <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
 function resumen(c, h) {
   const val = r => r.estado === 'valido';
   const eg = h.egresos.filter(val), ing = h.ingresos.filter(val);
   const sum = (a, f) => a.filter(f).reduce((s, r) => s + (+r.valor || 0), 0);
-  const ps = [...(c.personas || [])];
+  const ps = [...personasDe(c, h.mes)];
   eg.concat(ing).forEach(r => { if (r.tipo && r.tipo !== 'COMPARTIDO' && !ps.includes(r.tipo)) ps.push(r.tipo); });
   const comp = -sum(eg, r => r.tipo === 'COMPARTIDO') + sum(ing, r => r.tipo === 'COMPARTIDO');
-  const n = Math.max(1, (c.personas || []).length || ps.length);
+  const n = Math.max(1, personasDe(c, h.mes).length || ps.length);
   const per = ps.map(p => { const g = -sum(eg, r => r.tipo === p); const pagar = comp / n + g; const aporte = sum(ing, r => r.tipo === p); return {p, g, pagar, aporte, saldo: pagar + aporte}; });
   const todas = h.egresos.concat(h.ingresos);
   return {comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
@@ -514,7 +540,7 @@ function vInicio() {
   return `<div class="stack">
     <div><div class="eyebrow">Inicio</div><h1>Hola, ${esc((S.me.nombre || S.me.email || '').split(' ')[0])}</h1>
     <div class="note">${a ? 'Tienes el control completo: sincroniza, asigna, valida lo que registren los demás y administra los accesos.' : 'Aquí ves los controles y proyectos que compartes. Puedes registrar gastos e ingresos; quedan por validar hasta que el administrador los revise.'}</div></div>
-    ${a ? `<div class="kpis"><a class="kpi" href="#bandeja"><div class="eyebrow">En la bandeja</div><div class="v">${bandeja().length}</div></a><a class="kpi" href="#validar"><div class="eyebrow">Por validar</div><div class="v ${porValidar().length ? 'warn-t' : ''}">${porValidar().length}</div></a>
+    ${a ? `<div class="kpis"><a class="kpi" href="#bandeja"><div class="eyebrow">En la bandeja</div><div class="v">${bandeja().length}</div></a><a class="kpi" href="#validar"><div class="eyebrow">Por validar</div><div class="v ${porValidar().length ? 'warn-t' : ''}">${porValidar().length}</div></a><a class="kpi" href="#cambios"><div class="eyebrow">Cambios en la app</div><div class="v ${cambios().length ? 'neg' : ''}">${cambios().length}</div></a>
       <a class="kpi" href="#usuarios"><div class="eyebrow">Cuentas esperando acceso</div><div class="v">${S.perfiles.filter(p => !p.activo).length}</div></a><a class="kpi" href="#proyectos"><div class="eyebrow">Proyectos abiertos</div><div class="v">${proyectos().filter(c => !cerrado(c)).length}</div></a></div>` : ''}
     ${sinTx ? `<div class="panel"><div class="bd row" style="justify-content:space-between"><div><h2>Primer paso: sincroniza con Registro Contable</h2><div class="note">Trae los movimientos de la app para empezar a asignarlos.</div></div><button class="btn pri" data-act="sync">Sincronizar</button></div></div>` : ''}
     ${visibles.length ? `<div class="cards">${visibles.map(tarjeta).join('')}</div>` : `<div class="panel"><div class="empty"><b>Todavía no tienes controles asignados</b>${a ? 'Crea proyectos o revisa los controles en Ajustes.' : 'Pídele al administrador que te dé acceso.'}</div></div>`}
@@ -566,7 +592,7 @@ function vBandeja() {
 /* ================= vista: por validar (admin) ================= */
 function candidatos(m) {
   const v = Math.abs(m.valor);
-  return D.txs.filter(t => !D.asig.has(t.id) && !S.ign.has(t.id) && t.code !== 3 && m.fecha && (
+  return D.txs.filter(t => restante(t) > 0.005 && !S.ign.has(t.id) && t.code !== 3 && m.fecha && (
     (cents(t.monto) === cents(v) && dias(t.fecha, m.fecha) <= 20) || (dias(t.fecha, m.fecha) <= 3 && Math.abs(t.monto - v) <= 0.05 * v)))
     .sort((a, b) => (cents(a.monto) === cents(v) ? 0 : 1) - (cents(b.monto) === cents(v) ? 0 : 1) || dias(a.fecha, m.fecha) - dias(b.fecha, m.fecha)).slice(0, 5);
 }
@@ -601,12 +627,13 @@ function vControl(c) {
       <div><div class="eyebrow">${esProy(c) ? '<a href="#proyectos" class="muted small" style="text-decoration:none">← Proyectos</a> ' : ''}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(esProy(c) ? 'Proyecto' : c.nombre)}</span> ${esProy(c) ? `<span class="chip ${cerrado(c) ? '' : 'app'}">${cerrado(c) ? 'Cerrado el ' + fFecha(c.cerradoEl) : 'Abierto'}</span>` : ''}</div>
       <h1>${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>
       ${pend ? `<div class="note"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</a></div>` : ''}</div>
-      <div class="row"><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
+      <div class="row"><button class="btn" data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte PDF</button><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
       ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}">Reabrir proyecto</button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : 'Cerrar proyecto'}</button>`) : ''}</div>
     </div>
     ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
     ${c.porMes ? `<div class="months" role="group" aria-label="Meses">${[...meses].sort().reverse().map(m => `<button data-act="mes" data-c="${c.id}" data-m="${m}" aria-pressed="${m === mes}">${mesLargo(m)}</button>`).join('')}
-      <label class="small muted row" style="gap:6px">Otro mes <input type="month" class="in" id="otroMes" data-c="${c.id}"></label></div>` : ''}
+      <label class="small muted row" style="gap:6px">Otro mes <input type="month" class="in" id="otroMes" data-c="${c.id}"></label></div>
+    ${vParticipantes(c, mes)}` : ''}
     <div class="kpis">
       <div class="kpi"><div class="eyebrow">Ingreso</div><div class="v">${L(R.ingreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Egreso</div><div class="v">${L(-R.egreso)}</div></div>
@@ -637,11 +664,10 @@ function origenChip(r) {
   if (r.estado === 'pendiente') return `<span class="chip warn" title="Registró ${esc(nombreDe(r.creado_por))}">Por validar</span>`;
   if (r.estado === 'rechazado') return `<span class="chip bad" title="${esc(r.nota)}">Rechazado</span>`;
   if (r.tx_id) {
-    if (!esAdmin()) return '<span class="chip app">App</span>';
-    const t = D.byId.get(r.tx_id);
-    if (!t) return S.tx.has((r.fecha || '').slice(0, 7)) ? '<span class="chip bad" title="El registro ya no aparece en la app">Borrado en la app</span>' : '<span class="chip app">App</span>';
-    if (cents(t.monto) !== cents(r.valor)) return `<span class="chip warn" title="Monto en la app">App: ${L(t.monto)}</span>`;
-    return `<span class="chip app" title="${esc(t.cuenta)}">App</span>`;
+    const cb = cambioDe(r);
+    if (cb) return cb.tipo === 'eliminado' ? '<a class="chip bad" href="#cambios">Borrado en la app</a>' : '<a class="chip warn" href="#cambios">Cambió en la app</a>';
+    const n = esAdmin() ? partes(r.tx_id).length : 0;
+    return `<span class="chip app">App${n > 1 ? ' · repartido' : ''}</span>`;
   }
   return `<span class="chip">${r.origen === 'usuario' ? 'Validado' : 'Manual'}</span>`;
 }
@@ -658,19 +684,176 @@ function tablaFilas(c, h, lado) {
   <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>${eg ? 'Tipo' : 'Persona'}</th>${eg && fam ? '<th>Categoría</th>' : ''}<th>Descripción</th><th class="num">Valor</th><th>Estado</th><th></th></tr></thead><tbody>
   ${rows.map(r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}">
     <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
-    <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado)}</select></td>
+    <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado, h.mes)}</select></td>
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
-    <td class="desc small">${esc(r.descripcion || r.detalle)}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
+    <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
     <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}></td>
-    <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && D.byId.get(r.tx_id) && cents(D.byId.get(r.tx_id).monto) !== cents(r.valor) ? ' <button class="btn sm ghost" data-act="usarMonto">Usar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
+    <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
     <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`).join('')}
   ${ro ? '' : `<tr class="addrow" data-c="${c.id}" data-m="${esc(h.mes)}" data-lado="${lado}"><td><input type="date" class="in" data-new="fecha" aria-label="Fecha" value="${fechaDef}"></td>
-    <td><select class="in" data-new="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}">${tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || (c.personas || [])[0] || 'COMPARTIDO'), lado)}</select></td>
+    <td><select class="in" data-new="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}">${tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, h.mes)[0] || 'COMPARTIDO'), lado, h.mes)}</select></td>
     ${eg && fam ? '<td></td>' : ''}<td><input class="in" style="max-width:none;width:100%" data-new="desc" placeholder="${eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'}" aria-label="Descripción"></td>
     <td class="num"><input class="in num" data-new="valor" inputmode="decimal" placeholder="0.00" aria-label="Valor"></td>
     <td colspan="2"><button class="btn sm ${a ? '' : 'pri'}" data-act="agregar">${a ? 'Agregar' : 'Registrar'}</button></td></tr>`}
   </tbody></table></div>
   ${rows.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno manual en la última fila.' : `Registra un ${eg ? 'gasto' : 'ingreso'} en la última fila; quedará por validar.`}</div>`}</div>`;
+}
+
+/* ================= participantes por mes ================= */
+function todasPersonas(c) {
+  const s = new Set(c.personas || []);
+  Object.values(c.personasMes || {}).forEach(l => (l || []).forEach(p => s.add(p)));
+  [...S.movs.values()].filter(m => m.control === c.id && m.tipo && m.tipo !== 'COMPARTIDO').forEach(m => s.add(m.tipo));
+  (S.partTmp || []).forEach(p => s.add(p));
+  return [...s];
+}
+function vParticipantes(c, mes) {
+  const a = esAdmin(); const act = personasDe(c, mes); const propio = Array.isArray((c.personasMes || {})[mes]);
+  if (!(a && S.editPart === c.id + '|' + mes)) return `<div class="row small" style="gap:8px"><span class="eyebrow">Participan en ${esc(mesLargo(mes))}</span>${act.map(p => `<span class="chip">${esc(p)}</span>`).join('') || '<span class="muted">Nadie todavía</span>'}<span class="note">${propio ? 'lista propia de este mes' : 'los de siempre'}</span>${a && !cerrado(c) ? `<button class="btn sm ghost" data-act="editPart" data-c="${c.id}" data-m="${mes}">Cambiar</button>` : ''}</div>`;
+  const sel = S.partTmp || act;
+  return `<div class="panel"><div class="hd"><h2>Participantes de ${esc(mesLargo(mes))}</h2><span class="note">Solo ellos aparecen en TIPO y en la distribución de este mes.</span></div><div class="bd stack">
+    <div class="row" style="gap:6px 18px">${todasPersonas(c).map(p => `<label class="small row" style="gap:6px"><input type="checkbox" data-part value="${esc(p)}" ${sel.includes(p) ? 'checked' : ''}>${esc(p)}</label>`).join('')}</div>
+    <div class="row"><input class="in" id="partNueva" placeholder="Agregar persona (ej.: JENNIFER CANALES)" style="max-width:300px"><button class="btn sm" data-act="partAgregar">Agregar</button></div>
+    <div class="row"><button class="btn sm pri" data-act="partGuardar" data-c="${c.id}" data-m="${mes}">Guardar para este mes</button>${propio ? `<button class="btn sm" data-act="partDefecto" data-c="${c.id}" data-m="${mes}">Volver a los de siempre</button>` : ''}<button class="btn sm ghost" data-act="partCancelar">Cancelar</button></div>
+    <div class="note">Los de siempre (${esc((c.personas || []).join(', ') || 'ninguno')}) se cambian en Ajustes y aplican a los meses sin lista propia.</div></div></div>`;
+}
+
+/* ================= vista: cambios en la app (admin) ================= */
+function vCambios() {
+  const lista = cambios();
+  return `<div class="stack"><div><div class="eyebrow">Cambios en la app</div><h1>${lista.length ? `${lista.length} ${lista.length === 1 ? 'fila cambió' : 'filas cambiaron'} en Registro Contable` : 'Sin cambios pendientes'}</h1>
+    <div class="note">Movimientos ya asignados que, al sincronizar, aparecieron modificados o borrados en la app. Decide qué hacer con cada uno.</div></div>
+    <div class="panel">${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Fila en el control</th><th>Qué cambió en la app</th><th></th></tr></thead><tbody>${lista.map(({m, c: cb}) => { const c = ctrlById(m.control);
+      return `<tr data-mov="${esc(m.id)}"><td><span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)}</span><div class="cat">${esc(mesLargo(m.mes))}</div></td>
+      <td class="small"><button class="linkish" data-act="detalle">${esc(m.descripcion || '(sin descripción)')}</button><div class="cat">${fFecha(m.fecha)} · ${L(m.valor)}${partes(m.tx_id).length > 1 ? ' · repartido' : ''}</div></td>
+      <td class="small">${cb.tipo === 'eliminado' ? '<span class="chip bad">Borrado en la app</span>' : cb.d.map(([k, x, y]) => `<div><b>${k}:</b> <s class="muted">${esc(x)}</s> → ${esc(y)}</div>`).join('')}</td>
+      <td style="white-space:nowrap">${cb.tipo === 'eliminado' ? '<button class="btn sm danger" data-act="cbQuitar">Quitar del control</button> <button class="btn sm" data-act="cbManual">Conservar como manual</button>' : '<button class="btn sm pri" data-act="cbAplicar">Aplicar cambio</button> <button class="btn sm" data-act="cbMantener">Mantener mi fila</button>'}</td></tr>`; }).join('')}</tbody></table></div>`
+    : '<div class="empty">Cuando una sincronización encuentre movimientos asignados que cambiaron o se borraron en la app, aparecerán aquí.</div>'}</div></div>`;
+}
+
+/* ================= reparto de un movimiento ================= */
+function abrirReparto(txId) {
+  const t = D.byId.get(txId); if (!t) return toast('Ese movimiento ya no está en lo sincronizado.');
+  const ps = partes(txId).map(m => ({id: m.id, control: m.control, tipo: m.tipo, mes: m.mes, valor: m.valor, orig: m}));
+  if (!ps.length) { const c = sugerido(t) || familiares()[0]; ps.push({control: c.id, tipo: tipoSugerido(c, t), mes: c.porMes ? t.mes : 'general', valor: t.monto}); }
+  S.rep = {t, partes: ps, borrar: []}; pintarReparto();
+}
+function pintarReparto() {
+  const {t, partes: ps} = S.rep; const lado = t.code === 0 ? 'ingreso' : 'egreso';
+  const suma = ps.reduce((s, p) => s + (+p.valor || 0), 0); const resto = Math.round((t.monto - suma) * 100) / 100;
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="repT" style="max-width:780px">
+    <div class="hd"><h2 id="repT" style="margin-right:auto">Repartir movimiento</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd">
+      <div class="small"><b>${esc(t.det || '(sin detalle)')}</b><div class="cat">${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></div>
+      <div class="kpis"><div class="kpi"><div class="eyebrow">Monto en la app</div><div class="v">${L(t.monto)}</div></div><div class="kpi"><div class="eyebrow">Repartido</div><div class="v">${L(suma)}</div></div><div class="kpi"><div class="eyebrow">Sin repartir</div><div class="v ${resto < -0.005 ? 'neg' : resto > 0.005 ? 'warn-t' : 'pos'}">${L(resto)}</div></div></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Control o proyecto</th><th>Tipo</th><th>Mes</th><th class="num">Monto</th><th></th></tr></thead><tbody>
+      ${ps.map((p, i) => { const c = ctrlById(p.control); return `<tr data-i="${i}"><td>${ctrlSelect(p.control, 'class="in" data-rp="control" aria-label="Control o proyecto"')}</td>
+        <td><select class="in" data-rp="tipo" aria-label="Tipo">${tipoOptions(c, p.tipo, lado, p.mes)}</select></td>
+        <td><select class="in" data-rp="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(p.mes === 'general' ? t.mes : p.mes)}</select></td>
+        <td class="num"><input class="in num" data-rp="valor" value="${(+p.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Monto"></td>
+        <td><button class="btn sm ghost danger" data-act="rpQuitar">Quitar</button></td></tr>`; }).join('')}
+      </tbody></table></div>
+      <div class="row"><button class="btn sm" data-act="rpAgregar">Agregar parte</button>${resto > 0.005 ? `<span class="note">Lo que no repartas (${L(resto)}) sigue en la bandeja.</span>` : ''}${resto < -0.005 ? `<span class="small neg">Repartiste ${L(-resto)} de más.</span>` : ''}</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="rpGuardar" ${resto < -0.005 ? 'disabled' : ''}>Guardar reparto</button></div>
+    </div></div></div>`;
+}
+async function guardarReparto() {
+  const {t, partes: ps, borrar} = S.rep; const lado = t.code === 0 ? 'ingreso' : 'egreso';
+  if (ps.some(p => !(+p.valor > 0))) return toast('Cada parte necesita un monto mayor que cero.');
+  if (ps.some(p => !p.id && cerrado(ctrlById(p.control)))) return toast('No puedes agregar partes a un proyecto cerrado.');
+  try {
+    for (const id of borrar) { await q(sb.from('movimientos').delete().eq('id', id)); S.movs.delete(id); }
+    const nuevos = [];
+    for (const p of ps) {
+      const c = ctrlById(p.control); const mes = c.porMes ? (p.mes === 'general' ? t.mes : p.mes) : 'general';
+      if (p.id) {
+        const o = p.orig; const ch = {};
+        if (o.control !== p.control) ch.control = p.control; if (o.tipo !== p.tipo) ch.tipo = p.tipo; if (o.mes !== mes) ch.mes = mes; if (cents(o.valor) !== cents(p.valor)) ch.valor = +p.valor;
+        if (Object.keys(ch).length) { const d = await q(sb.from('movimientos').update(ch).eq('id', p.id).select()); if (d && d[0]) S.movs.set(p.id, normMov(d[0])); }
+      } else nuevos.push({control: c.id, mes, lado, fecha: t.fecha, tipo: p.tipo, cat: lado === 'ingreso' ? '' : t.sub, sub: lado === 'ingreso' ? '' : t.nota, descripcion: t.det, detalle: '', valor: +p.valor, tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t)});
+    }
+    if (nuevos.length) { const d = await q(sb.from('movimientos').insert(nuevos).select()); (d || []).forEach(m => S.movs.set(m.id, normMov(m))); }
+  } catch (e) { derive(); render(); return; }
+  S.rep = null; $('#modalRoot').innerHTML = ''; derive(); render(); toast('Reparto guardado');
+}
+
+/* ================= detalle de una fila ================= */
+function abrirDetalle(id) {
+  const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin();
+  const t = m.tx_id ? D.byId.get(m.tx_id) : null; const cb = cambioDe(m);
+  const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
+  const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
+  const ps = a && m.tx_id ? partes(m.tx_id) : [];
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="detT">
+    <div class="hd"><h2 id="detT" style="margin-right:auto">${esc(m.descripcion || m.detalle || 'Movimiento')}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd">
+      <div class="row">${origenChip(m)}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))}</span></div>
+      <table class="dist"><tbody>
+        ${fila('Movimiento', m.lado === 'ingreso' ? 'Ingreso' : 'Egreso')}${fila('Fecha', fFecha(m.fecha))}${fila(m.lado === 'ingreso' ? 'Persona' : 'TIPO', esc(m.tipo))}
+        ${fila('Valor en este control', `<b class="num">${L(m.valor)}</b>`)}${fila('Categoría', esc(m.cat))}${fila('Subcategoría', esc(m.sub))}${fila('Descripción', esc(m.descripcion))}${fila('Nota', esc(m.detalle))}
+      </tbody></table>
+      ${m.tx_id ? `<div class="eyebrow">En Registro Contable</div><table class="dist"><tbody>
+        ${fila('Cuenta', esc((t && t.cuenta) || m.app_cuenta))}${fila('Categoría', esc((t && t.cat) || m.app_categoria))}
+        ${t ? fila('Subcategoría', esc(t.sub)) + fila('Contenido', esc(t.nota)) + fila('Tipo en la app', esc(t.tipoMov)) : fila('Subcategoría', esc(m.cat)) + fila('Contenido', esc(m.sub))}
+        ${fila('Detalle', esc((t && t.det) || m.app_detalle))}${fila('Fecha en la app', fFecha((t && t.fecha) || m.app_fecha))}
+        ${fila('Monto total en la app', `<span class="num">${L((t && t.monto) || m.app_monto || m.valor)}</span>`)}${a ? fila('ID en la app', `<span class="mono small">${esc(m.tx_id)}</span>`) : ''}
+      </tbody></table>` : ''}
+      ${cb ? `<div class="panel"><div class="bd small">${cb.tipo === 'eliminado' ? 'Este registro ya no aparece en la app.' : 'Cambió en la app: ' + cb.d.map(([k, x, y]) => `${k} ${esc(x)} → ${esc(y)}`).join(' · ')} <a href="#cambios" data-act="cerrarModal">Revisar en Cambios</a></div></div>` : ''}
+      ${ps.length > 1 ? `<div class="eyebrow">Repartido en ${ps.length} partes</div><table class="dist"><tbody>${ps.map(p => { const pc = ctrlById(p.control); return `<tr><td>${esc(pc ? pc.nombre : p.control)} · ${esc(mesLargo(p.mes))} · ${esc(p.tipo)}</td><td class="num">${L(p.valor)}</td></tr>`; }).join('')}</tbody></table>` : ''}
+      <table class="dist"><tbody>
+        ${fila('Estado', {valido: 'Validado', pendiente: 'Por validar', rechazado: 'Rechazado'}[m.estado])}
+        ${fila('Origen', {app: 'Asignado desde la app', manual: 'Agregado a mano', usuario: 'Registrado por un usuario'}[m.origen])}
+        ${fila('Registró', m.creado_por ? `${esc(nombreDe(m.creado_por))} · ${cuando(m.creado_el)}` : '')}${fila('Validó', m.validado_por ? `${esc(nombreDe(m.validado_por))} · ${cuando(m.validado_el)}` : '')}
+        ${fila('Motivo de rechazo', m.estado === 'rechazado' ? esc(m.nota) : '')}
+      </tbody></table>
+      ${a && m.tx_id && t && !cerrado(c) ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dividirMov" data-mov-id="${esc(m.id)}">${ps.length > 1 ? 'Cambiar reparto' : 'Dividir'}</button></div>` : ''}
+    </div></div></div>`;
+}
+
+/* ================= reporte PDF ================= */
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const AUTOTABLE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+function cargarScript(src) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de PDF. Revisa tu internet.')); document.head.appendChild(s); }); }
+async function exportarPDF(c, mes) {
+  toast('Preparando PDF…');
+  try {
+    if (!window.jspdf) await cargarScript(JSPDF_URL);
+    if (!window.jspdf.jsPDF.API.autoTable) await cargarScript(AUTOTABLE_URL);
+    const {jsPDF} = window.jspdf; const doc = new jsPDF({unit: 'pt', format: 'letter'});
+    const h = hoja(c.id, mes); const R = resumen(c, h); const val = r => r.estado === 'valido';
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40; let y = 50;
+    const verde = [30, 106, 80], gris = [93, 107, 100], tinta = [24, 33, 29];
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(...tinta); doc.text(c.nombre, M, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...gris); y += 17;
+    doc.text(c.porMes ? mesLargo(mes) : (cerrado(c) ? `Proyecto cerrado el ${fFecha(c.cerradoEl)}` : 'Proyecto abierto'), M, y);
+    doc.text(`Generado el ${new Date().toLocaleString('es-HN', {dateStyle: 'long', timeStyle: 'short'})}`, W - M, y, {align: 'right'});
+    y += 24;
+    const titulo = t => { if (y > H - 110) { doc.addPage(); y = 50; } doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...tinta); doc.text(t, M, y); y += 7; };
+    const tabla = o => { doc.autoTable(Object.assign({startY: y, margin: {left: M, right: M}, styles: {font: 'helvetica', fontSize: 9, cellPadding: 4, textColor: tinta, lineColor: [215, 221, 214], lineWidth: 0.4}, headStyles: {fillColor: verde, textColor: 255, fontStyle: 'bold'}, footStyles: {fillColor: [235, 239, 234], textColor: tinta, fontStyle: 'bold'}, alternateRowStyles: {fillColor: [246, 248, 245]}}, o)); y = doc.lastAutoTable.finalY + 20; };
+    const der = cols => Object.fromEntries(cols.map(i => [i, {halign: 'right'}]));
+    titulo('Resumen');
+    tabla({head: [['Ingresos', 'Egresos', 'Saldo', 'Por validar']], body: [[L(R.ingreso), L(-R.egreso), L(R.ingreso - R.egreso), String(R.pendientes)]], columnStyles: der([0, 1, 2, 3])});
+    if (c.porMes) {
+      titulo('Resumen de distribución');
+      tabla({head: [['Descripción', 'Valor']], body: [['COMPARTIDO', L(R.comp)], ...R.per.map(x => [x.p, L(x.g)])], foot: [['SALDO', L(R.comp + R.per.reduce((s, x) => s + x.g, 0))]], columnStyles: der([1])});
+      titulo(`Distribución por persona (compartido entre ${R.n})`);
+      tabla({head: [['Persona', 'Total a pagar', 'Aportó', 'Saldo', 'Situación']], body: R.per.map(x => [x.p, L(x.pagar), L(x.aporte), L(x.saldo), x.saldo < -0.004 ? `Le falta ${L(-x.saldo)}` : x.saldo > 0.004 ? `A favor ${L(x.saldo)}` : 'Al día']), columnStyles: der([1, 2, 3])});
+    } else if (R.per.length) { titulo('Egresos por TIPO'); tabla({head: [['TIPO', 'Egresos']], body: R.per.map(x => [x.p, L(-x.g)]), columnStyles: der([1])}); }
+    const eg = h.egresos.filter(val), ing = h.ingresos.filter(val);
+    titulo(`Detalle de egresos (${eg.length})`);
+    tabla({head: [['Fecha', 'TIPO', 'Categoría', 'Descripción', 'Valor']], body: eg.length ? eg.map(r => [fFecha(r.fecha), r.tipo, [r.cat, r.sub].filter(Boolean).join(' / '), r.descripcion || r.detalle, L(r.valor)]) : [['', '', '', 'Sin egresos', '']], foot: [['', '', '', 'Total', L(R.egreso)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 86}, 2: {cellWidth: 118}, 4: {halign: 'right', cellWidth: 72}}});
+    titulo(`Detalle de ingresos (${ing.length})`);
+    tabla({head: [['Fecha', 'Persona', 'Descripción', 'Valor']], body: ing.length ? ing.map(r => [fFecha(r.fecha), r.tipo, r.descripcion || r.detalle, L(r.valor)]) : [['', '', 'Sin ingresos', '']], foot: [['', '', 'Total', L(R.ingreso)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 110}, 3: {halign: 'right', cellWidth: 72}}});
+    if (R.pendientes) { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...gris); doc.text(`No incluye ${R.pendientes} registros por validar.`, M, Math.min(y, H - 40)); }
+    const n = doc.getNumberOfPages();
+    for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gris); doc.text(`Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''} · página ${i} de ${n}`, W / 2, H - 22, {align: 'center'}); }
+    const base = c.nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_');
+    descargar(`${base}${c.porMes ? '_' + mes : ''}.pdf`, doc.output('blob'));
+  } catch (e) { toast('No se pudo generar el PDF: ' + (e && e.message || e)); }
+}
+async function rellenarDatosApp() {
+  const l = [...S.movs.values()].filter(m => m.tx_id && m.app_monto == null && D.byId.has(m.tx_id));
+  for (const m of l) { const {data} = await sb.from('movimientos').update(snapApp(D.byId.get(m.tx_id))).eq('id', m.id).select(); if (data && data[0]) S.movs.set(m.id, normMov(data[0])); }
 }
 
 /* ================= vista: proyectos ================= */
@@ -732,8 +915,8 @@ function vMovimientos() {
       <select id="fest" aria-label="Estado"><option value="">Todos los estados</option>${Object.entries(EST).map(([k, v]) => `<option value="${k}" ${f.estado === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
       <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select></div>
     ${total ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
-      ${lista.map(t => { const e = estadoTx(t); const m = D.asig.get(t.id); const c = m && ctrlById(m.control);
-        return `<tr data-tx="${esc(t.id)}">${txCells(t)}<td>${m ? `<span class="chip app"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)} · ${m.mes === 'general' ? 'proyecto' : mesLargo(m.mes)}</span>` : `<span class="chip ${EST[e][1]}">${EST[e][0]}</span>`}${e === 'noaplica' ? `<div class="note">${esc(S.ign.get(t.id).motivo || '')}</div>` : ''}</td>
+      ${lista.map(t => { const e = estadoTx(t); const pp = partes(t.id); const m = e === 'asignado' ? pp[0] : null; const c = m && ctrlById(m.control);
+        return `<tr data-tx="${esc(t.id)}">${txCells(t)}<td>${m ? `<span class="chip app"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)} · ${m.mes === 'general' ? 'proyecto' : mesLargo(m.mes)}${pp.length > 1 ? ` · +${pp.length - 1} ${pp.length === 2 ? 'parte' : 'partes'}` : ''}</span>` : `<span class="chip ${EST[e][1]}">${EST[e][0]}${pp.length ? ' · repartido en parte' : ''}</span>`}${e === 'noaplica' ? `<div class="note">${esc(S.ign.get(t.id).motivo || '')}</div>` : ''}</td>
         <td style="white-space:nowrap">${m ? `<a class="btn sm ghost" href="${c ? hrefC(c) : '#'}" data-act="irMes" data-c="${esc(m.control)}" data-m="${esc(m.mes)}">Ver</a>` : e === 'noaplica' ? `<button class="btn sm" data-act="restaurar" data-id="${esc(t.id)}">Devolver a la bandeja</button>` : (e === 'pendiente' ? '<a class="btn sm ghost" href="#bandeja">Ir a la bandeja</a>' : `<button class="btn sm" data-act="asignarOtro" data-id="${esc(t.id)}">Asignar…</button>`)}</td></tr>`; }).join('')}
     </tbody></table></div>${total > lista.length ? `<div class="bd"><button class="btn" data-act="mas">Mostrar más (${total - lista.length} restantes)</button></div>` : ''}`
     : '<div class="empty"><b>Sin resultados</b>Cambia los filtros o sincroniza.</div>'}</div></div>`;
@@ -872,28 +1055,33 @@ async function procesarPayload(txt) {
   let p = null; try { p = JSON.parse(txt); } catch (_) { p = xmlAPayload(txt); }
   if (!p || p.src !== 'registro-contable' || !Array.isArray(p.rows)) { msg.innerHTML = '<span class="neg">Eso no parece venir del portal. Vuelve a copiar los datos desde Registro Contable.</span>'; return; }
   msg.textContent = `Procesando ${p.rows.length} movimientos…`;
-  const antes = new Set(D.byId.keys());
+  const antes = new Set(D.byId.keys()); const prevTx = new Map(D.byId); const cambiosAntes = cambios().length;
   const porMes = new Map();
   for (const r of p.rows) { if (!r[0] || !r[1]) continue; const m = r[1].slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(r); }
   const desde = (p.desde || '').slice(0, 7), hasta = (p.hasta || '').slice(0, 7);
   for (const m of S.tx.keys()) if (m >= desde && m <= hasta && !porMes.has(m)) porMes.set(m, []);
-  const cambios = [];
-  for (const [m, rows] of porMes) { rows.sort((a, b) => a[0] < b[0] ? -1 : 1); const prev = S.tx.get(m); if (!prev || JSON.stringify(prev.rows) !== JSON.stringify(rows)) cambios.push({mes: m, rows, n: rows.length, sincronizado: p.at}); }
+  const mesesCamb = [];
+  for (const [m, rows] of porMes) { rows.sort((a, b) => a[0] < b[0] ? -1 : 1); const prev = S.tx.get(m); if (!prev || JSON.stringify(prev.rows) !== JSON.stringify(rows)) mesesCamb.push({mes: m, rows, n: rows.length, sincronizado: p.at}); }
   try {
-    for (let i = 0; i < cambios.length; i += 4) { const lote = cambios.slice(i, i + 4); await q(sb.from('tx_mes').upsert(lote)); lote.forEach(c => S.tx.set(c.mes, c)); msg.textContent = `Guardando meses… ${Math.min(i + 4, cambios.length)} de ${cambios.length}`; }
+    for (let i = 0; i < mesesCamb.length; i += 4) { const lote = mesesCamb.slice(i, i + 4); await q(sb.from('tx_mes').upsert(lote)); lote.forEach(c => S.tx.set(c.mes, c)); msg.textContent = `Guardando meses… ${Math.min(i + 4, mesesCamb.length)} de ${mesesCamb.length}`; }
     await guardarAjuste('ultimaSync', {at: new Date().toISOString(), n: p.rows.length, desde: p.desde, hasta: p.hasta});
   } catch (e) { msg.innerHTML = `<span class="neg">Se interrumpió la sincronización: ${esc(errMsg(e))}</span>`; return; }
   derive(); render();
   const nuevos = D.txs.filter(t => !antes.has(t.id)).length;
-  msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${antes.size ? `${nuevos} nuevos.` : ''} ${cambios.length} meses actualizados. <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
+  const ahora = new Set(D.byId.keys());
+  let modificados = 0, eliminados = 0;
+  for (const t of D.txs) { const o = prevTx.get(t.id); if (o && (cents(o.monto) !== cents(t.monto) || o.fecha !== t.fecha || o.det !== t.det || o.cuenta !== t.cuenta || o.cat !== t.cat)) modificados++; }
+  for (const [id, o] of prevTx) if (!ahora.has(id) && o.mes >= desde && o.mes <= hasta) eliminados++;
+  const nc = cambios().length;
+  msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${antes.size ? `${nuevos} nuevos, ${modificados} modificados y ${eliminados} borrados en la app.` : ''} ${mesesCamb.length} ${mesesCamb.length === 1 ? "mes actualizado" : "meses actualizados"}.${nc > cambiosAntes ? ` <b class="neg">${nc - cambiosAntes} filas ya asignadas cambiaron en la app.</b> <a href="#cambios" data-act="cerrarModal">Revisar cambios</a> ·` : ''} <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
 }
 
 /* ================= acciones ================= */
 async function asignar(ids, ctrlId, tipo, mesFijo) {
   const c = ctrlById(ctrlId); if (!c) return toast('Elige un control o proyecto.'); if (cerrado(c)) return toast('Ese proyecto está cerrado.');
-  const rows = ids.map(id => D.byId.get(id)).filter(t => t && !D.asig.has(t.id)).map(t => ({
+  const rows = ids.map(id => D.byId.get(id)).filter(t => t && restante(t) > 0.005).map(t => ({
     control: c.id, mes: c.porMes ? (mesFijo || t.mes) : 'general', lado: t.code === 0 ? 'ingreso' : 'egreso', fecha: t.fecha, tipo,
-    cat: t.code === 0 ? '' : t.sub, sub: t.code === 0 ? '' : t.nota, descripcion: t.det, detalle: '', valor: t.monto, tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString()}));
+    cat: t.code === 0 ? '' : t.sub, sub: t.code === 0 ? '' : t.nota, descripcion: t.det, detalle: '', valor: restante(t), tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t)}));
   if (!rows.length) return;
   ids.forEach(id => S.sel.delete(id));
   await insertarMovs(rows, `${rows.length === 1 ? 'Asignado' : rows.length + ' asignados'} a ${c.corto || c.nombre}`).catch(() => {});
@@ -1021,12 +1209,42 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'detalle') { const m = movDe(b); if (m) abrirDetalle(m.id); return; }
+  if (act === 'dividir') return abrirReparto(b.dataset.id);
+  if (act === 'dividirMov') { const m = movDe(b) || S.movs.get(b.dataset.movId); if (m && m.tx_id) abrirReparto(m.tx_id); return; }
+  if (act === 'rpAgregar') { const t = S.rep.t; const resto = Math.round((t.monto - S.rep.partes.reduce((s, p) => s + (+p.valor || 0), 0)) * 100) / 100; const c = familiares()[0]; S.rep.partes.push({control: c.id, tipo: c.tipoDefecto || 'COMPARTIDO', mes: t.mes, valor: Math.max(resto, 0)}); return pintarReparto(); }
+  if (act === 'rpQuitar') { const i = +b.closest('tr').dataset.i; const [p] = S.rep.partes.splice(i, 1); if (p && p.id) S.rep.borrar.push(p.id); return pintarReparto(); }
+  if (act === 'rpGuardar') return guardarReparto();
+  if (act === 'pdf') return exportarPDF(ctrlById(b.dataset.c), b.dataset.m);
+  if (act === 'editPart') { S.editPart = b.dataset.c + '|' + b.dataset.m; S.partTmp = null; return render(); }
+  if (act === 'partCancelar') { S.editPart = null; S.partTmp = null; return render(); }
+  if (act === 'partAgregar') { const v = ($('#partNueva').value || '').trim().toUpperCase(); if (!v) return toast('Escribe el nombre.'); const sel = [...document.querySelectorAll('[data-part]:checked')].map(x => x.value); if (!sel.includes(v)) sel.push(v); S.partTmp = sel; return render(); }
+  if (act === 'partGuardar' || act === 'partDefecto') {
+    const c = ctrlById(b.dataset.c); const mes = b.dataset.m; const prev = JSON.stringify(c.personasMes || {}); const pm = Object.assign({}, c.personasMes || {});
+    if (act === 'partGuardar') pm[mes] = [...document.querySelectorAll('[data-part]:checked')].map(x => x.value); else delete pm[mes];
+    c.personasMes = pm;
+    return guardarControl(c).then(() => { S.editPart = null; S.partTmp = null; derive(); render(); toast(act === 'partGuardar' ? 'Participantes guardados para ' + mesLargo(mes) : 'Este mes usa los de siempre'); }).catch(() => { c.personasMes = JSON.parse(prev); render(); });
+  }
+  if (act === 'cbAplicar' || act === 'cbMantener') {
+    const m = movDe(b); const t = m && D.byId.get(m.tx_id); if (!t) return;
+    const campos = snapApp(t); const solo = partes(m.tx_id).length === 1;
+    if (act === 'cbAplicar') {
+      if (solo && cents(m.valor) === cents(m.app_monto)) campos.valor = t.monto;
+      if (m.app_fecha && m.fecha === m.app_fecha) { campos.fecha = t.fecha; const c = ctrlById(m.control); if (solo && c && c.porMes && m.mes === m.app_fecha.slice(0, 7)) campos.mes = t.fecha.slice(0, 7); }
+      if (m.descripcion === m.app_detalle) campos.descripcion = t.det;
+    }
+    await actualizarMov(m.id, campos, act === 'cbAplicar' ? 'Cambio aplicado' : 'Se mantiene tu fila').catch(() => {});
+    if (act === 'cbAplicar' && !solo) { toast('Está repartido: revisa los montos de cada parte'); abrirReparto(m.tx_id); }
+    return;
+  }
+  if (act === 'cbQuitar') { const m = movDe(b); return borrarMov(m.id, 'Quitado del control').catch(() => {}); }
+  if (act === 'cbManual') { const m = movDe(b); return actualizarMov(m.id, {tx_id: null, origen: 'manual', app_monto: null, app_fecha: null, app_detalle: null, app_cuenta: null, app_categoria: null}, 'Se conserva como manual').catch(() => {}); }
   if (act === 'aprobar') { const m = movDe(b); return actualizarMov(m.id, {estado: 'valido', validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Aprobado como manual').catch(() => {}); }
   if (act === 'ligar') { const m = movDe(b); S.ligarAbierto = S.ligarAbierto === m.id ? null : m.id; S.rechazoAbierto = null; return render(); }
   if (act === 'ligarTx') {
     const m = movDe(b.closest('tr').previousElementSibling) || S.movs.get(S.ligarAbierto); const t = D.byId.get(b.dataset.tx); if (!m || !t) return;
     S.ligarAbierto = null;
-    return actualizarMov(m.id, {estado: 'valido', tx_id: t.id, cat: m.cat || (m.lado === 'egreso' ? t.sub : ''), sub: m.sub || (m.lado === 'egreso' ? t.nota : ''), validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Validado y ligado a la app').catch(() => {});
+    return actualizarMov(m.id, {estado: 'valido', tx_id: t.id, ...snapApp(t), cat: m.cat || (m.lado === 'egreso' ? t.sub : ''), sub: m.sub || (m.lado === 'egreso' ? t.nota : ''), validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Validado y ligado a la app').catch(() => {});
   }
   if (act === 'rechazar') { const m = movDe(b); S.rechazoAbierto = S.rechazoAbierto === m.id ? null : m.id; S.ligarAbierto = null; render(); const i = $('#notaRechazo'); i && i.focus(); return; }
   if (act === 'confirmarRechazo') { const m = S.movs.get(S.rechazoAbierto); if (!m) return; S.rechazoAbierto = null; return actualizarMov(m.id, {estado: 'rechazado', nota: $('#notaRechazo').value.trim(), validado_por: S.me.id, validado_el: new Date().toISOString()}, 'Rechazado').catch(() => {}); }
@@ -1067,7 +1285,14 @@ document.addEventListener('change', async e => {
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
   if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); return; }
-  if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso'); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (t.dataset.rp && S.rep) {
+    const i = +t.closest('tr').dataset.i; const p = S.rep.partes[i]; const f = t.dataset.rp;
+    if (f === 'valor') { const v = parseFloat(t.value.replace(/[^0-9.\-]/g, '')); p.valor = isFinite(v) ? Math.round(v * 100) / 100 : 0; }
+    else if (f === 'control') { const c = ctrlById(t.value); p.control = t.value; p.mes = c && c.porMes ? (p.mes === 'general' ? S.rep.t.mes : p.mes) : 'general'; p.tipo = tipoSugerido(c, S.rep.t); }
+    else p[f] = t.value;
+    return pintarReparto();
+  }
   if (t.dataset.edit) {
     const m = movDe(t); if (!m) return;
     if (t.dataset.edit === 'valor') { const v = parseFloat(t.value.replace(/[^0-9.\-]/g, '')); if (!isFinite(v)) { t.value = (+m.valor).toFixed(2); return toast('Valor no válido'); } return actualizarMov(m.id, {valor: v}).catch(() => {}); }
