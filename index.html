@@ -366,6 +366,7 @@ async function cargarTodo() {
     S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
     S.aj = Object.fromEntries(aj.map(a => [a.clave, a.valor])); S.perfiles = pf; S.accesos = ac;
     if (!S.aj.inicio) S.aj.inicio = hoy().slice(0, 8) + '01';
+    try { S.hist = new Map((await todo('tx_hist')).map(x => [x.tx_id, x])); } catch (e) { S.hist = null; }
   } else {
     S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
@@ -399,7 +400,7 @@ let arrancando = false;
 async function arrancar() {
   if (arrancando) return; arrancando = true;
   $('#topbar').hidden = false; app().innerHTML = '<div class="loading">Cargando tus datos…</div>';
-  try { await cargarTodo(); derive(); route(); render(); if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); } }
+  try { await cargarTodo(); derive(); route(); render(); if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); iniciarHistorial().catch(() => {}); } }
   catch (e) { fatal(errMsg(e)); }
   finally { arrancando = false; }
 }
@@ -541,7 +542,7 @@ function asignarCells(t) {
 function txCells(t) {
   const ing = t.code === 0;
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
-    <td class="desc"><div>${esc(t.det || '(sin detalle)')}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
+    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button></div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
     <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
@@ -1268,8 +1269,60 @@ async function procesarPayload(txt) {
   let modificados = 0, eliminados = 0;
   for (const t of D.txs) { const o = prevTx.get(t.id); if (o && (cents(o.monto) !== cents(t.monto) || o.fecha !== t.fecha || o.det !== t.det || o.cuenta !== t.cuenta || o.cat !== t.cat)) modificados++; }
   for (const [id, o] of prevTx) if (!ahora.has(id) && o.mes >= desde && o.mes <= hasta) eliminados++;
+  await registrarHistorial(prevTx, p.at || new Date().toISOString(), desde, hasta, msg).catch(() => {});
   const nc = cambios().length;
   msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${antes.size ? `${nuevos} nuevos, ${modificados} modificados y ${eliminados} borrados en la app.` : ''} ${mesesCamb.length} ${mesesCamb.length === 1 ? "mes actualizado" : "meses actualizados"}.${nc > cambiosAntes ? ` <b class="neg">${nc - cambiosAntes} filas ya asignadas cambiaron en la app.</b> <a href="#cambios" data-act="cerrarModal">Revisar cambios</a> ·` : ''} <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
+}
+
+/* ================= historial de sincronización ================= */
+const CAMPOS_TX = [['monto', 'Monto', v => L(v)], ['fecha', 'Fecha', v => fFecha(v)], ['det', 'Detalle'], ['cuenta', 'Cuenta'], ['cat', 'Categoría'], ['sub', 'Subcategoría'], ['nota', 'Contenido'], ['tipoMov', 'Tipo en la app']];
+function difTx(o, t) { return CAMPOS_TX.filter(([k]) => k === 'monto' ? cents(o.monto) !== cents(t.monto) : (o[k] || '') !== (t[k] || '')).map(([k, n, f]) => [n, f ? f(o[k]) : (o[k] || ''), f ? f(t[k]) : (t[k] || '')]); }
+async function registrarHistorial(prevTx, at, desde, hasta, msg) {
+  if (!S.hist) return;
+  const cambiar = []; const ahora = new Date().toISOString(); const vacio = S.hist.size === 0;
+  for (const t of D.txs) {
+    const h = S.hist.get(t.id); const o = prevTx.get(t.id);
+    if (!h) { cambiar.push({tx_id: t.id, primera: o && vacio ? null : at, visto: ahora, cambios: []}); continue; }
+    if (o) { const d = difTx(o, t); if (d.length) cambiar.push(Object.assign({}, h, {cambios: [...(h.cambios || []), {at, d}]})); }
+  }
+  for (const [id, o] of prevTx) if (!D.byId.has(id) && o.mes >= desde && o.mes <= hasta) { const h = S.hist.get(id); if (h && !(h.cambios || []).some(x => x.borrado)) cambiar.push(Object.assign({}, h, {cambios: [...(h.cambios || []), {at, borrado: true}]})); }
+  for (let i = 0; i < cambiar.length; i += 500) { const lote = cambiar.slice(i, i + 500); if (msg && cambiar.length > 500) msg.textContent = `Guardando historial… ${Math.min(i + 500, cambiar.length)} de ${cambiar.length}`; await q(sb.from('tx_hist').upsert(lote)); lote.forEach(x => S.hist.set(x.tx_id, x)); }
+}
+async function iniciarHistorial() {
+  if (!S.hist || S.hist.size || !D.txs.length) return;
+  const ahora = new Date().toISOString(); const filas = D.txs.map(t => ({tx_id: t.id, primera: null, visto: ahora, cambios: []}));
+  for (let i = 0; i < filas.length; i += 500) { const lote = filas.slice(i, i + 500); await q(sb.from('tx_hist').upsert(lote)); lote.forEach(x => S.hist.set(x.tx_id, x)); }
+}
+function abrirDetalleTx(id) {
+  const t = D.byId.get(id); if (!t) return;
+  const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
+  const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
+  const e = estadoTx(t); const pp = partes(t.id); const h = S.hist && S.hist.get(t.id); const ign = S.ign.get(t.id);
+  const estadoTxt = {asignado: 'Asignado', pendiente: pp.length ? 'Repartido en parte' : 'Pendiente en la bandeja', noaplica: 'No aplica', traslado: 'Traslado entre cuentas', futuro: 'Programado (fecha futura)', anterior: 'Antes del inicio de la bandeja', otro: 'Sin control sugerido'}[e] || e;
+  const hist = !S.hist ? '<div class="note">El historial de sincronización se activa al correr el SQL nuevo en Supabase.</div>'
+    : !h ? '<div class="note">Todavía no hay historial de este registro. Se guardará en la próxima sincronización.</div>'
+    : `<table class="dist"><tbody>
+        ${fila('Primera sincronización', h.primera ? cuando(h.primera) : `Ya estaba en la plataforma cuando se activó el historial (${cuando(h.visto)})`)}
+        ${(h.cambios || []).map(x => `<tr><th>${x.borrado ? 'Borrado en la app' : 'Modificado'}<div class="cat">${cuando(x.at)}</div></th><td>${x.borrado ? 'Ya no apareció al sincronizar' : x.d.map(([k, a, b]) => `<div><b>${esc(k)}:</b> <s class="muted">${esc(a)}</s> → ${esc(b)}</div>`).join('')}</td></tr>`).join('')}
+        ${(h.cambios || []).length ? '' : '<tr><th>Modificaciones</th><td>Sin cambios desde que llegó</td></tr>'}
+      </tbody></table>`;
+  const snap = pp.filter(m => m.app_monto != null).map(m => { const d = []; if (cents(m.app_monto) !== cents(t.monto)) d.push(`monto ${L(m.app_monto)}`); if (m.app_fecha && m.app_fecha !== t.fecha) d.push(`fecha ${fFecha(m.app_fecha)}`); if (m.app_detalle != null && m.app_detalle !== t.det) d.push(`detalle "${esc(m.app_detalle)}"`); return d; }).find(d => d.length);
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="dtxT">
+    <div class="hd"><h2 id="dtxT" style="margin-right:auto">${esc(t.det || 'Movimiento')}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd">
+      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${t.code === 0 ? 'Ingreso' : t.code === 3 ? 'Traslado' : 'Egreso'}</span></div>
+      <div class="eyebrow">En Registro Contable</div>
+      <table class="dist"><tbody>
+        ${fila('Fecha', fFecha(t.fecha))}${fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fila('Cuenta', esc(t.cuenta))}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
+      </tbody></table>
+      <div class="eyebrow">En la plataforma</div>
+      ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
+        ${restante(t) > 0.005 ? `<tr><td class="muted">Sin repartir</td><td class="num warn-t">${L(restante(t))}</td></tr>` : ''}</tbody></table>` : `<div class="note">${ign ? 'Marcado como no aplica' + (ign.motivo ? ': ' + esc(ign.motivo) : '') : 'Todavía no está en ningún control ni proyecto.'}</div>`}
+      ${snap ? `<div class="note">Al asignarse, en la app tenía ${snap.join(', ')}.</div>` : ''}
+      <div class="eyebrow">Sincronización</div>
+      ${hist}
+      <div class="row" style="justify-content:flex-end">${e === 'noaplica' ? `<button class="btn sm" data-act="restaurar" data-id="${esc(t.id)}">Devolver a la bandeja</button>` : ''}${restante(t) > 0.005 && e !== 'noaplica' ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">${pp.length ? 'Repartir lo que falta' : 'Asignar o dividir'}</button>` : pp.length ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">Cambiar reparto</button>` : ''}</div>
+    </div></div></div>`;
 }
 
 /* ================= acciones ================= */
@@ -1416,6 +1469,8 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'detalleTx') return abrirDetalleTx(b.dataset.id);
+  if (act === 'detalleMovId') return abrirDetalle(b.dataset.id);
   if (act === 'detalle') { const m = movDe(b); if (m) abrirDetalle(m.id); return; }
   if (act === 'dividir') return abrirReparto(b.dataset.id);
   if (act === 'dividirMov') { const m = movDe(b) || S.movs.get(b.dataset.movId); if (m && m.tx_id) abrirReparto(m.tx_id); return; }
