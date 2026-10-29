@@ -7,10 +7,14 @@ Plataforma web para llevar los gastos de la familia, de los padres y de proyecto
 **El administrador (tú):**
 - **Sincroniza** los movimientos de la app desde el portal Wi‑Fi del iPhone. Cada uno conserva su ID de la app.
 - **Bandeja:** asigna cada movimiento a un control o proyecto, con su TIPO (compartido o de quién es) y su mes, o lo marca como "no aplica".
+- **Dividir:** reparte un movimiento entre varios controles o proyectos (por ejemplo L 5,000: L 3,000 a un proyecto y L 2,000 a Familia). Lo que quede sin repartir sigue en la bandeja.
+- **Cambios:** al sincronizar, detecta los movimientos ya asignados que se modificaron o se borraron en la app. Para cada uno decides: aplicar el cambio, mantener tu fila, quitarla o conservarla como manual.
+- **Participantes por mes:** en cada mes de Familia o Padres eliges quién participa (por ejemplo, Jennifer solo en un mes). Solo ellos aparecen en TIPO y en la distribución de ese mes.
 - **Por validar:** revisa lo que registran los demás. Puede ligarlo a un registro de la app (te sugiere los que coinciden por monto y fecha), aprobarlo como manual o rechazarlo con un motivo.
 - **Usuarios:** activa cuentas, indica cómo aparece cada persona en TIPO y marca qué controles y proyectos puede ver.
 - **Proyectos:** crea proyectos, dales una clave para que la bandeja los reconozca, y ciérralos al terminar.
-- **Exporta a Excel** con el formato de las hojas mensuales y sus fórmulas de distribución.
+- **Exporta a Excel** con el formato de las hojas mensuales y sus fórmulas de distribución, y genera un **reporte PDF** del mes o del proyecto.
+- Al hacer clic en la descripción de cualquier fila se abre su **detalle**: cuenta, categoría, subcategoría, contenido, monto en la app, en qué partes se repartió, quién lo registró y validó.
 
 **Los demás usuarios (por ejemplo tu esposa o tus papás):**
 - Ven en **Inicio** sus controles y proyectos, con lo que les toca aportar en el mes.
@@ -95,7 +99,14 @@ Para que tu página de GitHub Pages también use el servidor local (funciona en 
 
 En **Ajustes → Sincronización**, arrastra **Enviar a Control de Gastos** a la barra de favoritos (se hace una sola vez). Luego, para sincronizar: presiona **Sincronizar**, pega la dirección del iPhone, presiona **Abrir portal**, toca el favorito y después **Copiar datos**, y regresa a pegar con Cmd+V.
 
-Se traen los movimientos del año anterior y del actual. Lo ya asignado no cambia; lo nuevo aparece en la bandeja. Si un monto cambió en la app, la fila lo marca para que decidas si usar el nuevo.
+Se traen los movimientos del año anterior y del actual. Lo ya asignado no cambia por sí solo: lo nuevo aparece en la bandeja, y si algo asignado se modificó o se borró en la app, aparece en la pestaña **Cambios** para que decidas.
+
+## Actualizar desde una versión anterior
+
+1. En Supabase, **SQL Editor → New query**, pega el `supabase.sql` nuevo y presiona **Run**. No borra datos: solo agrega lo necesario.
+2. Sube el `index.html` nuevo a GitHub (reemplazando el anterior). En uno o dos minutos la página se actualiza.
+
+Hazlo en ese orden: la página nueva necesita las columnas que agrega el SQL.
 
 ## Respaldos
 
@@ -103,7 +114,7 @@ En **Ajustes → Respaldo** descargas un `.json` con todo: controles, movimiento
 
 ## Detalles técnicos
 
-- Frontend: HTML, CSS y JavaScript en un solo archivo, sin compilación. Usa [supabase-js 2.45.4](https://github.com/supabase/supabase-js) (jsDelivr), [ExcelJS 4.4.0](https://github.com/exceljs/exceljs) (cdnjs, solo al exportar) y las fuentes Archivo e IBM Plex Mono.
-- Base de datos: tablas `perfiles`, `controles`, `accesos`, `movimientos`, `tx_mes`, `ignorados` y `ajustes`, con RLS. Un usuario ve los controles donde tiene acceso; lo que inserta se fuerza a `pendiente` mediante un trigger. `tx_mes`, `ignorados` y `ajustes` son solo para el administrador. La primera cuenta registrada queda como administrador.
+- Frontend: HTML, CSS y JavaScript en un solo archivo, sin compilación. Usa [supabase-js 2.45.4](https://github.com/supabase/supabase-js) (jsDelivr), [ExcelJS 4.4.0](https://github.com/exceljs/exceljs), [jsPDF 2.5.1](https://github.com/parallax/jsPDF) y jspdf-autotable 3.8.2 (cdnjs, solo al exportar) y las fuentes Archivo e IBM Plex Mono.
+- Base de datos: tablas `perfiles`, `controles`, `accesos`, `movimientos`, `tx_mes`, `ignorados` y `ajustes`, con RLS. Un usuario ve los controles donde tiene acceso; lo que inserta se fuerza a `pendiente` mediante un trigger. `tx_mes`, `ignorados` y `ajustes` son solo para el administrador. La primera cuenta registrada queda como administrador. Un registro de la app puede estar en varias filas de `movimientos` (reparto); cada fila guarda los datos de la app al asignarse (`app_monto`, `app_fecha`, `app_detalle`, `app_cuenta`, `app_categoria`) para detectar cambios. `controles.personas_mes` guarda los participantes de cada mes.
 - `servidor.py`: servidor HTTP de la biblioteca estándar de Python. Sirve la plataforma y expone `GET /api/portal?base=…&desde=…&hasta=…`, que lee `/moneyBook/getDataByPeriod` del portal de la app. Solo acepta direcciones de la red local.
 - Formato del portal: `GET /moneyBook/getDataByPeriod?startDate=AAAA-MM-DD&endDate=AAAA-MM-DD&mbid=1&assetId=` devuelve XML con `id`, `mbDate`, `inOutCode` (0 ingreso, 1 gasto, 3 traslado), `payType`, `mbCategory`, `subCategory`, `mbContent`, `mbDetailContent` y `mbCash`.
