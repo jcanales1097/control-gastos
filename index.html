@@ -124,6 +124,7 @@ code.blk{display:block;white-space:pre-wrap;word-break:break-all;font-family:var
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .filters input[type=search]{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 10px;min-width:200px;flex:1;max-width:320px}
 .filters select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px;max-width:100%}
+.panel>.filters{padding:10px 14px;border-bottom:1px solid var(--line)}
 .addrow td{background:var(--sunk)}
 .loading{padding:60px 16px;text-align:center;color:var(--muted)}
 @media (max-width:600px){.brand span{display:none}.sync-meta{display:none}}
@@ -463,6 +464,7 @@ function render() {
   else html = vControl(ctrlById(S.view.slice(2)));
   app().innerHTML = html;
   window.scrollTo(0, keep);
+  if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
 function renderEspera() {
@@ -695,16 +697,31 @@ function origenChip(r) {
   }
   return `<span class="chip">${r.origen === 'usuario' ? 'Validado' : 'Manual'}</span>`;
 }
+const subDe = r => r.sub || r.cat || '';
+const cuentaDe = r => { const t = r.tx_id && D.byId.get(r.tx_id); return (t && t.cuenta) || r.app_cuenta || 'Sin cuenta (manual)'; };
 function tablaFilas(c, h, lado) {
   const a = esAdmin(); const ro = cerrado(c);
-  const rows = lado === 'egreso' ? h.egresos : h.ingresos;
+  const todas = lado === 'egreso' ? h.egresos : h.ingresos;
   const eg = lado === 'egreso'; const fam = c.porMes;
+  const fk = c.id + '|' + lado; const F = (S.ftab || {})[fk] || {q: '', sub: '', cuenta: ''};
+  const subs = [...new Set(todas.map(subDe).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'es', {numeric: true}));
+  const ctas = [...new Set(todas.map(cuentaDe))].sort((x, y) => x.localeCompare(y, 'es'));
+  const qq = (F.q || '').trim().toUpperCase();
+  const rows = todas.filter(r => (!F.sub || subDe(r) === F.sub) && (!F.cuenta || cuentaDe(r) === F.cuenta)
+    && (!qq || [r.descripcion, r.detalle, r.cat, r.sub, r.tipo, cuentaDe(r), fFecha(r.fecha), (+r.valor || 0).toFixed(2)].join(' ').toUpperCase().includes(qq)));
+  const filtrado = F.q || F.sub || F.cuenta;
   const total = rows.filter(r => r.estado === 'valido').reduce((s, r) => s + r.valor, 0);
   const puedeEditar = r => !ro && (a || (r.creado_por === S.me.id && r.estado === 'pendiente'));
   const puedeBorrar = r => !ro && (a || (r.creado_por === S.me.id && r.estado !== 'valido'));
   const fechaDef = c.porMes && h.mes !== 'general' ? (hoy().slice(0, 7) === h.mes ? hoy() : h.mes + '-01') : hoy();
   const cols = 6 + (eg && fam ? 1 : 0);
-  return `<div class="panel"><div class="hd"><h2>${eg ? 'Detalle egreso' : 'Detalle ingreso'}</h2><span class="muted small">${rows.length} filas · ${L(total)} validado</span></div>
+  return `<div class="panel"><div class="hd"><h2>${eg ? 'Detalle egreso' : 'Detalle ingreso'}</h2><span class="muted small">${filtrado ? `${rows.length} de ${todas.length} filas` : `${rows.length} filas`} · ${L(total)} validado</span></div>
+  ${todas.length ? `<div class="filters">
+    <input type="search" data-ftab="q" data-k="${esc(fk)}" value="${esc(F.q || '')}" placeholder="Buscar en ${eg ? 'egresos' : 'ingresos'}" aria-label="Buscar en ${eg ? 'egresos' : 'ingresos'}">
+    <select data-ftab="sub" data-k="${esc(fk)}" aria-label="Subcategoría"><option value="">Todas las subcategorías</option>${subs.map(x => `<option value="${esc(x)}" ${F.sub === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+    <select data-ftab="cuenta" data-k="${esc(fk)}" aria-label="Cuenta"><option value="">Todas las cuentas</option>${ctas.map(x => `<option value="${esc(x)}" ${F.cuenta === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+    ${filtrado ? `<button class="btn sm ghost" data-act="limpiarFtab" data-k="${esc(fk)}">Quitar filtros</button>` : ''}
+  </div>` : ''}
   <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>${eg ? 'Tipo' : 'Persona'}</th>${eg && fam ? '<th>Categoría</th>' : ''}<th>Descripción</th><th class="num">Valor</th><th>Estado</th><th></th></tr></thead><tbody>
   ${rows.map(r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}">
     <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
@@ -720,7 +737,8 @@ function tablaFilas(c, h, lado) {
     <td class="num"><input class="in num" data-new="valor" inputmode="decimal" placeholder="0.00" aria-label="Valor"></td>
     <td colspan="2"><button class="btn sm ${a ? '' : 'pri'}" data-act="agregar">${a ? 'Agregar' : 'Registrar'}</button></td></tr>`}
   </tbody></table></div>
-  ${rows.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno manual en la última fila.' : `Registra un ${eg ? 'gasto' : 'ingreso'} en la última fila; quedará por validar.`}</div>`}</div>`;
+  ${filtrado && !rows.length ? '<div class="bd note">Ninguna fila coincide con la búsqueda o los filtros.</div>' : ''}
+  ${todas.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno manual en la última fila.' : `Registra un ${eg ? 'gasto' : 'ingreso'} en la última fila; quedará por validar.`}</div>`}</div>`;
 }
 
 /* ================= participantes por mes ================= */
@@ -1211,6 +1229,7 @@ document.addEventListener('click', async e => {
   if (act === 'mesHoy') return irMes(b.dataset.c, hoy().slice(0, 7));
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
+  if (act === 'limpiarFtab') { if (S.ftab) delete S.ftab[b.dataset.k]; return render(); }
   if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: ''}); S.limite = 300; return render(); }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
   if (act === 'export') return exportar(ctrlById(b.dataset.c));
@@ -1305,6 +1324,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
+  if (t.dataset.ftab === 'sub' || t.dataset.ftab === 'cuenta') { const k = t.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {[t.dataset.ftab]: t.value}); return render(); }
   if (t.id === 'fnat') { S.filtros.nat = t.value; S.limite = 300; return render(); }
   if (t.id === 'fcuenta') { S.filtros.cuenta = t.value; S.limite = 300; return render(); }
   if (t.id === 'fmes') { S.filtros.mes = t.value; S.limite = 300; return render(); }
@@ -1352,6 +1372,7 @@ document.addEventListener('change', async e => {
 });
 let qT;
 document.addEventListener('input', e => {
+  if (e.target.dataset.ftab === 'q') { const k = e.target.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {q: e.target.value}); clearTimeout(qT); qT = setTimeout(() => { S._focusF = k; render(); }, 250); return; }
   if (e.target.id === 'fq') { S.filtros.q = e.target.value; clearTimeout(qT); qT = setTimeout(() => { S._focusQ = true; S.limite = 300; render(); }, 250); }
   if (e.target.id === 'portalIn') { const v = normPortal(e.target.value); lsSet('portal', v); S.aj.portal = v; pintarEnlaces(); }
 });
