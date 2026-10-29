@@ -110,6 +110,27 @@ input.in.num{width:110px}
 .dist tr.sub td:first-child{padding-left:30px}
 .dist tr.sub .linkish{color:var(--muted)}
 .dist tr.sub.on td{background:rgba(30,106,80,.12);color:var(--fg)}
+.chart-box{position:relative;padding:4px 14px 10px}
+.chart-box svg{display:block;width:100%;overflow:visible}
+.chart-box .gl{stroke:var(--line);stroke-width:1}
+.chart-box .zl{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.chart-box .ax{fill:var(--muted);font:11px var(--f-num)}
+.chart-box .ln{fill:none;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round}
+.chart-box .ln.i{stroke:var(--good)} .chart-box .ln.e{stroke:var(--bad)} .chart-box .ln.s{stroke:var(--fg)}
+.chart-box .pt{stroke:var(--panel);stroke-width:2}
+.chart-box .pt.i{fill:var(--good)} .chart-box .pt.e{fill:var(--bad)} .chart-box .pt.s{fill:var(--fg)}
+.chart-box .cross{stroke:var(--muted);stroke-width:1}
+.chart-box .hit{fill:transparent;cursor:pointer}
+.chart-box .selb{fill:var(--accent-soft);opacity:.6}
+.chart-tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:170px;z-index:2}
+.chart-tip b{display:block;margin-bottom:4px}
+.chart-tip .r{display:flex;justify-content:space-between;gap:14px}
+.chart-tip .r span:last-child{font-family:var(--f-num)}
+.leg{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center}
+.leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:4px 10px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .note{font-size:12px;color:var(--muted)}
 .bulk{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .bulk select{background:var(--bg);color:var(--fg);border:0}
@@ -481,6 +502,7 @@ function render() {
   else html = vControl(ctrlById(S.view.slice(2)));
   app().innerHTML = html;
   window.scrollTo(0, keep);
+  dibujarGraficos();
   if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
@@ -704,19 +726,68 @@ function porMesProy(h) {
   h.egresos.filter(val).forEach(r => add(r, 'eg')); h.ingresos.filter(val).forEach(r => add(r, 'ing'));
   let acc = 0; return [...g.values()].sort((a, b) => a.mes < b.mes ? -1 : 1).map(x => { acc += x.ing - x.eg; return Object.assign(x, {saldo: x.ing - x.eg, acum: acc}); });
 }
+function serieProy(c, h) {
+  const l = porMesProy(h).filter(x => x.mes !== 'sin-fecha'); const modo = lsGet('graf-' + c.id) || 'acum';
+  let ai = 0, ae = 0;
+  return {modo, puntos: l.map(x => { ai += x.ing; ae += x.eg; return modo === 'acum' ? {mes: x.mes, i: ai, e: ae, s: ai - ae, n: x.n, mi: x.ing, me: x.eg} : {mes: x.mes, i: x.ing, e: x.eg, s: x.saldo, n: x.n, mi: x.ing, me: x.eg}; })};
+}
 function vResumenProy(c, R, h) {
-  const l = porMesProy(h); S.expProy = S.expProy || {}; if (!S.expProy[c.id]) { try { S.expProy[c.id] = JSON.parse(lsGet('exp-' + c.id) || '{}') || {}; } catch (_) { S.expProy[c.id] = {}; } } const E = S.expProy[c.id];
-  const sel = ((S.ftab || {})[c.id + '|egreso'] || {}).mes || '';
-  const nom = m => m === 'sin-fecha' ? 'Sin fecha' : mesLargo(m);
-  const todo = l.length && E.ing && E.eg && E.saldo;
-  const fila = (k, titulo, valor, cls, subs) => `<tr class="${k === 'saldo' ? 'tot' : ''}"><td>${l.length ? `<button class="exp" data-act="expProy" data-c="${c.id}" data-k="${k}" aria-expanded="${!!E[k]}">${titulo}</button>` : titulo}</td><td class="num ${cls}">${valor}</td></tr>
-    ${E[k] ? l.map(x => `<tr class="sub ${sel === x.mes ? 'on' : ''}"><td><button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}" title="Ver solo las filas de este mes">${esc(nom(x.mes))}</button></td><td class="num">${subs(x)}</td></tr>`).join('') : ''}`;
-  return `<div class="panel"><div class="hd"><h2>Resumen del proyecto</h2>${l.length > 0 ? `<span class="note">${l.length} ${l.length === 1 ? 'mes' : 'meses'}</span><button class="btn sm ghost" data-act="expProyTodo" data-c="${c.id}" style="margin-left:auto">${todo ? 'Contraer' : 'Expandir por mes'}</button>` : ''}</div><div class="bd"><table class="dist">
-      ${fila('ing', 'Ingresos', L(R.ingreso), '', x => L(x.ing))}
-      ${fila('eg', 'Egresos', L(-R.egreso), '', x => L(-x.eg))}
-      ${fila('saldo', 'Saldo', L(R.ingreso - R.egreso), R.ingreso - R.egreso < 0 ? 'neg' : 'pos', x => `<span class="${x.saldo < 0 ? 'neg' : 'pos'}">${L(x.saldo)}</span> <span class="muted">· acumulado ${L(x.acum)}</span>`)}
-    </table>
-    <p class="note">Por TIPO: ${R.per.map(x => `${esc(x.p)} ${L(-x.g)}`).join(' · ') || '—'}${R.pendientes ? ` · ${R.pendientes} registros por validar no cuentan todavía` : ''}${sel ? ` · Mostrando solo ${esc(nom(sel))} en las tablas <button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${sel}"><u>ver todo</u></button>` : ''}</p></div></div>`;
+  const {modo, puntos} = serieProy(c, h); const sel = ((S.ftab || {})[c.id + '|egreso'] || {}).mes || '';
+  const verTabla = lsGet('tabla-' + c.id) === '1';
+  const nota = `<p class="note" style="padding:0 14px 12px;margin:0">Por TIPO: ${R.per.map(x => `${esc(x.p)} ${L(-x.g)}`).join(' · ') || '—'}${R.pendientes ? ` · ${R.pendientes} registros por validar no cuentan todavía` : ''}${sel ? ` · Mostrando solo ${esc(mesLargo(sel))} en las tablas <button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${sel}"><u>ver todo</u></button>` : puntos.length ? ' · Toca un mes del gráfico para ver solo sus filas' : ''}</p>`;
+  if (!puntos.length) return `<div class="panel"><div class="hd"><h2>Evolución del proyecto</h2></div><div class="bd note">Cuando el proyecto tenga movimientos validados, aquí verás sus ingresos, egresos y saldo mes a mes.</div></div>`;
+  const ult = puntos[puntos.length - 1];
+  const tabla = `<div class="tbl-wrap"><table><thead><tr><th>Mes</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo${modo === 'acum' ? ' acumulado' : ' del mes'}</th></tr></thead><tbody>
+    ${puntos.map(x => `<tr><td><button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}">${esc(mesLargo(x.mes))}</button></td><td class="num">${L(x.i)}</td><td class="num">${L(-x.e)}</td><td class="num ${x.s < 0 ? 'neg' : 'pos'}">${L(x.s)}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="panel"><div class="hd" style="flex-wrap:wrap;gap:10px"><h2>Evolución del proyecto</h2>
+      <div class="seg" role="group" aria-label="Tipo de gráfico"><button data-act="grafModo" data-c="${c.id}" data-v="acum" aria-pressed="${modo === 'acum'}">Acumulado</button><button data-act="grafModo" data-c="${c.id}" data-v="mes" aria-pressed="${modo === 'mes'}">Por mes</button></div>
+      <button class="btn sm ghost" data-act="grafTabla" data-c="${c.id}" style="margin-left:auto">${verTabla ? 'Ver gráfico' : 'Ver tabla'}</button></div>
+    ${verTabla ? tabla : `<div class="bd" style="padding-bottom:0"><div class="leg"><span><i style="background:var(--good)"></i>Ingresos ${L(ult.i)}</span><span><i style="background:var(--bad)"></i>Egresos ${L(ult.e)}</span><span><i style="background:var(--fg)"></i>Saldo ${L(ult.s)}</span><span class="note">${modo === 'acum' ? 'acumulado a ' : ''}${esc(mesLargo(ult.mes))}</span></div></div>
+    <div class="chart-box" data-chart="${c.id}" data-sel="${sel}"></div>`}
+    ${nota}</div>`;
+}
+function curva(p) {
+  const n = p.length; if (n < 2) return '';
+  const dx = [], m = [], t = [];
+  for (let k = 0; k < n - 1; k++) { dx[k] = p[k + 1][0] - p[k][0]; m[k] = (p[k + 1][1] - p[k][1]) / dx[k]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let k = 1; k < n - 1; k++) t[k] = m[k - 1] * m[k] <= 0 ? 0 : (m[k - 1] + m[k]) / 2;
+  for (let k = 0; k < n - 1; k++) { if (m[k] === 0) { t[k] = t[k + 1] = 0; continue; } const a = t[k] / m[k], b = t[k + 1] / m[k], q = a * a + b * b; if (q > 9) { const f = 3 / Math.sqrt(q); t[k] = f * a * m[k]; t[k + 1] = f * b * m[k]; } }
+  let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+  for (let k = 0; k < n - 1; k++) { const h3 = dx[k] / 3; d += `C${(p[k][0] + h3).toFixed(1)},${(p[k][1] + t[k] * h3).toFixed(1)} ${(p[k + 1][0] - h3).toFixed(1)},${(p[k + 1][1] - t[k + 1] * h3).toFixed(1)} ${p[k + 1][0].toFixed(1)},${p[k + 1][1].toFixed(1)}`; }
+  return d;
+}
+const corto = v => { const a = Math.abs(v), sg = v < 0 ? '-' : ''; return a >= 1e6 ? `${sg}${(a / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M` : a >= 1e3 ? `${sg}${(a / 1e3).toFixed(a >= 1e4 ? 0 : 1)}k` : `${sg}${Math.round(a)}`; };
+const mesCorto = m => { const [y, mm] = m.split('-'); return MES[+mm - 1].slice(0, 3).charAt(0) + MES[+mm - 1].slice(1, 3).toLowerCase() + ' ' + y.slice(2); };
+function dibujarGraficos() {
+  document.querySelectorAll('[data-chart]').forEach(box => {
+    const c = ctrlById(box.dataset.chart); if (!c) return; const {puntos: P, modo} = serieProy(c, hoja(c.id, 'general'));
+    const W = Math.max(300, box.clientWidth - 28), H = W < 560 ? 220 : 280, ml = 52, mr = 14, mt = 12, mb = 28;
+    const vals = P.flatMap(x => [x.i, x.e, x.s]); let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals); if (hi === lo) hi = lo + 1;
+    const paso = (() => { const raw = (hi - lo) / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; })();
+    lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso;
+    const n = P.length, iw = W - ml - mr, ih = H - mt - mb;
+    const X = k => ml + (n === 1 ? iw / 2 : k * iw / (n - 1)), Y = v => mt + (hi - v) / (hi - lo) * ih;
+    const ticks = []; for (let v = lo; v <= hi + paso / 2; v += paso) ticks.push(v);
+    const cada = Math.max(1, Math.ceil(n / Math.floor(iw / 62)));
+    const linea = (k, cl) => { const pts = P.map((x, j) => [X(j), Y(x[k])]); return n > 1 ? `<path class="ln ${cl}" d="${curva(pts)}"/>` : ''; };
+    const puntos = (k, cl) => P.map((x, j) => (n <= 14 || j === n - 1) ? `<circle class="pt ${cl}" cx="${X(j).toFixed(1)}" cy="${Y(x[k]).toFixed(1)}" r="${j === n - 1 || n === 1 ? 4 : 3}"/>` : '').join('');
+    const bw = n === 1 ? iw : iw / (n - 1); const si = P.findIndex(x => x.mes === box.dataset.sel);
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Ingresos, egresos y saldo de ${esc(c.nombre)} por mes">
+      ${si >= 0 ? `<rect class="selb" x="${(X(si) - Math.min(bw, iw) / 2).toFixed(1)}" y="${mt}" width="${Math.min(bw, iw).toFixed(1)}" height="${ih}" rx="4"/>` : ''}
+      ${ticks.map(v => `<line class="${v === 0 && lo < 0 ? 'zl' : 'gl'}" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="ax" x="${ml - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${corto(v)}</text>`).join('')}
+      ${P.map((x, j) => j % cada === 0 || j === n - 1 ? `<text class="ax" x="${X(j).toFixed(1)}" y="${H - 8}" text-anchor="middle">${mesCorto(x.mes)}</text>` : '').join('')}
+      ${linea('i', 'i')}${linea('e', 'e')}${linea('s', 's')}${puntos('i', 'i')}${puntos('e', 'e')}${puntos('s', 's')}
+      <line class="cross" x1="0" x2="0" y1="${mt}" y2="${mt + ih}" style="display:none"/>
+      ${P.map((x, j) => `<rect class="hit" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}" data-j="${j}" x="${(X(j) - bw / 2).toFixed(1)}" y="0" width="${bw.toFixed(1)}" height="${H}"><title>${esc(mesLargo(x.mes))}</title></rect>`).join('')}
+    </svg><div class="chart-tip" hidden></div>`;
+    const tip = box.querySelector('.chart-tip'), cross = box.querySelector('.cross'), svg = box.querySelector('svg');
+    const mostrar = j => { const x = P[j]; cross.setAttribute('x1', X(j)); cross.setAttribute('x2', X(j)); cross.style.display = '';
+      tip.innerHTML = `<b>${esc(mesLargo(x.mes))}</b><div class="r"><span><i style="display:inline-block;width:10px;height:3px;background:var(--good);margin-right:6px;vertical-align:middle"></i>Ingresos</span><span>${L(x.i)}</span></div><div class="r"><span><i style="display:inline-block;width:10px;height:3px;background:var(--bad);margin-right:6px;vertical-align:middle"></i>Egresos</span><span>${L(x.e)}</span></div><div class="r"><span><i style="display:inline-block;width:10px;height:3px;background:var(--fg);margin-right:6px;vertical-align:middle"></i>Saldo</span><span class="${x.s < 0 ? 'neg' : 'pos'}">${L(x.s)}</span></div>${modo === 'acum' ? `<div class="r muted" style="margin-top:4px"><span>En el mes</span><span>+${L(x.mi)} / -${L(x.me)}</span></div>` : ''}<div class="muted" style="margin-top:4px">${x.n} filas · toca para filtrar</div>`;
+      tip.hidden = false; const sc = svg.clientWidth / W; let left = X(j) * sc + 14 + 16; if (left + tip.offsetWidth > box.clientWidth) left = X(j) * sc + 14 - tip.offsetWidth - 16; tip.style.left = Math.max(4, left) + 'px'; tip.style.top = (mt + 6) + 'px'; };
+    box.querySelectorAll('.hit').forEach(rc => { rc.addEventListener('mouseenter', () => mostrar(+rc.dataset.j)); });
+    svg.addEventListener('mouseleave', () => { tip.hidden = true; cross.style.display = 'none'; });
+  });
 }
 function vPorMes(c, h) {
   const l = porMesProy(h); if (!l.length) return '';
@@ -1310,6 +1381,8 @@ document.addEventListener('click', async e => {
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
   if (act === 'limpiarMov') { S.fmov = {cat: '', sub: '', cuenta: ''}; Object.assign(S.filtros, {q: '', estado: '', mes: ''}); S.limite = 300; return render(); }
+  if (act === 'grafModo') { lsSet('graf-' + b.dataset.c, b.dataset.v); return render(); }
+  if (act === 'grafTabla') { lsSet('tabla-' + b.dataset.c, lsGet('tabla-' + b.dataset.c) === '1' ? '0' : '1'); return render(); }
   if (act === 'expProy' || act === 'expProyTodo') { const id = b.dataset.c; S.expProy = S.expProy || {}; const E = S.expProy[id] = S.expProy[id] || {}; if (act === 'expProy') E[b.dataset.k] = !E[b.dataset.k]; else { const v = !(E.ing && E.eg && E.saldo); E.ing = E.eg = E.saldo = v; } lsSet('exp-' + id, JSON.stringify(E)); return render(); }
   if (act === 'proyMes') { const id = b.dataset.c, m = b.dataset.m; S.ftab = S.ftab || {}; const ya = (S.ftab[id + '|egreso'] || {}).mes === m; ['egreso', 'ingreso'].forEach(l => { S.ftab[id + '|' + l] = Object.assign({q: '', sub: '', cuenta: '', mes: ''}, S.ftab[id + '|' + l], {mes: ya ? '' : (m === 'sin-fecha' ? '' : m)}); }); render(); return; }
   if (act === 'limpiarFtab') { if (S.ftab) delete S.ftab[b.dataset.k]; return render(); }
@@ -1485,6 +1558,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('on'); } });
 document.addEventListener('drop', async e => { const d = e.target.closest && e.target.closest('#drop'); if (!d) return; e.preventDefault(); d.classList.remove('on'); const f = e.dataTransfer.files[0]; if (f) procesarPayload(await f.text()); });
 $('#btnSync').addEventListener('click', () => abrirSync(true));
+let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(dibujarGraficos, 150); });
 init().catch(e => fatal(e && e.message || String(e)));
 })();
 
