@@ -245,6 +245,15 @@ function cambioDe(m) {
   if (!esAdmin() || !m.tx_id || m.estado === 'rechazado') return null;
   const t = D.byId.get(m.tx_id);
   if (!t) { const mes = (m.app_fecha || m.fecha || '').slice(0, 7); return S.tx.has(mes) ? {tipo: 'eliminado'} : null; }
+  const pp = partes(t.id);
+  if (pp.length > 1 && asignado(t.id) > t.monto + 0.005) {
+    const orden = [...pp].sort((x, y) => (x.creado_el || '') < (y.creado_el || '') ? -1 : (x.creado_el || '') > (y.creado_el || '') ? 1 : (x.id < y.id ? -1 : 1));
+    const firma = x => [x.control, x.mes, x.tipo, cents(x.valor)].join('|');
+    const i = orden.findIndex(x => x.id === m.id);
+    if (orden.slice(0, i).some(x => firma(x) === firma(m))) return {tipo: 'duplicado', t, total: asignado(t.id)};
+    const hayDup = orden.some((x, j) => orden.slice(0, j).some(y => firma(y) === firma(x)));
+    if (!hayDup && i === 0) return {tipo: 'excedido', t, total: asignado(t.id)};
+  }
   if (m.app_monto == null) return null;
   const d = [];
   if (cents(t.monto) !== cents(m.app_monto)) d.push(['Monto', L(m.app_monto), L(t.monto)]);
@@ -692,7 +701,7 @@ function origenChip(r) {
   if (r.estado === 'rechazado') return `<span class="chip bad" title="${esc(r.nota)}">Rechazado</span>`;
   if (r.tx_id) {
     const cb = cambioDe(r);
-    if (cb) return cb.tipo === 'eliminado' ? '<a class="chip bad" href="#cambios">Borrado en la app</a>' : '<a class="chip warn" href="#cambios">Cambió en la app</a>';
+    if (cb) return cb.tipo === 'eliminado' ? '<a class="chip bad" href="#cambios">Borrado en la app</a>' : cb.tipo === 'duplicado' ? '<a class="chip bad" href="#cambios">Duplicado</a>' : cb.tipo === 'excedido' ? '<a class="chip bad" href="#cambios">Asignado de más</a>' : '<a class="chip warn" href="#cambios">Cambió en la app</a>';
     const n = esAdmin() ? partes(r.tx_id).length : 0;
     return `<span class="chip app">App${n > 1 ? ' · repartido' : ''}</span>`;
   }
@@ -764,13 +773,13 @@ function vParticipantes(c, mes) {
 /* ================= vista: cambios en la app (admin) ================= */
 function vCambios() {
   const lista = cambios();
-  return `<div class="stack"><div><div class="eyebrow">Cambios en la app</div><h1>${lista.length ? `${lista.length} ${lista.length === 1 ? 'fila cambió' : 'filas cambiaron'} en Registro Contable` : 'Sin cambios pendientes'}</h1>
-    <div class="note">Movimientos ya asignados que, al sincronizar, aparecieron modificados o borrados en la app. Decide qué hacer con cada uno.</div></div>
+  return `<div class="stack"><div><div class="eyebrow">Cambios en la app</div><h1>${lista.length ? `${lista.length} ${lista.length === 1 ? 'fila por revisar' : 'filas por revisar'}` : 'Sin cambios pendientes'}</h1>
+    <div class="note">Movimientos ya asignados que se modificaron o borraron en la app, o que quedaron asignados más de una vez. Decide qué hacer con cada uno.${lista.filter(x => x.c.tipo === 'duplicado').length > 1 ? ` <button class="btn sm danger" data-act="cbQuitarDups">Quitar los ${lista.filter(x => x.c.tipo === 'duplicado').length} duplicados</button>` : ''}</div></div>
     <div class="panel">${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Fila en el control</th><th>Qué cambió en la app</th><th></th></tr></thead><tbody>${lista.map(({m, c: cb}) => { const c = ctrlById(m.control);
       return `<tr data-mov="${esc(m.id)}"><td><span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)}</span><div class="cat">${esc(mesLargo(m.mes))}</div></td>
       <td class="small"><button class="linkish" data-act="detalle">${esc(m.descripcion || '(sin descripción)')}</button><div class="cat">${fFecha(m.fecha)} · ${L(m.valor)}${partes(m.tx_id).length > 1 ? ' · repartido' : ''}</div></td>
-      <td class="small">${cb.tipo === 'eliminado' ? '<span class="chip bad">Borrado en la app</span>' : cb.d.map(([k, x, y]) => `<div><b>${k}:</b> <s class="muted">${esc(x)}</s> → ${esc(y)}</div>`).join('')}</td>
-      <td style="white-space:nowrap">${cb.tipo === 'eliminado' ? '<button class="btn sm danger" data-act="cbQuitar">Quitar del control</button> <button class="btn sm" data-act="cbManual">Conservar como manual</button>' : '<button class="btn sm pri" data-act="cbAplicar">Aplicar cambio</button> <button class="btn sm" data-act="cbMantener">Mantener mi fila</button>'}</td></tr>`; }).join('')}</tbody></table></div>`
+      <td class="small">${cb.tipo === 'eliminado' ? '<span class="chip bad">Borrado en la app</span>' : cb.tipo === 'duplicado' ? `<span class="chip bad">Duplicado</span><div class="cat">Se asignó dos veces: suma ${L(cb.total)} y en la app es ${L(cb.t.monto)}</div>` : cb.tipo === 'excedido' ? `<span class="chip bad">Asignado de más</span><div class="cat">Las partes suman ${L(cb.total)} y en la app es ${L(cb.t.monto)}</div>` : cb.d.map(([k, x, y]) => `<div><b>${k}:</b> <s class="muted">${esc(x)}</s> → ${esc(y)}</div>`).join('')}</td>
+      <td style="white-space:nowrap">${cb.tipo === 'duplicado' ? '<button class="btn sm danger" data-act="cbQuitar">Quitar duplicado</button>' : cb.tipo === 'excedido' ? '<button class="btn sm pri" data-act="dividirMov">Corregir reparto</button>' : cb.tipo === 'eliminado' ? '<button class="btn sm danger" data-act="cbQuitar">Quitar del control</button> <button class="btn sm" data-act="cbManual">Conservar como manual</button>' : '<button class="btn sm pri" data-act="cbAplicar">Aplicar cambio</button> <button class="btn sm" data-act="cbMantener">Mantener mi fila</button>'}</td></tr>`; }).join('')}</tbody></table></div>`
     : '<div class="empty">Cuando una sincronización encuentre movimientos asignados que cambiaron o se borraron en la app, aparecerán aquí.</div>'}</div></div>`;
 }
 
@@ -841,7 +850,7 @@ function abrirDetalle(id) {
         ${fila('Detalle', esc((t && t.det) || m.app_detalle))}${fila('Fecha en la app', fFecha((t && t.fecha) || m.app_fecha))}
         ${fila('Monto total en la app', `<span class="num">${L((t && t.monto) || m.app_monto || m.valor)}</span>`)}${a ? fila('ID en la app', `<span class="mono small">${esc(m.tx_id)}</span>`) : ''}
       </tbody></table>` : ''}
-      ${cb ? `<div class="panel"><div class="bd small">${cb.tipo === 'eliminado' ? 'Este registro ya no aparece en la app.' : 'Cambió en la app: ' + cb.d.map(([k, x, y]) => `${k} ${esc(x)} → ${esc(y)}`).join(' · ')} <a href="#cambios" data-act="cerrarModal">Revisar en Cambios</a></div></div>` : ''}
+      ${cb ? `<div class="panel"><div class="bd small">${cb.tipo === 'eliminado' ? 'Este registro ya no aparece en la app.' : cb.tipo === 'duplicado' ? `Esta fila es un duplicado: el registro se asignó más de una vez (suma ${L(cb.total)}, en la app ${L(cb.t.monto)}).` : cb.tipo === 'excedido' ? `Las partes suman ${L(cb.total)} y en la app el registro es de ${L(cb.t.monto)}.` : 'Cambió en la app: ' + cb.d.map(([k, x, y]) => `${k} ${esc(x)} → ${esc(y)}`).join(' · ')} <a href="#cambios" data-act="cerrarModal">Revisar en Cambios</a></div></div>` : ''}
       ${ps.length > 1 ? `<div class="eyebrow">Repartido en ${ps.length} partes</div><table class="dist"><tbody>${ps.map(p => { const pc = ctrlById(p.control); return `<tr><td>${esc(pc ? pc.nombre : p.control)} · ${esc(mesLargo(p.mes))} · ${esc(p.tipo)}</td><td class="num">${L(p.valor)}</td></tr>`; }).join('')}</tbody></table>` : ''}
       <table class="dist"><tbody>
         ${fila('Estado', {valido: 'Validado', pendiente: 'Por validar', rechazado: 'Rechazado'}[m.estado])}
@@ -1122,12 +1131,14 @@ async function procesarPayload(txt) {
 /* ================= acciones ================= */
 async function asignar(ids, ctrlId, tipo, mesFijo) {
   const c = ctrlById(ctrlId); if (!c) return toast('Elige un control o proyecto.'); if (cerrado(c)) return toast('Ese proyecto está cerrado.');
+  S.enCurso = S.enCurso || new Set();
+  ids = ids.filter(id => !S.enCurso.has(id));
   const rows = ids.map(id => D.byId.get(id)).filter(t => t && restante(t) > 0.005).map(t => ({
     control: c.id, mes: c.porMes ? (mesFijo || t.mes) : 'general', lado: t.code === 0 ? 'ingreso' : 'egreso', fecha: t.fecha, tipo,
     cat: t.code === 0 ? '' : t.sub, sub: t.code === 0 ? '' : t.nota, descripcion: t.det, detalle: '', valor: restante(t), tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t)}));
   if (!rows.length) return;
-  ids.forEach(id => S.sel.delete(id));
-  await insertarMovs(rows, `${rows.length === 1 ? 'Asignado' : rows.length + ' asignados'} a ${c.corto || c.nombre}`).catch(() => {});
+  ids.forEach(id => { S.sel.delete(id); S.enCurso.add(id); });
+  try { await insertarMovs(rows, `${rows.length === 1 ? 'Asignado' : rows.length + ' asignados'} a ${c.corto || c.nombre}`); } catch (e) {} finally { ids.forEach(id => S.enCurso.delete(id)); }
 }
 async function ignorar(ids) {
   const rows = ids.map(id => ({tx_id: id, motivo: 'Marcado como no aplica'}));
@@ -1283,6 +1294,13 @@ document.addEventListener('click', async e => {
     await actualizarMov(m.id, campos, act === 'cbAplicar' ? 'Cambio aplicado' : 'Se mantiene tu fila').catch(() => {});
     if (act === 'cbAplicar' && !solo) { toast('Está repartido: revisa los montos de cada parte'); abrirReparto(m.tx_id); }
     return;
+  }
+  if (act === 'cbQuitarDups') {
+    const ids = cambios().filter(x => x.c.tipo === 'duplicado').map(x => x.m.id);
+    if (S.confirmDups !== ids.length) { S.confirmDups = ids.length; b.textContent = `¿Seguro? Quitar ${ids.length}`; return; }
+    S.confirmDups = null;
+    try { for (let i = 0; i < ids.length; i += 100) { const lote = ids.slice(i, i + 100); await q(sb.from('movimientos').delete().in('id', lote)); lote.forEach(id => S.movs.delete(id)); } toast(`${ids.length} duplicados quitados`); } catch (e) {}
+    derive(); render(); return;
   }
   if (act === 'cbQuitar') { const m = movDe(b); return borrarMov(m.id, 'Quitado del control').catch(() => {}); }
   if (act === 'cbManual') { const m = movDe(b); return actualizarMov(m.id, {tx_id: null, origen: 'manual', app_monto: null, app_fecha: null, app_detalle: null, app_cuenta: null, app_categoria: null}, 'Se conserva como manual').catch(() => {}); }
