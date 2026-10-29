@@ -123,7 +123,7 @@ code.blk{display:block;white-space:pre-wrap;word-break:break-all;font-family:var
 .chk{flex-direction:row!important;align-items:center;gap:8px!important}
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .filters input[type=search]{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 10px;min-width:200px;flex:1;max-width:320px}
-.filters select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px}
+.filters select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px;max-width:100%}
 .addrow td{background:var(--sunk)}
 .loading{padding:60px 16px;text-align:center;color:var(--muted)}
 @media (max-width:600px){.brand span{display:none}.sync-meta{display:none}}
@@ -204,7 +204,7 @@ let sb = null;
 /* ================= estado ================= */
 const S = {
   me: null, ctrls: [], movs: new Map(), tx: new Map(), ign: new Map(), aj: {}, perfiles: [], accesos: [],
-  view: 'inicio', sel: new Set(), mesSel: {}, filtros: {q: '', ctrl: '', mes: '', todos: false, estado: ''}, limite: 300,
+  view: 'inicio', sel: new Set(), mesSel: {}, filtros: {q: '', ctrl: '', mes: '', todos: false, estado: '', nat: '', cuenta: ''}, limite: 300,
   authView: 'login', recuperando: false, ligarAbierto: null, rechazoAbierto: null,
 };
 let D = {txs: [], byId: new Map(), asig: new Map()};
@@ -572,12 +572,17 @@ function vBandeja() {
     if (!(e === 'pendiente' || (f.todos && e === 'otro'))) return false;
     if (f.ctrl) { const s = sugerido(t); if (f.ctrl === '_none' ? s : (!s || s.id !== f.ctrl)) return false; }
     if (f.mes && t.mes !== f.mes) return false;
+    if (f.nat && (f.nat === 'ingreso' ? t.code !== 0 : t.code === 0)) return false;
+    if (f.cuenta && t.cuenta !== f.cuenta) return false;
     if (qq && !(t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)) return false;
     return true;
   }).sort((a, b) => a.fecha < b.fecha ? -1 : 1);
   const porCtrl = {}; bandeja().forEach(t => { const s = sugerido(t); const k = s ? s.id : "_none"; porCtrl[k] = (porCtrl[k] || 0) + 1; });
   const total = lista.length; const shown = lista.slice(0, S.limite);
   const meses = [...new Set(D.txs.filter(t => estadoTx(t) === 'pendiente').map(t => t.mes))].sort().reverse();
+  const cuentas = [...new Set(D.txs.filter(t => { const e = estadoTx(t); return e === 'pendiente' || (f.todos && e === 'otro'); }).map(t => t.cuenta).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  if (f.cuenta && !cuentas.includes(f.cuenta)) cuentas.unshift(f.cuenta);
+  const hayFiltro = f.q || f.ctrl || f.mes || f.nat || f.cuenta;
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><div class="eyebrow">Bandeja de entrada</div><h1>${bandeja().length ? `${bandeja().length} movimientos por asignar` : 'Todo está asignado'}</h1>
@@ -589,8 +594,12 @@ function vBandeja() {
         <input type="search" id="fq" placeholder="Buscar comercio, categoría o cuenta" value="${esc(f.q)}" aria-label="Buscar">
         <select id="fctrl" aria-label="Control sugerido"><option value="">Todos los controles</option>${abiertos().map(c => `<option value="${c.id}" ${f.ctrl === c.id ? 'selected' : ''}>${esc(c.corto || c.nombre)}</option>`).join('')}<option value="_none" ${f.ctrl === '_none' ? 'selected' : ''}>Sin sugerencia</option></select>
         <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>
+        <select id="fnat" aria-label="Naturaleza"><option value="">Ingresos y egresos</option><option value="egreso" ${f.nat === 'egreso' ? 'selected' : ''}>Solo egresos</option><option value="ingreso" ${f.nat === 'ingreso' ? 'selected' : ''}>Solo ingresos</option></select>
+        <select id="fcuenta" aria-label="Cuenta"><option value="">Todas las cuentas</option>${cuentas.map(c => `<option value="${esc(c)}" ${f.cuenta === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+        ${hayFiltro ? '<button class="btn sm ghost" data-act="limpiarFiltros">Quitar filtros</button>' : ''}
         <label class="small row" style="gap:6px"><input type="checkbox" id="ftodos" ${f.todos ? 'checked' : ''}> Incluir movimientos sin sugerencia</label>
       </div>
+      ${hayFiltro && total ? `<div class="bd small muted">${total} ${total === 1 ? 'movimiento coincide' : 'movimientos coinciden'} con los filtros · ${L(lista.reduce((a, t) => a + (t.code === 0 ? 1 : -1) * restante(t), 0))}</div>` : ''}
       ${total ? `<div class="tbl-wrap"><table>
         <thead><tr><th><input type="checkbox" id="selAll" aria-label="Seleccionar todo"></th><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th class="num">Monto</th><th>Control</th><th>Tipo</th><th>Mes</th><th></th></tr></thead>
         <tbody>${shown.map(t => `<tr data-tx="${esc(t.id)}"><td><input type="checkbox" data-sel="${esc(t.id)}" ${S.sel.has(t.id) ? 'checked' : ''} aria-label="Seleccionar"></td>${txCells(t)}${asignarCells(t)}</tr>`).join('')}</tbody></table></div>
@@ -1202,6 +1211,7 @@ document.addEventListener('click', async e => {
   if (act === 'mesHoy') return irMes(b.dataset.c, hoy().slice(0, 7));
   if (act === 'mes') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return render(); }
   if (act === 'irMes' && b.dataset.m && b.dataset.m !== 'general') { S.mesSel[b.dataset.c] = b.dataset.m; lsSet('mes-' + b.dataset.c, b.dataset.m); return; }
+  if (act === 'limpiarFiltros') { Object.assign(S.filtros, {q: '', ctrl: '', mes: '', nat: '', cuenta: ''}); S.limite = 300; return render(); }
   if (act === 'verPend') { S.filtros.ctrl = b.dataset.c; S.filtros.mes = b.dataset.m || ''; return; }
   if (act === 'export') return exportar(ctrlById(b.dataset.c));
   if (act === 'copiarBM' || act === 'copiarInv') { const txt = act === 'copiarBM' ? BM : $('#invUrl').textContent; try { await navigator.clipboard.writeText(txt); toast('Copiado'); } catch (_) { toast('Selecciona el texto y cópialo con Cmd+C'); } return; }
@@ -1295,6 +1305,8 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
+  if (t.id === 'fnat') { S.filtros.nat = t.value; S.limite = 300; return render(); }
+  if (t.id === 'fcuenta') { S.filtros.cuenta = t.value; S.limite = 300; return render(); }
   if (t.id === 'fmes') { S.filtros.mes = t.value; S.limite = 300; return render(); }
   if (t.id === 'fest') { S.filtros.estado = t.value; S.limite = 300; return render(); }
   if (t.id === 'ftodos') { S.filtros.todos = t.checked; return render(); }
