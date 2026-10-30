@@ -14,7 +14,7 @@
   --bg:#F4F6F3; --panel:#FFFFFF; --sunk:#EBEFEA; --line:#D7DDD6; --fg:#18211D; --muted:#5D6B64;
   --accent:#1E6A50; --accent-ink:#FFFFFF; --accent-soft:#DCEDE5;
   --warn:#9A6A12; --warn-soft:#F8ECD3; --bad:#A93E2B; --bad-soft:#F7E0DA; --good:#2C7A4B;
-  --ca:#1E6A50; --cb:#7A4E9C; --cc:#B0601E;
+  --ca:#1E6A50; --cb:#7A4E9C; --cc:#B0601E; --azul:#2559A8;
   --f-ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
 }
@@ -22,12 +22,12 @@
   --bg:#111613; --panel:#18201C; --sunk:#1F2924; --line:#2E3A34; --fg:#E3EAE5; --muted:#93A39A;
   --accent:#4DB88D; --accent-ink:#0D1511; --accent-soft:#1C3A2E;
   --warn:#E0B055; --warn-soft:#3A2F17; --bad:#E7826D; --bad-soft:#3D221C; --good:#6BCB8F;
-  --ca:#4DB88D; --cb:#B897D6; --cc:#E3995B; color-scheme:dark}}
+  --ca:#4DB88D; --cb:#B897D6; --cc:#E3995B; --azul:#7EA9EC; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#111613; --panel:#18201C; --sunk:#1F2924; --line:#2E3A34; --fg:#E3EAE5; --muted:#93A39A;
   --accent:#4DB88D; --accent-ink:#0D1511; --accent-soft:#1C3A2E;
   --warn:#E0B055; --warn-soft:#3A2F17; --bad:#E7826D; --bad-soft:#3D221C; --good:#6BCB8F;
-  --ca:#4DB88D; --cb:#B897D6; --cc:#E3995B; color-scheme:dark}
+  --ca:#4DB88D; --cb:#B897D6; --cc:#E3995B; --azul:#7EA9EC; color-scheme:dark}
 *{box-sizing:border-box}
 html{color-scheme:light}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -124,6 +124,7 @@ input.in.num{width:110px}
 .chart-box .gl{stroke:var(--line);stroke-width:1}
 .chart-box .zl{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
 .chart-box .ax{fill:var(--muted);font:11px var(--f-num)}
+.chart-box .sx{font:600 10.5px var(--f-num)}.chart-box .sx.n{fill:var(--bad)}.chart-box .sx.p{fill:var(--azul)}.chart-box .sx.z{fill:var(--muted)}
 .chart-box .ln{fill:none;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round}
 .chart-box .ln.i{stroke:var(--good)} .chart-box .ln.e{stroke:var(--bad)} .chart-box .ln.s{stroke:var(--fg)}
 .chart-box .pt{stroke:var(--panel);stroke-width:2}
@@ -783,7 +784,7 @@ function dibujarGraficos() {
     const c = ctrlById(box.dataset.chart); if (!c) return; const {puntos: TODO, modo} = serieProy(c, hoja(c.id, 'general'));
     const s0 = TODO.findIndex(x => x.mes === box.dataset.sel); const zoom = s0 >= 0 && TODO.length > 3;
     const P = zoom ? TODO.slice(Math.max(0, s0 - 1), s0 + 2) : TODO;
-    const W = Math.max(300, box.clientWidth - 28), H = W < 560 ? 220 : 280, ml = 52, mr = 14, mt = 12, mb = 28;
+    const W = Math.max(300, box.clientWidth - 28), H = W < 560 ? 236 : 296, ml = 52, mr = 14, mt = 12, mb = 44;
     const vals = P.flatMap(x => [x.i, x.e, x.s]); let lo = zoom ? Math.min(...vals) : Math.min(0, ...vals), hi = zoom ? Math.max(...vals) : Math.max(0, ...vals);
     if (zoom) { const pad = Math.max((hi - lo) * 0.12, Math.abs(hi) * 0.02, 1); lo -= pad; hi += pad; } if (hi === lo) hi = lo + 1;
     const paso = (() => { const raw = (hi - lo) / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; })();
@@ -798,7 +799,8 @@ function dibujarGraficos() {
     box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Ingresos, egresos y saldo de ${esc(c.nombre)} por mes">
       ${si >= 0 ? `<rect class="selb" x="${(X(si) - Math.min(bw * .5, 160) / 2).toFixed(1)}" y="${mt}" width="${Math.min(bw * .5, 160).toFixed(1)}" height="${ih}" rx="4"/>` : ''}
       ${ticks.map(v => `<line class="${Math.abs(v) < paso / 1e6 && lo < 0 ? 'zl' : 'gl'}" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="ax" x="${ml - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${corto(v)}</text>`).join('')}
-      ${P.map((x, j) => j % cada === 0 || j === n - 1 ? `<text class="ax" x="${X(j).toFixed(1)}" y="${H - 8}" text-anchor="${zoom && n > 1 ? (j === 0 ? 'start' : j === n - 1 ? 'end' : 'middle') : 'middle'}" ${zoom && x.mes === box.dataset.sel ? 'style="fill:var(--fg);font-weight:600"' : ''}>${zoom ? esc(mesLargo(x.mes)) : mesCorto(x.mes)}</text>` : '').join('')}
+      ${(() => { const ancho = n === 1 ? iw : iw / (n - 1) * cada; const txt = v => ancho >= 84 ? (v < 0 ? '-' : '') + 'L ' + Math.abs(v).toLocaleString('es-HN', {maximumFractionDigits: 0}) : corto(v); return P.map((x, j) => j % cada === 0 || j === n - 1 ? `<text class="sx ${Math.abs(x.s) < 0.005 ? 'z' : x.s < 0 ? 'n' : 'p'}" x="${X(j).toFixed(1)}" y="${H - 6}" text-anchor="${zoom && n > 1 ? (j === 0 ? 'start' : j === n - 1 ? 'end' : 'middle') : 'middle'}"><title>Saldo${modo === 'acum' ? ' acumulado' : ' del mes'}: ${L(x.s)}</title>${txt(x.s)}</text>` : '').join(''); })()}
+      ${P.map((x, j) => j % cada === 0 || j === n - 1 ? `<text class="ax" x="${X(j).toFixed(1)}" y="${H - 22}" text-anchor="${zoom && n > 1 ? (j === 0 ? 'start' : j === n - 1 ? 'end' : 'middle') : 'middle'}" ${zoom && x.mes === box.dataset.sel ? 'style="fill:var(--fg);font-weight:600"' : ''}>${zoom ? esc(mesLargo(x.mes)) : mesCorto(x.mes)}</text>` : '').join('')}
       ${linea('i', 'i')}${linea('e', 'e')}${linea('s', 's')}${puntos('i', 'i')}${puntos('e', 'e')}${puntos('s', 's')}
       ${zoom ? (() => { const j = P.findIndex(x => x.mes === box.dataset.sel), x = P[j]; const lab = [['i', x.i, 'var(--good)'], ['e', x.e, 'var(--bad)'], ['s', x.s, 'var(--fg)']].sort((a, b) => Y(a[1]) - Y(b[1])); let last = -99; return lab.map(([k, v, col]) => { let y = Y(v) + 4; if (y - last < 14) y = last + 14; last = y; const anchor = j === n - 1 ? 'end' : 'start', dx = j === n - 1 ? -10 : 10; return `<text x="${(X(j) + dx).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" style="font:600 11.5px var(--f-num);fill:var(--fg);paint-order:stroke;stroke:var(--panel);stroke-width:4px">${L(v)}</text>`; }).join(''); })() : ''}
       <line class="cross" x1="0" x2="0" y1="${mt}" y2="${mt + ih}" style="display:none"/>
