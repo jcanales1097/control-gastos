@@ -111,6 +111,13 @@ input.in.num{width:110px}
 .dist tr.sub .linkish{color:var(--muted)}
 .dist tr.sub.on td{background:rgba(30,106,80,.12);color:var(--fg)}
 .chart-box{position:relative;padding:4px 14px 10px}
+.adj-list{display:flex;flex-direction:column;gap:6px}
+.adj{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.adj .th{width:44px;height:44px;border-radius:6px;background:var(--sunk);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none;font:600 10px var(--f-num);color:var(--muted)}
+.adj .th img{width:100%;height:100%;object-fit:cover}
+.adj .nm{flex:1;min-width:0}.adj .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.clip{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);margin-left:6px;vertical-align:middle}
+.clip svg{width:12px;height:12px}
 .menu{position:relative;display:inline-block}
 .menu>summary{list-style:none;cursor:pointer}.menu>summary::-webkit-details-marker{display:none}
 .menu-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:240px;display:flex;flex-direction:column}
@@ -375,6 +382,7 @@ async function cargarTodo() {
   if (!S.me.activo) return;
   const [ctr, movs] = await Promise.all([todo('controles', 'orden'), todo('movimientos', 'creado_el')]);
   S.ctrls = ctr.map(fromC); S.movs = new Map(movs.map(m => [m.id, normMov(m)]));
+  try { S.adj = await todo('adjuntos', 'subido_el'); } catch (e) { S.adj = null; }
   if (esAdmin()) {
     const [tx, ign, aj, pf, ac] = await Promise.all([todo('tx_mes', 'mes'), todo('ignorados'), todo('ajustes'), todo('perfiles', 'creado_el'), todo('accesos')]);
     S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
@@ -398,7 +406,7 @@ async function actualizarMov(id, campos, okMsg) {
   if (data && data[0]) S.movs.set(id, normMov(data[0])); else toast('No se aplicó el cambio: no tienes permiso sobre esa fila.');
   derive(); render(); return data;
 }
-async function borrarMov(id, okMsg) { await q(sb.from('movimientos').delete().eq('id', id), okMsg); S.movs.delete(id); derive(); render(); }
+async function borrarMov(id, okMsg) { const solos = (S.adj || []).filter(x => x.mov_id === id && !x.tx_id); for (const x of solos) await quitarAdjunto(x.id, true).catch(() => {}); await q(sb.from('movimientos').delete().eq('id', id), okMsg); S.movs.delete(id); derive(); render(); }
 
 /* ================= arranque y sesión ================= */
 async function init() {
@@ -557,7 +565,7 @@ function asignarCells(t) {
 function txCells(t) {
   const ing = t.code === 0;
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
-    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button></div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
+    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button>${clipN(adjDeTx(t.id))}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
     <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${fxTxt(t)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
@@ -885,7 +893,7 @@ function tablaFilas(c, h, lado) {
     <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
     <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado, h.mes)}</select></td>
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
-    <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
+    <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
     <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}>${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
     <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? ' <button class="btn sm ghost" data-act="asociar" title="Asociar esta fila a un registro de la app">Asociar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
     <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`).join('')}
@@ -977,6 +985,58 @@ async function guardarReparto() {
   S.rep = null; $('#modalRoot').innerHTML = ''; derive(); render(); toast('Reparto guardado');
 }
 
+/* ================= comprobantes adjuntos ================= */
+const CLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.1l-8.5 8.5a5.5 5.5 0 01-7.8-7.8l8.5-8.5a3.7 3.7 0 015.2 5.2l-8.5 8.5a1.8 1.8 0 01-2.6-2.6l7.8-7.8"/></svg>';
+const adjDeFila = m => (S.adj || []).filter(x => (m.tx_id && x.tx_id === m.tx_id) || x.mov_id === m.id);
+const adjDeTx = id => (S.adj || []).filter(x => x.tx_id === id || (!x.tx_id && partes(id).some(p => p.id === x.mov_id)));
+const clipN = l => l.length ? `<span class="clip" title="${l.length} ${l.length === 1 ? 'comprobante' : 'comprobantes'}">${CLIP}${l.length}</span>` : '';
+const tam = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+function vAdjuntos(lista, destino, puedeSubir) {
+  if (S.adj === null) return esAdmin() ? '<div class="eyebrow">Comprobantes</div><div class="note">Para adjuntar comprobantes, corre en Supabase el SQL de adjuntos.</div>' : '';
+  const cuando = d => d ? new Date(d).toLocaleDateString('es-HN', {dateStyle: 'medium'}) : '';
+  return `<div class="eyebrow">Comprobantes${lista.length ? ` (${lista.length})` : ''}</div>
+    ${lista.length ? `<div class="adj-list">${lista.map(x => `<div class="adj" data-adj="${esc(x.id)}">
+      <div class="th" ${/^image\//.test(x.tipo) ? `data-thumb="${esc(x.ruta)}"` : ''}>${/pdf/.test(x.tipo) ? 'PDF' : /^image\//.test(x.tipo) ? '' : 'DOC'}</div>
+      <div class="nm"><b title="${esc(x.nombre)}">${esc(x.nombre)}</b><span class="cat">${tam(+x.tamano || 0)} · ${esc(nombreDe(x.subido_por))} · ${cuando(x.subido_el)}</span></div>
+      <button class="btn sm" data-act="adjVer" data-id="${esc(x.id)}">Ver</button>
+      ${esAdmin() || x.subido_por === S.me.id ? `<button class="btn sm ghost danger" data-act="adjQuitar" data-id="${esc(x.id)}">${S.confirmAdj === x.id ? '¿Quitar? Sí' : 'Quitar'}</button>` : ''}</div>`).join('')}</div>` : '<div class="note">Sin comprobantes todavía.</div>'}
+    ${puedeSubir ? `<label class="btn sm" style="align-self:flex-start">Adjuntar comprobante<input type="file" hidden multiple accept="image/*,application/pdf" data-adj-up data-tx="${esc(destino.tx || '')}" data-mov="${esc(destino.mov || '')}"></label>
+      <div class="note">Foto o PDF de la factura, depósito o transferencia (máx. 10 MB). ${destino.tx ? 'Queda ligado al registro de la app: aparece en todas sus partes.' : ''}</div>` : ''}`;
+}
+async function cargarMiniaturas() {
+  for (const el of document.querySelectorAll('#modalRoot [data-thumb]')) {
+    try { const {data} = await sb.storage.from('comprobantes').createSignedUrl(el.dataset.thumb, 600); if (data && data.signedUrl) el.innerHTML = `<img src="${esc(data.signedUrl)}" alt="">`; } catch (_) {}
+  }
+}
+function reabrirDetalle() { const d = S.detAbierto; if (!d) return; if (d.tipo === 'tx') abrirDetalleTx(d.id); else abrirDetalle(d.id); }
+async function subirAdjuntos(files, tx, mov) {
+  const ok = []; for (const f of files) {
+    if (f.size > 10485760) { toast(`${f.name}: pesa más de 10 MB`); continue; }
+    if (!/^image\//.test(f.type) && f.type !== 'application/pdf') { toast(`${f.name}: solo imágenes o PDF`); continue; }
+    const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+    const ext = (f.name.match(/\.[a-z0-9]{1,5}$/i) || [''])[0].toLowerCase();
+    const ruta = `${mov ? 'm/' + mov : 't/' + tx}/${id}${ext}`;
+    toast(`Subiendo ${f.name}…`);
+    const up = await sb.storage.from('comprobantes').upload(ruta, f, {contentType: f.type, upsert: false});
+    if (up.error) { toast('No se pudo subir: ' + errMsg(up.error)); continue; }
+    try { const d = await q(sb.from('adjuntos').insert({id, tx_id: tx || null, mov_id: mov || null, nombre: f.name, ruta, tipo: f.type, tamano: f.size, subido_por: S.me.id}).select()); if (d && d[0]) { S.adj.push(d[0]); ok.push(d[0]); } }
+    catch (e) { await sb.storage.from('comprobantes').remove([ruta]); }
+  }
+  if (ok.length) toast(ok.length === 1 ? 'Comprobante adjuntado' : `${ok.length} comprobantes adjuntados`);
+  render(); reabrirDetalle();
+}
+async function quitarAdjunto(id, silencio) {
+  const x = (S.adj || []).find(z => z.id === id); if (!x) return;
+  await sb.storage.from('comprobantes').remove([x.ruta]);
+  await q(sb.from('adjuntos').delete().eq('id', id), silencio ? undefined : 'Comprobante quitado');
+  S.adj = S.adj.filter(z => z.id !== id);
+}
+async function ligarAdjuntos(movId, txId) {
+  const l = (S.adj || []).filter(x => x.mov_id === movId && !x.tx_id); if (!l.length) return;
+  const d = await q(sb.from('adjuntos').update({tx_id: txId}).eq('mov_id', movId).is('tx_id', null).select());
+  (d || []).forEach(n => { const i = S.adj.findIndex(z => z.id === n.id); if (i >= 0) S.adj[i] = n; });
+}
+
 /* ================= asociar fila manual a un registro de la app ================= */
 function abrirAsociar(id) {
   const m = S.movs.get(id); if (!m) return;
@@ -1033,12 +1093,12 @@ async function guardarAsoc() {
   if (A.usar.desc) ch.descripcion = t.det;
   if (A.usar.cat && m.lado === 'egreso') { ch.cat = t.sub; ch.sub = t.nota; }
   if (A.moverMes && c && c.porMes && ch.fecha) ch.mes = ch.fecha.slice(0, 7);
-  try { await actualizarMov(m.id, ch, 'Fila asociada al registro de la app'); S.asoc = null; $('#modalRoot').innerHTML = ''; } catch (e) {}
+  try { await actualizarMov(m.id, ch, 'Fila asociada al registro de la app'); await ligarAdjuntos(m.id, t.id).catch(() => {}); S.asoc = null; $('#modalRoot').innerHTML = ''; render(); } catch (e) {}
 }
 
 /* ================= detalle de una fila ================= */
 function abrirDetalle(id) {
-  const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin();
+  const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin(); S.detAbierto = {tipo: 'fila', id};
   const t = m.tx_id ? D.byId.get(m.tx_id) : null; const cb = cambioDe(m);
   const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
@@ -1059,6 +1119,7 @@ function abrirDetalle(id) {
       </tbody></table>` : ''}
       ${cb ? `<div class="panel"><div class="bd small">${cb.tipo === 'eliminado' ? 'Este registro ya no aparece en la app.' : cb.tipo === 'duplicado' ? `Esta fila es un duplicado: el registro se asignó más de una vez (suma ${L(cb.total)}, en la app ${L(cb.t.monto)}).` : cb.tipo === 'excedido' ? `Las partes suman ${L(cb.total)} y en la app el registro es de ${L(cb.t.monto)}.` : 'Cambió en la app: ' + cb.d.map(([k, x, y]) => `${k} ${esc(x)} → ${esc(y)}`).join(' · ')} <a href="#cambios" data-act="cerrarModal">Revisar en Cambios</a></div></div>` : ''}
       ${ps.length > 1 ? `<div class="eyebrow">Repartido en ${ps.length} partes</div><table class="dist"><tbody>${ps.map(p => { const pc = ctrlById(p.control); return `<tr><td>${esc(pc ? pc.nombre : p.control)} · ${esc(mesLargo(p.mes))} · ${esc(p.tipo)}</td><td class="num">${L(p.valor)}</td></tr>`; }).join('')}</tbody></table>` : ''}
+      ${vAdjuntos(adjDeFila(m), {tx: m.tx_id || '', mov: m.id}, !cerrado(c) && (a || m.estado !== 'rechazado'))}
       <table class="dist"><tbody>
         ${fila('Estado', {valido: 'Validado', pendiente: 'Por validar', rechazado: 'Rechazado'}[m.estado])}
         ${fila('Origen', {app: 'Asignado desde la app', manual: 'Agregado a mano', usuario: 'Registrado por un usuario'}[m.origen])}
@@ -1437,7 +1498,7 @@ async function iniciarHistorial() {
   for (let i = 0; i < filas.length; i += 500) { const lote = filas.slice(i, i + 500); await q(sb.from('tx_hist').upsert(lote)); lote.forEach(x => S.hist.set(x.tx_id, x)); }
 }
 function abrirDetalleTx(id) {
-  const t = D.byId.get(id); if (!t) return;
+  const t = D.byId.get(id); if (!t) return; S.detAbierto = {tipo: 'tx', id};
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
   const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
   const e = estadoTx(t); const pp = partes(t.id); const h = S.hist && S.hist.get(t.id); const ign = S.ign.get(t.id);
@@ -1462,6 +1523,7 @@ function abrirDetalleTx(id) {
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
         ${restante(t) > 0.005 ? `<tr><td class="muted">Sin repartir</td><td class="num warn-t">${L(restante(t))}</td></tr>` : ''}</tbody></table>` : `<div class="note">${ign ? 'Marcado como no aplica' + (ign.motivo ? ': ' + esc(ign.motivo) : '') : 'Todavía no está en ningún control ni proyecto.'}</div>`}
       ${snap ? `<div class="note">Al asignarse, en la app tenía ${snap.join(', ')}.</div>` : ''}
+      ${(() => { const p0 = partes(t.id)[0]; return vAdjuntos(adjDeTx(t.id), {tx: t.id, mov: p0 ? p0.id : ''}, esAdmin()); })()}
       <div class="eyebrow">Sincronización</div>
       ${hist}
       <div class="row" style="justify-content:flex-end">${e === 'noaplica' ? `<button class="btn sm" data-act="restaurar" data-id="${esc(t.id)}">Devolver a la bandeja</button>` : ''}${restante(t) > 0.005 && e !== 'noaplica' ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">${pp.length ? 'Repartir lo que falta' : 'Asignar o dividir'}</button>` : pp.length ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">Cambiar reparto</button>` : ''}</div>
@@ -1613,6 +1675,8 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'adjVer') { const x = (S.adj || []).find(z => z.id === b.dataset.id); if (!x) return; const w = window.open('', '_blank'); const {data, error} = await sb.storage.from('comprobantes').createSignedUrl(x.ruta, 600); if (error || !data) { if (w) w.close(); return toast('No se pudo abrir el comprobante'); } if (w) w.location.href = data.signedUrl; else location.href = data.signedUrl; return; }
+  if (act === 'adjQuitar') { if (S.confirmAdj !== b.dataset.id) { S.confirmAdj = b.dataset.id; b.textContent = '¿Quitar? Sí'; return; } S.confirmAdj = null; try { await quitarAdjunto(b.dataset.id); } catch (e) {} render(); return reabrirDetalle(); }
   if (act === 'asociar') { if (!esAdmin()) return; const m = movDe(b) || S.movs.get(b.dataset.movId); if (m) abrirAsociar(m.id); return; }
   if (act === 'asocElegir') { S.asoc.tx = b.dataset.tx; const t = D.byId.get(S.asoc.tx), m = S.movs.get(S.asoc.id); if (t && m) S.asoc.moverMes = false; return pintarAsoc(); }
   if (act === 'asocCambiar') { S.asoc.tx = null; return pintarAsoc(); }
@@ -1661,6 +1725,7 @@ document.addEventListener('click', async e => {
   if (act === 'ligarTx') {
     const m = movDe(b.closest('tr').previousElementSibling) || S.movs.get(S.ligarAbierto); const t = D.byId.get(b.dataset.tx); if (!m || !t) return;
     S.ligarAbierto = null;
+    ligarAdjuntos(m.id, t.id).catch(() => {});
     return actualizarMov(m.id, {estado: 'valido', tx_id: t.id, ...snapApp(t), cat: m.cat || (m.lado === 'egreso' ? t.sub : ''), sub: m.sub || (m.lado === 'egreso' ? t.nota : ''), validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Validado y ligado a la app').catch(() => {});
   }
   if (act === 'rechazar') { const m = movDe(b); S.rechazoAbierto = S.rechazoAbierto === m.id ? null : m.id; S.ligarAbierto = null; render(); const i = $('#notaRechazo'); i && i.focus(); return; }
@@ -1712,6 +1777,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
   if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); return; }
   if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (t.hasAttribute('data-adj-up') && t.files.length) { const f = [...t.files]; t.value = ''; return subirAdjuntos(f, t.dataset.tx, t.dataset.mov); }
   if (S.asoc && (t.dataset.asocUsar || t.hasAttribute('data-asoc-mes'))) { if (t.dataset.asocUsar) S.asoc.usar[t.dataset.asocUsar] = t.checked; else S.asoc.moverMes = t.checked; return pintarAsoc(); }
   if (t.dataset.rp && S.rep) {
     const i = +t.closest('tr').dataset.i; const p = S.rep.partes[i]; const f = t.dataset.rp;
@@ -1768,6 +1834,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('on'); } });
 document.addEventListener('drop', async e => { const d = e.target.closest && e.target.closest('#drop'); if (!d) return; e.preventDefault(); d.classList.remove('on'); const f = e.dataTransfer.files[0]; if (f) procesarPayload(await f.text()); });
 $('#btnSync').addEventListener('click', () => abrirSync(true));
+new MutationObserver(() => { if (document.querySelector('#modalRoot [data-thumb]:empty')) cargarMiniaturas(); }).observe($('#modalRoot'), {childList: true});
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(dibujarGraficos, 150); });
 init().catch(e => fatal(e && e.message || String(e)));
 })();
