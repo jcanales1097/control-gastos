@@ -845,10 +845,10 @@ function vDistribucion(c, R) {
     ${R.per.map(x => `<tr><td>${esc(x.p)}</td><td class="num">${L(x.g)}</td></tr>`).join('')}
     <tr class="tot"><td>Saldo</td><td class="num">${L(R.comp + R.per.reduce((s, x) => s + x.g, 0))}</td></tr></tbody></table></div></div>
     <div class="panel"><div class="hd"><h2>Distribución por persona</h2></div><div class="tbl-wrap"><table class="dist">
-    <thead><tr><th>Persona</th><th class="num">Total a pagar</th><th class="num">Saldo</th></tr></thead><tbody>
-    ${R.per.map(x => `<tr><td>${esc(x.p)}<div class="note">${x.saldo < -0.004 ? `Le falta aportar ${L(-x.saldo)}` : x.saldo > 0.004 ? `Tiene ${L(x.saldo)} a favor` : 'Al día'}</div></td><td class="num">${L(x.pagar)}</td><td class="num ${x.saldo < -0.004 ? 'neg' : 'pos'}">${L(x.saldo)}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Agrega las personas de este control en Ajustes.</td></tr>'}
-    <tr class="tot"><td>Saldo total</td><td></td><td class="num">${L(R.per.reduce((s, x) => s + x.saldo, 0))}</td></tr></tbody></table></div>
-    <div class="bd note">Compartido dividido entre ${R.n} ${R.n === 1 ? 'persona' : 'personas'}, más lo individual de cada quien. Saldo = total a pagar + lo que aportó.${R.pendientes ? ` No incluye ${R.pendientes} registros por validar.` : ''}</div></div></div>`;
+    <thead><tr><th>Persona</th><th class="num">Total a pagar</th><th class="num">Abonado</th><th class="num">Saldo</th></tr></thead><tbody>
+    ${R.per.map(x => `<tr><td>${esc(x.p)}<div class="note">${x.saldo < -0.004 ? `Le falta aportar ${L(-x.saldo)}` : x.saldo > 0.004 ? `Tiene ${L(x.saldo)} a favor` : 'Al día'}</div></td><td class="num">${L(x.pagar)}</td><td class="num ${x.aporte > 0.004 ? 'pos' : 'muted'}">${L(x.aporte)}</td><td class="num ${x.saldo < -0.004 ? 'neg' : 'pos'}">${L(x.saldo)}</td></tr>`).join('') || '<tr><td colspan="4" class="note">Agrega las personas de este control en Ajustes.</td></tr>'}
+    <tr class="tot"><td>Saldo total</td><td class="num">${L(R.per.reduce((s, x) => s + x.pagar, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.aporte, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.saldo, 0))}</td></tr></tbody></table></div>
+    <div class="bd note">Compartido dividido entre ${R.n} ${R.n === 1 ? 'persona' : 'personas'}, más lo individual de cada quien. Saldo = total a pagar + lo abonado.${R.pendientes ? ` No incluye ${R.pendientes} registros por validar.` : ''}</div></div></div>`;
 }
 function origenChip(r) {
   if (r.estado === 'pendiente') return `<span class="chip warn" title="Registró ${esc(nombreDe(r.creado_por))}">Por validar</span>`;
@@ -1159,7 +1159,7 @@ async function exportarPDF(c, mes, persona) {
       titulo('Resumen de distribución');
       tabla({head: [['Descripción', 'Valor']], body: [['COMPARTIDO', L(R.comp)], ...R.per.map(x => [x.p, L(x.g)])], foot: [['SALDO', L(R.comp + R.per.reduce((s, x) => s + x.g, 0))]], columnStyles: der([1])});
       titulo(`Distribución por persona (compartido entre ${R.n})`);
-      tabla({head: [['Persona', 'Total a pagar', 'Aportó', 'Saldo', 'Situación']], body: R.per.map(x => [x.p, L(x.pagar), L(x.aporte), L(x.saldo), x.saldo < -0.004 ? `Le falta ${L(-x.saldo)}` : x.saldo > 0.004 ? `A favor ${L(x.saldo)}` : 'Al día']), columnStyles: der([1, 2, 3])});
+      tabla({head: [['Persona', 'Total a pagar', 'Abonado', 'Saldo', 'Situación']], body: R.per.map(x => [x.p, L(x.pagar), L(x.aporte), L(x.saldo), x.saldo < -0.004 ? `Le falta ${L(-x.saldo)}` : x.saldo > 0.004 ? `A favor ${L(x.saldo)}` : 'Al día']), columnStyles: der([1, 2, 3])});
     } else {
       const pm = porMesProy(h);
       if (pm.length) { titulo('Resumen por mes'); tabla({head: [['Mes', 'Ingresos', 'Egresos', 'Saldo del mes', 'Saldo acumulado']], body: pm.map(x => [x.mes === 'sin-fecha' ? 'Sin fecha' : mesLargo(x.mes), L(x.ing), L(-x.eg), L(x.saldo), L(x.acum)]), foot: [['Total', L(R.ingreso), L(-R.egreso), L(R.ingreso - R.egreso), '']], columnStyles: der([1, 2, 3, 4])}); }
@@ -1188,7 +1188,7 @@ function pdfPersona(doc, o) {
     titulo('Tu resumen del mes');
     const filas = [['Gastos compartidos del mes', L(-egC)]];
     if (ingC) filas.push(['Ingresos compartidos', L(ingC)]);
-    filas.push([`Tu parte del compartido (entre ${R.n})`, L(R.comp / R.n)], ['Tus gastos individuales', L(-egP)], ['Total a pagar', L(x ? x.pagar : R.comp / R.n - egP)], ['Lo que aportaste', L(x ? x.aporte : ingP)]);
+    filas.push([`Tu parte del compartido (entre ${R.n})`, L(R.comp / R.n)], ['Tus gastos individuales', L(-egP)], ['Total a pagar', L(x ? x.pagar : R.comp / R.n - egP)], ['Lo que abonaste', L(x ? x.aporte : ingP)]);
     const sal = x ? x.saldo : 0;
     tabla({head: [['Concepto', 'Valor']], body: filas, foot: [[sal < -0.004 ? 'Te falta aportar' : sal > 0.004 ? 'Tienes a favor' : 'Saldo', L(Math.abs(sal) > 0.004 ? Math.abs(sal) : 0)]], columnStyles: der([1])});
   } else {
