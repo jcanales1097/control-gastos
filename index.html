@@ -887,7 +887,7 @@ function tablaFilas(c, h, lado) {
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
     <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
     <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}>${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
-    <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
+    <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? ' <button class="btn sm ghost" data-act="asociar" title="Asociar esta fila a un registro de la app">Asociar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
     <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`).join('')}
   ${ro ? '' : `<tr class="addrow" data-c="${c.id}" data-m="${esc(h.mes)}" data-lado="${lado}"><td><input type="date" class="in" data-new="fecha" aria-label="Fecha" value="${fechaDef}"></td>
     <td><select class="in" data-new="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}">${tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, h.mes)[0] || 'COMPARTIDO'), lado, h.mes)}</select></td>
@@ -977,6 +977,65 @@ async function guardarReparto() {
   S.rep = null; $('#modalRoot').innerHTML = ''; derive(); render(); toast('Reparto guardado');
 }
 
+/* ================= asociar fila manual a un registro de la app ================= */
+function abrirAsociar(id) {
+  const m = S.movs.get(id); if (!m) return;
+  S.asoc = {id, q: '', tx: null, usar: {fecha: true, valor: true, desc: true, cat: true}, moverMes: false}; pintarAsoc();
+}
+function candidatosAsoc(m, qq) {
+  const v = Math.abs(+m.valor || 0); const code = m.lado === 'ingreso' ? 0 : 1; const Q = (qq || '').trim().toUpperCase();
+  const num = parseFloat(Q.replace(/[^0-9.]/g, ''));
+  let l = D.txs.filter(t => t.code === code && restante(t) > 0.005 && !S.ign.has(t.id));
+  if (Q) l = l.filter(t => (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta + ' ' + fFecha(t.fecha)).toUpperCase().includes(Q) || (isFinite(num) && Math.abs(restante(t) - num) < 0.01));
+  const pts = t => (cents(restante(t)) === cents(v) ? 0 : Math.min(9, Math.abs(restante(t) - v) / Math.max(v, 1) * 20)) + (m.fecha ? Math.min(30, dias(t.fecha, m.fecha)) / 3 : 5);
+  return l.sort((a, b) => pts(a) - pts(b)).slice(0, 25);
+}
+function pintarAsoc() {
+  const A = S.asoc; const m = S.movs.get(A.id); const c = ctrlById(m.control); const t = A.tx && D.byId.get(A.tx);
+  const lista = candidatosAsoc(m, A.q);
+  let comp = '';
+  if (t) {
+    const rest = restante(t); const valApp = rest; const nueva = A.usar.fecha ? t.fecha : m.fecha;
+    const mesNuevo = (nueva || '').slice(0, 7); const cambiaMes = c && c.porMes && mesNuevo && mesNuevo !== m.mes;
+    const valorFinal = A.usar.valor ? valApp : +m.valor; const excede = valorFinal > rest + 0.005;
+    const f = (k, n, a, b) => `<tr><th>${n}</th><td>${esc(a || '—')}</td><td>${esc(b || '—')}</td><td style="text-align:center"><input type="checkbox" data-asoc-usar="${k}" ${A.usar[k] ? 'checked' : ''} aria-label="Usar el dato de la app para ${n}"></td></tr>`;
+    comp = `<div class="eyebrow">Qué datos quedan en la fila</div>
+      <div class="tbl-wrap"><table class="dist"><thead><tr><th></th><th>Tu fila</th><th>Registro de la app</th><th style="text-align:center">Usar el de la app</th></tr></thead><tbody>
+        ${f('fecha', 'Fecha', fFecha(m.fecha), fFecha(t.fecha))}
+        ${f('valor', 'Valor', L(m.valor), L(valApp) + (cents(valApp) !== cents(t.monto) ? ` (de ${L(t.monto)}, lo demás ya está asignado)` : ''))}
+        ${f('desc', 'Descripción', m.descripcion, t.det)}
+        ${m.lado === 'egreso' ? f('cat', 'Categoría', [m.cat, m.sub].filter(Boolean).join(' / '), [t.sub, t.nota].filter(Boolean).join(' / ')) : ''}
+      </tbody></table></div>
+      ${cambiaMes ? `<label class="small row" style="gap:6px"><input type="checkbox" data-asoc-mes ${A.moverMes ? 'checked' : ''}> Mover la fila a ${esc(mesLargo(mesNuevo))} (hoy está en ${esc(mesLargo(m.mes))})</label>` : ''}
+      ${!A.usar.valor && cents(m.valor) < cents(rest) ? `<div class="note">Quedarán ${L(rest - m.valor)} del registro sin asignar en la bandeja.</div>` : ''}
+      ${excede ? `<div class="small neg">Tu valor (${L(m.valor)}) es mayor que lo disponible del registro (${L(rest)}). Usa el valor de la app o elige otro registro.</div>` : ''}
+      <div class="row" style="justify-content:flex-end"><button class="btn" data-act="asocCambiar">Elegir otro</button><button class="btn pri" data-act="asocGuardar" ${excede ? 'disabled' : ''}>Asociar</button></div>`;
+  }
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="asT" style="max-width:820px">
+    <div class="hd"><h2 id="asT" style="margin-right:auto">Asociar a un registro de la app</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd">
+      <div class="small"><span class="chip">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))}</span> <b>${esc(m.descripcion || '(sin descripción)')}</b> · ${fFecha(m.fecha)} · ${L(m.valor)} · ${m.lado === 'ingreso' ? 'Ingreso' : 'Egreso'} · ${esc(m.tipo)}</div>
+      ${t ? `<div class="panel"><div class="bd small"><b>${esc(t.det)}</b><div class="cat">${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))} · ${L(t.monto)}${fxTxt(t)}</div></div></div>${comp}`
+      : `<div class="row"><input type="search" class="in" id="asocQ" value="${esc(A.q)}" placeholder="Buscar por comercio, cuenta, fecha o monto" style="max-width:none;flex:1" aria-label="Buscar registro de la app"></div>
+      <div class="note">${A.q ? '' : 'Sugeridos primero: mismo monto y fecha cercana. '}Solo aparecen ${m.lado === 'ingreso' ? 'ingresos' : 'egresos'} de la app con monto disponible.</div>
+      ${lista.length ? `<div class="tbl-wrap" style="max-height:360px;overflow:auto"><table><thead><tr><th>Fecha</th><th>Detalle</th><th>Cuenta</th><th class="num">Disponible</th><th></th></tr></thead><tbody>
+        ${lista.map(x => `<tr><td class="mono small">${fFecha(x.fecha)}${m.fecha && x.fecha !== m.fecha ? `<div class="cat">${dias(x.fecha, m.fecha)} d de diferencia</div>` : ''}</td><td class="small">${esc(x.det)}<div class="cat">${esc([x.cat, x.sub, x.nota].filter(Boolean).join(' › '))}</div></td><td class="small muted">${esc(x.cuenta)}</td><td class="num ${cents(restante(x)) === cents(m.valor) ? 'pos' : ''}">${L(restante(x))}${fxTxt(x)}</td><td><button class="btn sm" data-act="asocElegir" data-tx="${esc(x.id)}">Elegir</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="empty">No hay registros disponibles que coincidan.</div>'}`}
+    </div></div></div>`;
+  if (!t && S._focusAsoc) { const i = $('#asocQ'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } S._focusAsoc = false; }
+}
+async function guardarAsoc() {
+  const A = S.asoc; const m = S.movs.get(A.id); const t = D.byId.get(A.tx); if (!m || !t) return;
+  const c = ctrlById(m.control); const rest = restante(t);
+  const ch = {tx_id: t.id, origen: 'app', ...snapApp(t), validado_por: S.me.id, validado_el: new Date().toISOString()};
+  if (A.usar.fecha) ch.fecha = t.fecha;
+  if (A.usar.valor) ch.valor = rest; else if (+m.valor > rest + 0.005) return toast('Ese valor es mayor que lo disponible del registro.');
+  if (A.usar.desc) ch.descripcion = t.det;
+  if (A.usar.cat && m.lado === 'egreso') { ch.cat = t.sub; ch.sub = t.nota; }
+  if (A.moverMes && c && c.porMes && ch.fecha) ch.mes = ch.fecha.slice(0, 7);
+  try { await actualizarMov(m.id, ch, 'Fila asociada al registro de la app'); S.asoc = null; $('#modalRoot').innerHTML = ''; } catch (e) {}
+}
+
 /* ================= detalle de una fila ================= */
 function abrirDetalle(id) {
   const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin();
@@ -1006,6 +1065,7 @@ function abrirDetalle(id) {
         ${fila('Registró', m.creado_por ? `${esc(nombreDe(m.creado_por))} · ${cuando(m.creado_el)}` : '')}${fila('Validó', m.validado_por ? `${esc(nombreDe(m.validado_por))} · ${cuando(m.validado_el)}` : '')}
         ${fila('Motivo de rechazo', m.estado === 'rechazado' ? esc(m.nota) : '')}
       </tbody></table>
+      ${a && !m.tx_id && m.estado === 'valido' && !cerrado(c) ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-act="asociar" data-mov-id="${esc(m.id)}">Asociar a un registro de la app</button></div>` : ''}
       ${a && m.tx_id && t && !cerrado(c) ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dividirMov" data-mov-id="${esc(m.id)}">${ps.length > 1 ? 'Cambiar reparto' : 'Dividir'}</button></div>` : ''}
     </div></div></div>`;
 }
@@ -1553,6 +1613,10 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'asociar') { if (!esAdmin()) return; const m = movDe(b) || S.movs.get(b.dataset.movId); if (m) abrirAsociar(m.id); return; }
+  if (act === 'asocElegir') { S.asoc.tx = b.dataset.tx; const t = D.byId.get(S.asoc.tx), m = S.movs.get(S.asoc.id); if (t && m) S.asoc.moverMes = false; return pintarAsoc(); }
+  if (act === 'asocCambiar') { S.asoc.tx = null; return pintarAsoc(); }
+  if (act === 'asocGuardar') return guardarAsoc();
   if (act === 'detalleTx') return abrirDetalleTx(b.dataset.id);
   if (act === 'detalleMovId') return abrirDetalle(b.dataset.id);
   if (act === 'detalle') { const m = movDe(b); if (m) abrirDetalle(m.id); return; }
@@ -1648,6 +1712,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
   if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); return; }
   if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (S.asoc && (t.dataset.asocUsar || t.hasAttribute('data-asoc-mes'))) { if (t.dataset.asocUsar) S.asoc.usar[t.dataset.asocUsar] = t.checked; else S.asoc.moverMes = t.checked; return pintarAsoc(); }
   if (t.dataset.rp && S.rep) {
     const i = +t.closest('tr').dataset.i; const p = S.rep.partes[i]; const f = t.dataset.rp;
     if (f === 'valor') { const v = parseFloat(t.value.replace(/[^0-9.\-]/g, '')); p.valor = isFinite(v) ? Math.round(v * 100) / 100 : 0; }
@@ -1684,6 +1749,7 @@ document.addEventListener('change', async e => {
 });
 let qT;
 document.addEventListener('input', e => {
+  if (e.target.id === 'asocQ' && S.asoc) { S.asoc.q = e.target.value; clearTimeout(S._asocT); S._asocT = setTimeout(() => { S._focusAsoc = true; pintarAsoc(); }, 200); return; }
   if (e.target.dataset.ftab === 'q') { const k = e.target.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {q: e.target.value}); clearTimeout(qT); qT = setTimeout(() => { S._focusF = k; render(); }, 250); return; }
   if (e.target.id === 'fq') { S.filtros.q = e.target.value; clearTimeout(qT); qT = setTimeout(() => { S._focusQ = true; S.limite = 300; render(); }, 250); }
   if (e.target.id === 'portalIn') { const v = normPortal(e.target.value); lsSet('portal', v); S.aj.portal = v; pintarEnlaces(); }
