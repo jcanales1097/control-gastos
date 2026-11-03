@@ -276,14 +276,28 @@ const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, por
 const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo: c.porMes ? 'mensual' : 'proyecto', personas: c.personas, categorias: c.categorias, incluye: c.incluye, excluye: c.excluye, tipo_defecto: c.tipoDefecto, sugerir_por_nombre: c.sugerirPorNombre, color: c.color, estado: c.estado, abierto_el: c.abiertoEl || null, cerrado_el: c.cerradoEl || null, orden: c.orden || 0, personas_mes: c.personasMes || {}});
 const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha ? String(m.fecha).slice(0, 10) : null, app_monto: m.app_monto == null ? null : +m.app_monto, app_fecha: m.app_fecha ? String(m.app_fecha).slice(0, 10) : null});
 
+function rowToTx(r) {
+  const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
+  const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)};
+  t.montoApp = t.monto; const fx = S.mon && S.mon.get(id);
+  if (fx && fx.moneda && fx.moneda !== 'HNL' && +fx.original) { t.moneda = fx.moneda; t.original = Math.abs(+fx.original); t.monto = Math.abs(+fx.hnl); t.tasa = Math.round(t.monto / t.original * 10000) / 10000; }
+  else if (/\$\s*$/.test((cuenta || '').trim())) t.sinTasa = true;
+  return t;
+}
+function decisionDe(id) {
+  const h = S.hist && S.hist.get(id); const l = (h && h.cambios) || []; let borrado = null, web = null;
+  for (const e of l) {
+    if (e.borrado) borrado = e.decision === 'mantener' ? e : null;
+    if (e.reaparece) borrado = null;
+    if (e.d || e.decision) { if (!e.borrado) web = e.decision === 'web' ? e : null; }
+  }
+  return {borrado, web};
+}
 function derive() {
   const txs = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
-    const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
-    const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)};
-    t.montoApp = t.monto; const fx = S.mon && S.mon.get(id);
-    if (fx && fx.moneda && fx.moneda !== 'HNL' && +fx.original) { t.moneda = fx.moneda; t.original = Math.abs(+fx.original); t.monto = Math.abs(+fx.hnl); t.tasa = Math.round(t.monto / t.original * 10000) / 10000; }
-    else if (/\$\s*$/.test((cuenta || '').trim())) t.sinTasa = true;
+    const t = rowToTx(r); const dc = decisionDe(t.id);
+    if (dc.borrado) t.borradoApp = dc.borrado.at; if (dc.web) t.versionWeb = dc.web;
     txs.push(t);
   }
   txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
@@ -570,7 +584,7 @@ function asignarCells(t) {
 function txCells(t) {
   const ing = t.code === 0;
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
-    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button>${clipN(adjDeTx(t.id))}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
+    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button>${clipN(adjDeTx(t.id))}${t.borradoApp ? ` <span class="chip bad" title="Ya no existe en Registro Contable; lo mantuviste en la web">Borrado en la app</span> <button class="btn sm ghost danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? (partes(t.id).length ? '¿Eliminar también de los controles? Sí' : '¿Eliminar? Sí') : 'Eliminar'}</button>` : t.versionWeb ? ' <span class="chip" title="Conservaste la versión web; en la app es distinta">Versión web</span>' : ''}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
     <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${fxTxt(t)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
@@ -1283,7 +1297,7 @@ function vMovimientos() {
   const ctas = [...new Set(all.filter(t => (!g.cat || t.cat === g.cat) && (!g.sub || t.sub === g.sub)).map(t => t.cuenta).filter(Boolean))].sort(ord);
   if (g.cuenta && !ctas.includes(g.cuenta)) ctas.unshift(g.cuenta);
   const hayF = f.q || f.estado || f.mes || g.cat || g.sub || g.cuenta;
-  let lista = all.filter(t => (!g.cat || t.cat === g.cat) && (!g.sub || t.sub === g.sub) && (!g.cuenta || t.cuenta === g.cuenta) && (!f.estado || estadoTx(t) === f.estado) && (!f.mes || t.mes === f.mes) && (!qq || (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)));
+  let lista = all.filter(t => (!g.cat || t.cat === g.cat) && (!g.sub || t.sub === g.sub) && (!g.cuenta || t.cuenta === g.cuenta) && (!f.estado || (f.estado === '_borrado' ? !!t.borradoApp : f.estado === '_web' ? !!t.versionWeb : estadoTx(t) === f.estado)) && (!f.mes || t.mes === f.mes) && (!qq || (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)));
   const mdef = {k: 'fecha', dir: 'desc'}; lista = ordenarLista(lista, ordDe('movs', mdef), {fecha: t => t.fecha, det: t => t.det, cuenta: t => t.cuenta, monto: t => t.monto, estado: t => estadoTx(t)});
   const total = lista.length; const suma = lista.reduce((a, t) => a + (t.code === 0 ? t.monto : t.code === 3 ? 0 : -t.monto), 0); lista = lista.slice(0, S.limite);
   const meses = [...new Set(all.map(t => t.mes))].sort().reverse();
@@ -1293,7 +1307,7 @@ function vMovimientos() {
       <div class="note">${Object.entries(EST).map(([k, v]) => `${v[0]}: ${cnt[k] || 0}`).join(' · ')}</div></div>
     <div class="panel"><div class="hd filters">
       <input type="search" id="fq" placeholder="Buscar" value="${esc(f.q)}" aria-label="Buscar">
-      <select id="fest" aria-label="Estado"><option value="">Todos los estados</option>${Object.entries(EST).map(([k, v]) => `<option value="${k}" ${f.estado === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+      <select id="fest" aria-label="Estado"><option value="">Todos los estados</option>${Object.entries(EST).map(([k, v]) => `<option value="${k}" ${f.estado === k ? 'selected' : ''}>${v[0]}</option>`).join('')}<option value="_borrado" ${f.estado === '_borrado' ? 'selected' : ''}>Borrados en la app (mantenidos)</option><option value="_web" ${f.estado === '_web' ? 'selected' : ''}>Con versión web conservada</option></select>
       <select id="fmes" aria-label="Mes"><option value="">Todos los meses</option>${meses.map(m => `<option value="${m}" ${f.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>
       <select data-fmov="cat" aria-label="Categoría">${opt(cats, g.cat, 'Todas las categorías')}</select>
       <select data-fmov="sub" aria-label="Subcategoría">${opt(subs, g.sub, 'Todas las subcategorías')}</select>
@@ -1442,26 +1456,94 @@ async function procesarPayload(txt) {
   let p = null; try { p = JSON.parse(txt); } catch (_) { p = xmlAPayload(txt); }
   if (!p || p.src !== 'registro-contable' || !Array.isArray(p.rows)) { msg.innerHTML = '<span class="neg">Eso no parece venir del portal. Vuelve a copiar los datos desde Registro Contable.</span>'; return; }
   msg.textContent = `Procesando ${p.rows.length} movimientos…`;
-  const antes = new Set(D.byId.keys()); const prevTx = new Map(D.byId); const cambiosAntes = cambios().length;
-  const porMes = new Map();
-  for (const r of p.rows) { if (!r[0] || !r[1]) continue; const m = r[1].slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(r); }
   const desde = (p.desde || '').slice(0, 7), hasta = (p.hasta || '').slice(0, 7);
+  const prevRaw = new Map(); for (const [, doc] of S.tx) for (const r of (doc.rows || [])) prevRaw.set(r[0], r);
+  const inMap = new Map(); for (const r of p.rows) if (r[0] && r[1]) inMap.set(r[0], r);
+  const mods = [], dels = [], autoWeb = [], autoDel = [], reaparece = []; let nuevos = 0;
+  for (const [id, r] of inMap) {
+    const o = prevRaw.get(id);
+    if (!o) { nuevos++; continue; }
+    const dc = decisionDe(id); if (dc.borrado) reaparece.push(id);
+    if (JSON.stringify(o) === JSON.stringify(r)) continue;
+    const dif = difTx(rowToTx(o), rowToTx(r)); if (!dif.length) continue;
+    if (dc.web && dc.web.app === JSON.stringify(r)) { autoWeb.push(id); continue; }
+    mods.push({id, o, r, dif});
+  }
+  if (prevRaw.size) for (const [id, o] of prevRaw) { const m = o[1].slice(0, 7); if (m >= desde && m <= hasta && !inMap.has(id)) { if (decisionDe(id).borrado) autoDel.push(id); else dels.push({id, o}); } }
+  const ctx = {p, desde, hasta, prevRaw, inMap, mods, dels, autoWeb, autoDel, reaparece, nuevos, dec: {}};
+  mods.forEach(x => ctx.dec[x.id] = 'app');
+  dels.forEach(x => ctx.dec[x.id] = partes(x.id).length ? 'mantener' : 'borrar');
+  if (!mods.length && !dels.length) return aplicarSync(ctx);
+  S.syncPend = ctx; pintarPrevia();
+}
+function asigTxt(id) { const pp = partes(id); return pp.length ? pp.map(m => { const c = ctrlById(m.control); return `${c ? (c.corto || c.nombre) : m.control} · ${m.mes === 'general' ? 'proyecto' : mesLargo(m.mes)} · ${L(m.valor)}`; }).join(' / ') : ''; }
+function pintarPrevia() {
+  const X = S.syncPend; if (!X) return; const msg = $('#syncMsg'); if (!msg) return;
+  const radio = (id, v, txt) => `<label class="small row" style="gap:5px"><input type="radio" name="dec-${esc(id)}" data-dec="${esc(id)}" value="${v}" ${X.dec[id] === v ? 'checked' : ''}>${txt}</label>`;
+  const chipA = id => { const a = asigTxt(id); return a ? `<div class="cat">Asignado: ${esc(a)}</div>` : ''; };
+  msg.innerHTML = `<div class="panel" style="margin-top:6px"><div class="hd" style="flex-wrap:wrap;gap:8px"><h2>Revisa antes de guardar</h2><span class="note">${X.p.rows.length} leídos (${fFecha(X.p.desde)} a ${fFecha(X.p.hasta)}) · ${X.nuevos} nuevos · ${X.mods.length} modificados · ${X.dels.length} borrados en la app</span></div>
+    <div class="bd stack" style="max-height:52vh;overflow:auto">
+      <div class="row"><button class="btn sm" data-act="prevTodo" data-v="app">Todo como viene de la app</button><button class="btn sm" data-act="prevTodo" data-v="web">Conservar todo lo de la web</button></div>
+      ${X.mods.length ? `<div class="eyebrow">Modificados en la app (${X.mods.length})</div>
+      ${X.mods.map(x => { const t = rowToTx(x.r); return `<div class="adj" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div><b>${esc(t.det || '(sin detalle)')}</b><div class="cat">${fFecha(t.fecha)} · ${esc(t.cuenta)}</div>${chipA(x.id)}</div>
+        <table class="dist"><thead><tr><th></th><th>Versión web</th><th>Versión de la app</th></tr></thead><tbody>${x.dif.map(([k, a, b]) => `<tr><th>${esc(k)}</th><td>${esc(a)}</td><td><b>${esc(b)}</b></td></tr>`).join('')}</tbody></table>
+        <div class="row" style="gap:16px">${radio(x.id, 'app', 'Usar la versión de la app')}${radio(x.id, 'web', 'Conservar la versión web')}</div></div>`; }).join('')}` : ''}
+      ${X.dels.length ? `<div class="eyebrow">Borrados en la app (${X.dels.length})</div>
+      ${X.dels.map(x => { const t = rowToTx(x.o); return `<div class="adj" style="flex-direction:column;align-items:stretch;gap:6px">
+        <div><b>${esc(t.det || '(sin detalle)')}</b><div class="cat">${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${L(t.monto)}</div>${chipA(x.id)}</div>
+        <div class="row" style="gap:16px">${radio(x.id, 'mantener', 'Mantener en la web')}${radio(x.id, 'borrar', 'Aplicar el borrado')}</div>
+        ${partes(x.id).length && X.dec[x.id] === 'borrar' ? '<div class="note">Está asignado: después aparecerá en Cambios para quitarlo del control.</div>' : ''}</div>`; }).join('')}` : ''}
+      ${X.autoWeb.length || X.autoDel.length ? `<div class="note">${X.autoWeb.length ? `${X.autoWeb.length} registros siguen con la versión web que elegiste antes. ` : ''}${X.autoDel.length ? `${X.autoDel.length} borrados en la app se mantienen como decidiste antes.` : ''}</div>` : ''}
+    </div>
+    <div class="bd row" style="justify-content:flex-end;border-top:1px solid var(--line)"><button class="btn" data-act="prevCancelar">Cancelar</button><button class="btn pri" data-act="prevGuardar">Guardar sincronización</button></div></div>`;
+}
+async function aplicarSync(X) {
+  const msg = $('#syncMsg'); const {p, desde, hasta, prevRaw, inMap} = X; const at = p.at || new Date().toISOString();
+  const cambiosAntes = cambios().length; const prevTx = new Map(D.byId);
+  const fin = new Map(inMap);
+  for (const x of X.mods) if (X.dec[x.id] === 'web') fin.set(x.id, x.o);
+  for (const id of X.autoWeb) fin.set(id, prevRaw.get(id));
+  for (const x of X.dels) if (X.dec[x.id] === 'mantener') fin.set(x.id, x.o);
+  for (const id of X.autoDel) fin.set(id, prevRaw.get(id));
+  const porMes = new Map(); const ponerEn = (m, r) => { if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(r); };
+  for (const r of fin.values()) ponerEn(r[1].slice(0, 7), r);
   for (const m of S.tx.keys()) if (m >= desde && m <= hasta && !porMes.has(m)) porMes.set(m, []);
+  for (const [m, doc] of S.tx) if (m < desde || m > hasta) for (const r of (doc.rows || [])) if (!fin.has(r[0])) ponerEn(m, r);
   const mesesCamb = [];
   for (const [m, rows] of porMes) { rows.sort((a, b) => a[0] < b[0] ? -1 : 1); const prev = S.tx.get(m); if (!prev || JSON.stringify(prev.rows) !== JSON.stringify(rows)) mesesCamb.push({mes: m, rows, n: rows.length, sincronizado: p.at}); }
+  for (const m of S.tx.keys()) if (!porMes.has(m)) { const prev = S.tx.get(m); if ((prev.rows || []).length) mesesCamb.push({mes: m, rows: [], n: 0, sincronizado: p.at}); }
   try {
     for (let i = 0; i < mesesCamb.length; i += 4) { const lote = mesesCamb.slice(i, i + 4); await q(sb.from('tx_mes').upsert(lote)); lote.forEach(c => S.tx.set(c.mes, c)); msg.textContent = `Guardando meses… ${Math.min(i + 4, mesesCamb.length)} de ${mesesCamb.length}`; }
     await guardarAjuste('ultimaSync', {at: new Date().toISOString(), n: p.rows.length, desde: p.desde, hasta: p.hasta});
   } catch (e) { msg.innerHTML = `<span class="neg">Se interrumpió la sincronización: ${esc(errMsg(e))}</span>`; return; }
+  S.syncPend = null; derive(); render();
+  const extra = {};
+  for (const x of X.mods) if (X.dec[x.id] === 'web') extra[x.id] = [{at, d: x.dif, decision: 'web', app: JSON.stringify(x.r)}];
+  for (const x of X.dels) if (X.dec[x.id] === 'mantener') extra[x.id] = [{at, borrado: true, decision: 'mantener'}];
+  for (const id of X.reaparece) extra[id] = [...(extra[id] || []), {at, reaparece: true}];
+  await registrarHistorial(prevTx, at, desde, hasta, msg, extra).catch(() => {});
+  let filasAct = 0;
+  for (const x of X.mods) if (X.dec[x.id] === 'app') { const pp = partes(x.id); const t = D.byId.get(x.id); if (pp.length !== 1 || !t) continue; const m = pp[0]; if (m.app_monto == null) continue;
+    const ch = snapApp(t); if (cents(m.valor) === cents(m.app_monto)) ch.valor = t.monto;
+    if (m.app_fecha && m.fecha === m.app_fecha) { ch.fecha = t.fecha; const c = ctrlById(m.control); if (c && c.porMes && m.mes === m.app_fecha.slice(0, 7)) ch.mes = t.fecha.slice(0, 7); }
+    if (m.descripcion === m.app_detalle) ch.descripcion = t.det;
+    try { const d = await q(sb.from('movimientos').update(ch).eq('id', m.id).select()); if (d && d[0]) { S.movs.set(m.id, normMov(d[0])); filasAct++; } } catch (e) {} }
   derive(); render();
-  const nuevos = D.txs.filter(t => !antes.has(t.id)).length;
-  const ahora = new Set(D.byId.keys());
-  let modificados = 0, eliminados = 0;
-  for (const t of D.txs) { const o = prevTx.get(t.id); if (o && (cents(o.monto) !== cents(t.monto) || o.fecha !== t.fecha || o.det !== t.det || o.cuenta !== t.cuenta || o.cat !== t.cat)) modificados++; }
-  for (const [id, o] of prevTx) if (!ahora.has(id) && o.mes >= desde && o.mes <= hasta) eliminados++;
-  await registrarHistorial(prevTx, p.at || new Date().toISOString(), desde, hasta, msg).catch(() => {});
+  const nWeb = X.mods.filter(x => X.dec[x.id] === 'web').length, nApp = X.mods.length - nWeb, nMan = X.dels.filter(x => X.dec[x.id] === 'mantener').length, nBor = X.dels.length - nMan;
   const nc = cambios().length;
-  msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${antes.size ? `${nuevos} nuevos, ${modificados} modificados y ${eliminados} borrados en la app.` : ''} ${mesesCamb.length} ${mesesCamb.length === 1 ? "mes actualizado" : "meses actualizados"}.${nc > cambiosAntes ? ` <b class="neg">${nc - cambiosAntes} filas ya asignadas cambiaron en la app.</b> <a href="#cambios" data-act="cerrarModal">Revisar cambios</a> ·` : ''} <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
+  msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${prevRaw.size ? `${X.nuevos} nuevos${X.mods.length ? `; modificados: ${nApp} con la versión de la app${nWeb ? `, ${nWeb} con la versión web` : ''}` : ''}${X.dels.length ? `; borrados en la app: ${nBor} aplicados${nMan ? `, ${nMan} mantenidos` : ''}` : ''}.` : ''} ${mesesCamb.length} ${mesesCamb.length === 1 ? 'mes actualizado' : 'meses actualizados'}.${filasAct ? ` ${filasAct} ${filasAct === 1 ? 'fila asignada se actualizó' : 'filas asignadas se actualizaron'}.` : ''}${nc > cambiosAntes ? ` <b class="neg">${nc - cambiosAntes} filas asignadas por revisar.</b> <a href="#cambios" data-act="cerrarModal">Revisar cambios</a> ·` : ''} <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
+}
+async function eliminarTx(id) {
+  const t = D.byId.get(id); if (!t) return; const at = new Date().toISOString();
+  try {
+    for (const m of partes(id)) { const solos = (S.adj || []).filter(x => x.mov_id === m.id && !x.tx_id); for (const x of solos) await quitarAdjunto(x.id, true).catch(() => {}); await q(sb.from('movimientos').delete().eq('id', m.id)); S.movs.delete(m.id); }
+    const doc = S.tx.get(t.mes); const rows = (doc.rows || []).filter(r => r[0] !== id); const nd = Object.assign({}, doc, {rows, n: rows.length});
+    await q(sb.from('tx_mes').upsert(nd)); S.tx.set(t.mes, nd);
+    const h = S.hist && S.hist.get(id); if (h) { const nh = Object.assign({}, h, {cambios: [...(h.cambios || []), {at, eliminado: true}]}); await q(sb.from('tx_hist').upsert(nh)); S.hist.set(id, nh); }
+    toast('Registro eliminado de la plataforma');
+  } catch (e) {}
+  $('#modalRoot').innerHTML = ''; derive(); render();
 }
 
 /* ================= historial de sincronización ================= */
@@ -1500,7 +1582,7 @@ async function importarMonedas(file, msg) {
 }
 const CAMPOS_TX = [['monto', 'Monto', v => L(v)], ['fecha', 'Fecha', v => fFecha(v)], ['det', 'Detalle'], ['cuenta', 'Cuenta'], ['cat', 'Categoría'], ['sub', 'Subcategoría'], ['nota', 'Contenido'], ['tipoMov', 'Tipo en la app']];
 function difTx(o, t) { return CAMPOS_TX.filter(([k]) => k === 'monto' ? cents(o.monto) !== cents(t.monto) : (o[k] || '') !== (t[k] || '')).map(([k, n, f]) => [n, f ? f(o[k]) : (o[k] || ''), f ? f(t[k]) : (t[k] || '')]); }
-async function registrarHistorial(prevTx, at, desde, hasta, msg) {
+async function registrarHistorial(prevTx, at, desde, hasta, msg, extra) {
   if (!S.hist) return;
   const cambiar = []; const ahora = new Date().toISOString(); const vacio = S.hist.size === 0;
   for (const t of D.txs) {
@@ -1508,7 +1590,8 @@ async function registrarHistorial(prevTx, at, desde, hasta, msg) {
     if (!h) { cambiar.push({tx_id: t.id, primera: o && vacio ? null : at, visto: ahora, cambios: []}); continue; }
     if (o) { const d = difTx(o, t); if (d.length) cambiar.push(Object.assign({}, h, {cambios: [...(h.cambios || []), {at, d}]})); }
   }
-  for (const [id, o] of prevTx) if (!D.byId.has(id) && o.mes >= desde && o.mes <= hasta) { const h = S.hist.get(id); if (h && !(h.cambios || []).some(x => x.borrado)) cambiar.push(Object.assign({}, h, {cambios: [...(h.cambios || []), {at, borrado: true}]})); }
+  for (const [id, o] of prevTx) if (!D.byId.has(id) && o.mes >= desde && o.mes <= hasta) { const h = S.hist.get(id); const ult = h && (h.cambios || []).slice(-1)[0]; if (h && !(ult && ult.borrado)) cambiar.push(Object.assign({}, h, {cambios: [...(h.cambios || []), {at, borrado: true}]})); }
+  for (const [id, ents] of Object.entries(extra || {})) { const k = cambiar.findIndex(x => x.tx_id === id); const base = k >= 0 ? cambiar[k] : S.hist.get(id); if (!base) continue; const nh = Object.assign({}, base, {cambios: [...(base.cambios || []), ...ents]}); if (k >= 0) cambiar[k] = nh; else cambiar.push(nh); }
   for (let i = 0; i < cambiar.length; i += 500) { const lote = cambiar.slice(i, i + 500); if (msg && cambiar.length > 500) msg.textContent = `Guardando historial… ${Math.min(i + 500, cambiar.length)} de ${cambiar.length}`; await q(sb.from('tx_hist').upsert(lote)); lote.forEach(x => S.hist.set(x.tx_id, x)); }
 }
 async function iniciarHistorial() {
@@ -1526,14 +1609,15 @@ function abrirDetalleTx(id) {
     : !h ? '<div class="note">Todavía no hay historial de este registro. Se guardará en la próxima sincronización.</div>'
     : `<table class="dist"><tbody>
         ${fila('Primera sincronización', h.primera ? cuando(h.primera) : `Ya estaba en la plataforma cuando se activó el historial (${cuando(h.visto)})`)}
-        ${(h.cambios || []).map(x => `<tr><th>${x.borrado ? 'Borrado en la app' : 'Modificado'}<div class="cat">${cuando(x.at)}</div></th><td>${x.borrado ? 'Ya no apareció al sincronizar' : x.d.map(([k, a, b]) => `<div><b>${esc(k)}:</b> <s class="muted">${esc(a)}</s> → ${esc(b)}</div>`).join('')}</td></tr>`).join('')}
+        ${(h.cambios || []).map(x => `<tr><th>${x.reaparece ? 'Volvió a la app' : x.eliminado ? 'Eliminado' : x.borrado ? 'Borrado en la app' : 'Modificado en la app'}<div class="cat">${cuando(x.at)}</div></th><td>${x.reaparece ? 'Apareció de nuevo al sincronizar' : x.eliminado ? 'Eliminado a mano de la plataforma' : x.borrado ? (x.decision === 'mantener' ? 'Ya no apareció al sincronizar · <b>se mantuvo en la web</b>' : 'Ya no apareció al sincronizar') : (x.d || []).map(([k, a, b]) => `<div><b>${esc(k)}:</b> ${x.decision === 'web' ? `${esc(a)} <span class="muted">(en la app: ${esc(b)})</span>` : `<s class="muted">${esc(a)}</s> → ${esc(b)}`}</div>`).join('') + (x.decision === 'web' ? '<div><b>Se conservó la versión web</b></div>' : '')}</td></tr>`).join('')}
         ${(h.cambios || []).length ? '' : '<tr><th>Modificaciones</th><td>Sin cambios desde que llegó</td></tr>'}
       </tbody></table>`;
   const snap = pp.filter(m => m.app_monto != null).map(m => { const d = []; if (cents(m.app_monto) !== cents(t.monto)) d.push(`monto ${L(m.app_monto)}`); if (m.app_fecha && m.app_fecha !== t.fecha) d.push(`fecha ${fFecha(m.app_fecha)}`); if (m.app_detalle != null && m.app_detalle !== t.det) d.push(`detalle "${esc(m.app_detalle)}"`); return d; }).find(d => d.length);
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="dtxT">
     <div class="hd"><h2 id="dtxT" style="margin-right:auto">${esc(t.det || 'Movimiento')}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
     <div class="bd">
-      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${t.code === 0 ? 'Ingreso' : t.code === 3 ? 'Traslado' : 'Egreso'}</span></div>
+      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${t.code === 0 ? 'Ingreso' : t.code === 3 ? 'Traslado' : 'Egreso'}</span>${t.versionWeb ? '<span class="chip">Versión web conservada</span>' : ''}</div>
+      ${t.borradoApp ? `<div class="panel"><div class="bd small row" style="justify-content:space-between"><span><b class="neg">Borrado en la app.</b> Lo mantuviste en la plataforma el ${fFecha(t.borradoApp.slice(0, 10))}. Elimínalo cuando quieras homologar con la app${partes(t.id).length ? '; también se quitará de los controles donde está asignado' : ''}.</span><button class="btn sm danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? '¿Seguro? Eliminar' : 'Eliminar de la plataforma'}</button></div></div>` : ''}
       <div class="eyebrow">En Registro Contable</div>
       <table class="dist"><tbody>
         ${fila('Fecha', fFecha(t.fecha))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta))}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
@@ -1694,6 +1778,10 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'prevTodo') { const X = S.syncPend; if (!X) return; X.mods.forEach(x => X.dec[x.id] = b.dataset.v === 'app' ? 'app' : 'web'); X.dels.forEach(x => X.dec[x.id] = b.dataset.v === 'app' ? 'borrar' : 'mantener'); return pintarPrevia(); }
+  if (act === 'prevCancelar') { S.syncPend = null; $('#syncMsg').innerHTML = '<span class="muted">Sincronización cancelada. No se guardó nada.</span>'; return; }
+  if (act === 'prevGuardar') { const X = S.syncPend; if (!X) return; b.disabled = true; return aplicarSync(X); }
+  if (act === 'elimTx') { if (!esAdmin()) return; if (S.confirmElim !== b.dataset.id) { S.confirmElim = b.dataset.id; const t = D.byId.get(b.dataset.id); b.textContent = partes(b.dataset.id).length ? '¿Eliminar también de los controles? Sí' : '¿Eliminar? Sí'; return; } S.confirmElim = null; return eliminarTx(b.dataset.id); }
   if (act === 'adjVer') { const x = (S.adj || []).find(z => z.id === b.dataset.id); if (!x) return; const w = window.open('', '_blank'); const {data, error} = await sb.storage.from('comprobantes').createSignedUrl(x.ruta, 600); if (error || !data) { if (w) w.close(); return toast('No se pudo abrir el comprobante'); } if (w) w.location.href = data.signedUrl; else location.href = data.signedUrl; return; }
   if (act === 'adjQuitar') { if (S.confirmAdj !== b.dataset.id) { S.confirmAdj = b.dataset.id; b.textContent = '¿Quitar? Sí'; return; } S.confirmAdj = null; try { await quitarAdjunto(b.dataset.id); } catch (e) {} render(); return reabrirDetalle(); }
   if (act === 'ordenar') { const [dk, dd] = b.dataset.def.split('|'); const cur = ordDe(b.dataset.key, {k: dk, dir: dd}); const campo = b.dataset.campo; S.orden[b.dataset.key] = cur.k === campo ? {k: campo, dir: cur.dir === 'asc' ? 'desc' : 'asc'} : {k: campo, dir: campo === 'fecha' || campo === 'valor' || campo === 'monto' ? 'desc' : 'asc'}; try { localStorage.setItem('cg-orden', JSON.stringify(S.orden)); } catch (_) {} return render(); }
@@ -1797,6 +1885,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
   if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); return; }
   if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (t.dataset.dec && S.syncPend) { S.syncPend.dec[t.dataset.dec] = t.value; return pintarPrevia(); }
   if (t.hasAttribute('data-adj-up') && t.files.length) { const f = [...t.files]; t.value = ''; return subirAdjuntos(f, t.dataset.tx, t.dataset.mov); }
   if (S.asoc && (t.dataset.asocUsar || t.hasAttribute('data-asoc-mes'))) { if (t.dataset.asocUsar) S.asoc.usar[t.dataset.asocUsar] = t.checked; else S.asoc.moverMes = t.checked; return pintarAsoc(); }
   if (t.dataset.rp && S.rep) {
