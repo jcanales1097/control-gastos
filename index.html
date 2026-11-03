@@ -716,7 +716,7 @@ function vBandeja() {
       ${ctrlSelect((familiares()[0] || {}).id, 'id="bCtrl" aria-label="Control o proyecto"')}
       <select id="bTipo" aria-label="Tipo">${tipoOptions(familiares()[0], 'COMPARTIDO', 'egreso')}</select>
       <select id="bGrupo" aria-label="Micro proyecto" ${familiares()[0] && microsDe(familiares()[0].id, true).length ? '' : 'hidden'}>${familiares()[0] ? microOptions(familiares()[0].id, '') : ''}</select>
-      <span class="small">Mes: el de cada movimiento</span>
+      <select id="bMes" aria-label="Mes para la selección" ${familiares()[0] ? '' : 'disabled'}><option value="">Mes de cada movimiento</option>${mesOptions('').replace(/ selected/g, '')}</select>
       <button class="btn sm" data-act="bulkAsignar">Asignar selección</button><button class="btn sm" data-act="bulkIgnorar">Marcar como no aplica</button><button class="btn sm" data-act="bulkClear">Quitar selección</button></div>` : ''}
   </div>`;
 }
@@ -1813,7 +1813,7 @@ document.addEventListener('click', async e => {
   if (act === 'mas') { S.limite += 300; return render(); }
   if (act === 'asignar') { const tr = b.closest('tr'); const ctrl = $('[data-f=ctrl]', tr).value; const c = ctrlById(ctrl); const g = $('[data-f=grupo]', tr); return asignar([b.dataset.id], ctrl, $('[data-f=tipo]', tr).value, c && c.porMes ? $('[data-f=mes]', tr).value : null, c && c.porMes && g ? g.value : ''); }
   if (act === 'ignorar') return ignorar([b.dataset.id]);
-  if (act === 'bulkAsignar') { const g = $('#bGrupo'); return asignar([...S.sel], $('#bCtrl').value, $('#bTipo').value, null, g ? g.value : ''); }
+  if (act === 'bulkAsignar') { const g = $('#bGrupo'); const c = ctrlById($('#bCtrl').value); const mm = $('#bMes'); return asignar([...S.sel], $('#bCtrl').value, $('#bTipo').value, c && c.porMes && mm && mm.value ? mm.value : null, g ? g.value : ''); }
   if (act === 'bulkIgnorar') return ignorar([...S.sel]);
   if (act === 'bulkClear') { S.sel.clear(); return render(); }
   if (act === 'restaurar') { await q(sb.from('ignorados').delete().eq('tx_id', b.dataset.id), 'Devuelto a la bandeja').catch(() => null); S.ign.delete(b.dataset.id); derive(); return render(); }
@@ -1969,7 +1969,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'otroMes' && t.value) { S.mesSel[t.dataset.c] = t.value; lsSet('mes-' + t.dataset.c, t.value); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
-  if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); const g = $('#bGrupo'); if (g) { const mps = c && c.porMes ? microsDe(c.id, true) : []; g.innerHTML = c && c.porMes ? microOptions(c.id, '') : ''; g.hidden = !mps.length; } return; }
+  if (t.id === 'bCtrl') { const c = ctrlById(t.value); const mm = $('#bMes'); if (mm) { mm.disabled = !(c && c.porMes); if (mm.disabled) mm.value = ''; } $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); const g = $('#bGrupo'); if (g) { const mps = c && c.porMes ? microsDe(c.id, true) : []; g.innerHTML = c && c.porMes ? microOptions(c.id, '') : ''; g.hidden = !mps.length; } return; }
   if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; const g = $('[data-f=grupo]', tr); if (g) { const mps = c && c.porMes ? microsDe(c.id, true) : []; g.innerHTML = c && c.porMes ? microOptions(c.id, microSugerido(c, tx)) : '<option value=""></option>'; g.style.display = mps.length ? 'block' : 'none'; } return; }
   if (t.dataset.movGrupo) { const id = t.dataset.movGrupo; await actualizarMov(id, {grupo: t.value || null}, t.value ? 'Asignado al micro proyecto' : 'Quitado del micro proyecto').catch(() => {}); return abrirDetalle(id); }
   if (t.dataset.dec && S.syncPend) { S.syncPend.dec[t.dataset.dec] = t.value; return pintarPrevia(); }
