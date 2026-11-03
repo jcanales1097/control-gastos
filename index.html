@@ -942,9 +942,10 @@ function tablaFilas(c, h, lado) {
     <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? ' <button class="btn sm ghost" data-act="asociar" title="Asociar esta fila a un registro de la app">Asociar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
     <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`;
     const hechos = new Set(); const nc = cols; const ivalor = 3 + (eg && fam ? 1 : 0);
-    return rowsO.map(r => {
-      const mp = r.grupo && microById(r.grupo); if (!mp) return filaH(r);
-      if (hechos.has(mp.id)) return ''; hechos.add(mp.id);
+    const sueltas = rowsO.filter(r => !(r.grupo && microById(r.grupo)));
+    const grupos = [...new Set(rowsO.filter(r => r.grupo && microById(r.grupo)).map(r => r.grupo))].sort((x, y) => microById(x).nombre.localeCompare(microById(y).nombre, 'es'));
+    return sueltas.map(filaH).join('') + grupos.map(g => {
+      const mp = microById(g); if (hechos.has(mp.id)) return ''; hechos.add(mp.id);
       const del = rowsO.filter(x => x.grupo === mp.id); const val = del.filter(x => x.estado === 'valido');
       const sub = {}; val.forEach(x => sub[x.tipo] = (sub[x.tipo] || 0) + x.valor);
       const orden = Object.keys(sub).sort((x, y) => x === 'COMPARTIDO' ? -1 : y === 'COMPARTIDO' ? 1 : x.localeCompare(y));
