@@ -123,6 +123,14 @@ input.in.num{width:110px}
 .ordb i{font-style:normal;font-size:9px;opacity:.35}
 th[aria-sort] .ordb{color:var(--fg)} th[aria-sort] .ordb i{opacity:1}
 th.num .ordb{flex-direction:row-reverse}
+.grp td{background:var(--sunk);border-top:1px solid var(--line)}
+.grp .gbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.grp .gbtn::before{content:'';border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;opacity:.6}
+.grp .gbtn[aria-expanded="true"]::before{transform:rotate(90deg)}
+.grp-sub td{background:var(--sunk);font-size:12.5px;color:var(--muted);padding-top:3px;padding-bottom:3px}
+.grp-sub td.num{color:var(--fg)}
+tr.en-grupo td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.chip.mp{background:var(--accent-soft);color:var(--accent)}
 .menu{position:relative;display:inline-block}
 .menu>summary{list-style:none;cursor:pointer}.menu>summary::-webkit-details-marker{display:none}
 .menu-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:240px;display:flex;flex-direction:column}
@@ -402,6 +410,7 @@ async function cargarTodo() {
   const [ctr, movs] = await Promise.all([todo('controles', 'orden'), todo('movimientos', 'creado_el')]);
   S.ctrls = ctr.map(fromC); S.movs = new Map(movs.map(m => [m.id, normMov(m)]));
   try { S.adj = await todo('adjuntos', 'subido_el'); } catch (e) { S.adj = null; }
+  try { S.micro = await todo('microproyectos', 'creado_el'); } catch (e) { S.micro = null; }
   if (esAdmin()) {
     const [tx, ign, aj, pf, ac] = await Promise.all([todo('tx_mes', 'mes'), todo('ignorados'), todo('ajustes'), todo('perfiles', 'creado_el'), todo('accesos')]);
     S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
@@ -576,7 +585,8 @@ function mesOptions(sel) {
 function asignarCells(t) {
   const c = sugerido(t) || null;
   const lado = t.code === 0 ? 'ingreso' : 'egreso';
-  return `<td>${ctrlSelect(c ? c.id : '', 'class="in" data-f="ctrl" aria-label="Control o proyecto"')}</td>
+  const mps = c && c.porMes ? microsDe(c.id, true) : [];
+  return `<td>${ctrlSelect(c ? c.id : '', 'class="in" data-f="ctrl" aria-label="Control o proyecto"')}<select class="in" data-f="grupo" aria-label="Micro proyecto" style="margin-top:4px;display:${mps.length ? 'block' : 'none'}">${c && c.porMes ? microOptions(c.id, microSugerido(c, t)) : '<option value=""></option>'}</select></td>
     <td><select class="in" data-f="tipo" aria-label="Tipo">${tipoOptions(c, tipoSugerido(c, t), lado, t.mes)}</select></td>
     <td><select class="in" data-f="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(t.mes)}</select></td>
     <td style="white-space:nowrap"><button class="btn sm pri" data-act="asignar" data-id="${esc(t.id)}">Asignar</button> <button class="btn sm" data-act="dividir" data-id="${esc(t.id)}" title="Repartir entre varios controles o proyectos">Dividir</button> <button class="btn sm ghost" data-act="ignorar" data-id="${esc(t.id)}" title="No va en ningún control">No aplica</button></td>`;
@@ -705,6 +715,7 @@ function vBandeja() {
     ${S.sel.size ? `<div class="bulk" role="region" aria-label="Acciones para la selección"><b>${S.sel.size} seleccionados</b>
       ${ctrlSelect((familiares()[0] || {}).id, 'id="bCtrl" aria-label="Control o proyecto"')}
       <select id="bTipo" aria-label="Tipo">${tipoOptions(familiares()[0], 'COMPARTIDO', 'egreso')}</select>
+      <select id="bGrupo" aria-label="Micro proyecto" ${familiares()[0] && microsDe(familiares()[0].id, true).length ? '' : 'hidden'}>${familiares()[0] ? microOptions(familiares()[0].id, '') : ''}</select>
       <span class="small">Mes: el de cada movimiento</span>
       <button class="btn sm" data-act="bulkAsignar">Asignar selección</button><button class="btn sm" data-act="bulkIgnorar">Marcar como no aplica</button><button class="btn sm" data-act="bulkClear">Quitar selección</button></div>` : ''}
   </div>`;
@@ -765,6 +776,7 @@ function vControl(c) {
     </div>
     ${c.porMes ? vDistribucion(c, R) : vResumenProy(c, R, h)}
     ${tablaFilas(c, h, 'egreso')}${tablaFilas(c, h, 'ingreso')}
+    ${c.porMes ? vMicros(c) : ''}
     ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
 }
 function porMesProy(h) {
@@ -921,17 +933,30 @@ function tablaFilas(c, h, lado) {
     ${filtrado ? `<button class="btn sm ghost" data-act="limpiarFtab" data-k="${esc(fk)}">Quitar filtros</button>` : ''}
   </div>` : ''}
   <div class="tbl-wrap"><table><thead><tr>${thOrd(okey, 'fecha', 'Fecha', odef)}${thOrd(okey, 'tipo', eg ? 'Tipo' : 'Persona', odef)}${eg && fam ? thOrd(okey, 'cat', 'Categoría', odef) : ''}${thOrd(okey, 'desc', 'Descripción', odef)}${thOrd(okey, 'valor', 'Valor', odef, 'num')}${thOrd(okey, 'estado', 'Estado', odef)}<th></th></tr></thead><tbody>
-  ${rowsO.map(r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}">
+  ${(() => { const filaH = r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}${r.grupo && microById(r.grupo) ? ' en-grupo' : ''}">
     <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
     <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado, h.mes)}</select></td>
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
     <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
     <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}>${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
     <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? ' <button class="btn sm ghost" data-act="asociar" title="Asociar esta fila a un registro de la app">Asociar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
-    <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`).join('')}
+    <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`;
+    const hechos = new Set(); const nc = cols; const ivalor = 3 + (eg && fam ? 1 : 0);
+    return rowsO.map(r => {
+      const mp = r.grupo && microById(r.grupo); if (!mp) return filaH(r);
+      if (hechos.has(mp.id)) return ''; hechos.add(mp.id);
+      const del = rowsO.filter(x => x.grupo === mp.id); const val = del.filter(x => x.estado === 'valido');
+      const sub = {}; val.forEach(x => sub[x.tipo] = (sub[x.tipo] || 0) + x.valor);
+      const orden = Object.keys(sub).sort((x, y) => x === 'COMPARTIDO' ? -1 : y === 'COMPARTIDO' ? 1 : x.localeCompare(y));
+      const k = fk + '|' + mp.id; const abierto = !!(S.mpAbierto || {})[k];
+      const vacios = n => n > 0 ? `<td colspan="${n}"></td>` : '';
+      return `<tr class="grp"><td colspan="${ivalor}"><button class="gbtn" data-act="mpToggle" data-k="${esc(k)}" aria-expanded="${abierto}">${esc(mp.nombre)}</button> <span class="chip mp">Micro proyecto</span> <span class="note">${del.length} ${del.length === 1 ? 'registro' : 'registros'}</span> <button class="btn sm ghost" data-act="microVer" data-id="${esc(mp.id)}">Ver todo</button></td><td class="num"><b>${L(val.reduce((a, x) => a + x.valor, 0))}</b></td>${vacios(nc - ivalor - 1)}</tr>
+        ${orden.map(t => `<tr class="grp-sub"><td></td><td>${esc(t)}</td>${vacios(ivalor - 2)}<td class="num">${L(sub[t])}</td>${vacios(nc - ivalor - 1)}</tr>`).join('')}
+        ${abierto ? del.map(filaH).join('') : ''}`;
+    }).join(''); })()}
   ${ro ? '' : `<tr class="addrow" data-c="${c.id}" data-m="${esc(h.mes)}" data-lado="${lado}"><td><input type="date" class="in" data-new="fecha" aria-label="Fecha" value="${fechaDef}"></td>
     <td><select class="in" data-new="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}">${tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, h.mes)[0] || 'COMPARTIDO'), lado, h.mes)}</select></td>
-    ${eg && fam ? '<td></td>' : ''}<td><input class="in" style="max-width:none;width:100%" data-new="desc" placeholder="${eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'}" aria-label="Descripción"></td>
+    ${eg && fam ? '<td></td>' : ''}<td><input class="in" style="max-width:none;width:100%" data-new="desc" placeholder="${eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'}" aria-label="Descripción">${fam && microsDe(c.id, true).length ? `<select class="in" data-new="grupo" aria-label="Micro proyecto" style="margin-top:4px">${microOptions(c.id, '', 'Sin micro proyecto')}</select>` : ''}</td>
     <td class="num"><input class="in num" data-new="valor" inputmode="decimal" placeholder="0.00" aria-label="Valor"></td>
     <td colspan="2"><button class="btn sm ${a ? '' : 'pri'}" data-act="agregar">${a ? 'Agregar' : 'Registrar'}</button></td></tr>`}
   </tbody></table></div>
@@ -1015,6 +1040,47 @@ async function guardarReparto() {
     if (nuevos.length) { const d = await q(sb.from('movimientos').insert(nuevos).select()); (d || []).forEach(m => S.movs.set(m.id, normMov(m))); }
   } catch (e) { derive(); render(); return; }
   S.rep = null; $('#modalRoot').innerHTML = ''; derive(); render(); toast('Reparto guardado');
+}
+
+/* ================= micro proyectos ================= */
+const microsDe = (cid, soloAbiertos) => (S.micro || []).filter(x => x.control === cid && (!soloAbiertos || x.estado === 'abierto'));
+const microById = id => (S.micro || []).find(x => x.id === id);
+function microSugerido(c, t) { if (!c || !t) return ''; const d = (t.det + ' ' + t.nota).toUpperCase(); const x = microsDe(c.id, true).find(x => x.clave && d.includes(x.clave.toUpperCase())); return x ? x.id : ''; }
+const microOptions = (cid, sel, vacio) => `<option value="">${vacio || 'Sin micro proyecto'}</option>` + microsDe(cid).filter(x => x.estado === 'abierto' || x.id === sel).map(x => `<option value="${esc(x.id)}" ${x.id === sel ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
+function resumenMicro(id) {
+  const rows = [...S.movs.values()].filter(m => m.grupo === id && m.estado === 'valido');
+  const eg = rows.filter(m => m.lado === 'egreso'), ing = rows.filter(m => m.lado === 'ingreso');
+  const porTipo = {}; eg.forEach(m => porTipo[m.tipo] = (porTipo[m.tipo] || 0) + m.valor);
+  const porPersona = {}; ing.forEach(m => porPersona[m.tipo] = (porPersona[m.tipo] || 0) + m.valor);
+  const e = eg.reduce((a, m) => a + m.valor, 0), i = ing.reduce((a, m) => a + m.valor, 0);
+  const meses = [...new Set(rows.map(m => m.mes))].sort();
+  return {rows, eg, ing, porTipo, porPersona, egreso: e, ingreso: i, saldo: i - e, meses, pendientes: [...S.movs.values()].filter(m => m.grupo === id && m.estado === 'pendiente').length};
+}
+function vMicros(c) {
+  if (S.micro === null) return esAdmin() ? '<div class="panel"><div class="hd"><h2>Micro proyectos</h2></div><div class="bd note">Para usar micro proyectos, corre en Supabase el SQL de micro proyectos.</div></div>' : '';
+  const l = microsDe(c.id); const a = esAdmin();
+  if (!l.length && !a) return '';
+  const fila = x => { const R = resumenMicro(x.id); return `<tr><td><button class="linkish" data-act="microVer" data-id="${esc(x.id)}"><b>${esc(x.nombre)}</b></button>${x.clave ? `<div class="cat">Clave: ${esc(x.clave)}</div>` : ''}</td>
+    <td class="small">${R.meses.length ? esc(R.meses.map(mesLargo).join(', ')) : '—'}</td><td class="num pos">${L(R.ingreso)}</td><td class="num">${L(-R.egreso)}</td><td class="num ${R.saldo < 0 ? 'neg' : 'pos'}">${L(R.saldo)}</td>
+    <td><span class="chip ${x.estado === 'abierto' ? 'app' : ''}">${x.estado === 'abierto' ? 'Abierto' : 'Cerrado'}</span></td>
+    <td style="white-space:nowrap">${a ? (x.estado === 'abierto' ? `<button class="btn sm ghost" data-act="microEstado" data-id="${esc(x.id)}" data-v="cerrado">Cerrar</button>` : `<button class="btn sm ghost" data-act="microEstado" data-id="${esc(x.id)}" data-v="abierto">Reabrir</button>`) + (R.rows.length || R.pendientes ? '' : ` <button class="btn sm ghost danger" data-act="microBorrar" data-id="${esc(x.id)}">${S.confirmMicro === x.id ? '¿Eliminar? Sí' : 'Eliminar'}</button>`) : ''}</td></tr>`; };
+  return `<div class="panel"><div class="hd"><h2>Micro proyectos de ${esc(c.corto || c.nombre)}</h2><span class="note">Agrupan registros dentro del control; sus gastos se reparten en el mes como cualquier otro.</span></div>
+    ${l.length ? `<div class="tbl-wrap"><table><thead><tr><th>Micro proyecto</th><th>Meses</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>${l.map(fila).join('')}</tbody></table></div>` : '<div class="bd note">Todavía no hay micro proyectos en este control.</div>'}
+    ${a ? `<div class="bd row" style="border-top:1px solid var(--line)"><input class="in" id="mpNombre-${c.id}" placeholder="Nombre (ej.: Viaje a Santa Rosa)" style="max-width:280px"><input class="in" id="mpClave-${c.id}" placeholder="Clave opcional (ej.: SROSA)" style="max-width:200px" title="Si el detalle de un registro de la app contiene esta palabra, la bandeja lo sugiere"><button class="btn sm pri" data-act="microNuevo" data-c="${c.id}">Crear micro proyecto</button></div>` : ''}</div>`;
+}
+function abrirMicro(id) {
+  const x = microById(id); if (!x) return; const c = ctrlById(x.control); const R = resumenMicro(id); S.detAbierto = null;
+  const porMes = {}; R.rows.forEach(m => (porMes[m.mes] = porMes[m.mes] || []).push(m));
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mpT" style="max-width:860px">
+    <div class="hd"><h2 id="mpT" style="margin-right:auto">${esc(x.nombre)}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd">
+      <div class="row"><span class="chip mp">Micro proyecto · ${esc(c ? c.nombre : x.control)}</span><span class="chip ${x.estado === 'abierto' ? 'app' : ''}">${x.estado === 'abierto' ? 'Abierto' : 'Cerrado'}</span></div>
+      <div class="kpis"><div class="kpi"><div class="eyebrow">Ingresos</div><div class="v">${L(R.ingreso)}</div></div><div class="kpi"><div class="eyebrow">Egresos</div><div class="v">${L(-R.egreso)}</div></div><div class="kpi"><div class="eyebrow">Saldo</div><div class="v ${R.saldo < 0 ? 'neg' : 'pos'}">${L(R.saldo)}</div></div></div>
+      <div class="dist-grid"><table class="dist"><thead><tr><th>Egresos por responsable</th><th class="num">Valor</th></tr></thead><tbody>${Object.entries(R.porTipo).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${L(-v)}</td></tr>`).join('') || '<tr><td colspan="2" class="note">Sin egresos</td></tr>'}</tbody></table>
+      <table class="dist"><thead><tr><th>Ingresos por persona</th><th class="num">Valor</th></tr></thead><tbody>${Object.entries(R.porPersona).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${L(v)}</td></tr>`).join('') || '<tr><td colspan="2" class="note">Sin ingresos</td></tr>'}</tbody></table></div>
+      ${Object.keys(porMes).sort().map(m => `<div class="eyebrow"><button class="linkish" data-act="mes" data-c="${esc(x.control)}" data-m="${m}">${esc(mesLargo(m))}</button></div><table class="dist"><tbody>${porMes[m].sort((a, b) => (a.fecha || '') < (b.fecha || '') ? -1 : 1).map(r => `<tr><td class="mono small" style="width:90px">${fFecha(r.fecha)}</td><td class="small">${r.lado === 'ingreso' ? '<span class="chip app">Ingreso</span> ' : ''}<button class="linkish" data-act="detalleMovId" data-id="${esc(r.id)}">${esc(r.descripcion || '(sin descripción)')}</button><div class="cat">${esc(r.tipo)}</div></td><td class="num">${r.lado === 'ingreso' ? '+' : ''}${L(r.valor)}</td></tr>`).join('')}</tbody></table>`).join('') || '<div class="note">Todavía no tiene registros. Asígnalos desde la bandeja, el detalle de una fila o la fila de agregar del mes.</div>'}
+      ${R.pendientes ? `<div class="note">${R.pendientes} registros por validar no cuentan todavía.</div>` : ''}
+    </div></div></div>`;
 }
 
 /* ================= comprobantes adjuntos ================= */
@@ -1151,6 +1217,7 @@ function abrirDetalle(id) {
       </tbody></table>` : ''}
       ${cb ? `<div class="panel"><div class="bd small">${cb.tipo === 'eliminado' ? 'Este registro ya no aparece en la app.' : cb.tipo === 'duplicado' ? `Esta fila es un duplicado: el registro se asignó más de una vez (suma ${L(cb.total)}, en la app ${L(cb.t.monto)}).` : cb.tipo === 'excedido' ? `Las partes suman ${L(cb.total)} y en la app el registro es de ${L(cb.t.monto)}.` : 'Cambió en la app: ' + cb.d.map(([k, x, y]) => `${k} ${esc(x)} → ${esc(y)}`).join(' · ')} <a href="#cambios" data-act="cerrarModal">Revisar en Cambios</a></div></div>` : ''}
       ${ps.length > 1 ? `<div class="eyebrow">Repartido en ${ps.length} partes</div><table class="dist"><tbody>${ps.map(p => { const pc = ctrlById(p.control); return `<tr><td>${esc(pc ? pc.nombre : p.control)} · ${esc(mesLargo(p.mes))} · ${esc(p.tipo)}</td><td class="num">${L(p.valor)}</td></tr>`; }).join('')}</tbody></table>` : ''}
+      ${c && c.porMes && S.micro && (microsDe(c.id).length) ? `<div class="row small" style="gap:8px"><span class="eyebrow">Micro proyecto</span>${(a || (m.creado_por === S.me.id && m.estado === 'pendiente')) ? `<select class="in" data-mov-grupo="${esc(m.id)}" aria-label="Micro proyecto">${microOptions(c.id, m.grupo || '')}</select>` : `<span class="chip mp">${esc((microById(m.grupo) || {}).nombre || 'Ninguno')}</span>`}${m.grupo ? ` <button class="linkish" data-act="microVer" data-id="${esc(m.grupo)}"><u>Ver micro proyecto</u></button>` : ''}</div>` : ''}
       ${vAdjuntos(adjDeFila(m), {tx: m.tx_id || '', mov: m.id}, !cerrado(c) && (a || m.estado !== 'rechazado'))}
       <table class="dist"><tbody>
         ${fila('Estado', {valido: 'Validado', pendiente: 'Por validar', rechazado: 'Rechazado'}[m.estado])}
@@ -1202,6 +1269,13 @@ async function exportarPDF(c, mes, persona) {
     tabla({head: [['Fecha', 'TIPO', 'Categoría', 'Descripción', 'Valor']], body: eg.length ? eg.map(r => [fFecha(r.fecha), r.tipo, [r.cat, r.sub].filter(Boolean).join(' / '), r.descripcion || r.detalle, L(r.valor)]) : [['', '', '', 'Sin egresos', '']], foot: [['', '', '', 'Total', L(R.egreso)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 86}, 2: {cellWidth: 118}, 4: {halign: 'right', cellWidth: 72}}});
     titulo(`Detalle de ingresos (${ing.length})`);
     tabla({head: [['Fecha', 'Persona', 'Descripción', 'Valor']], body: ing.length ? ing.map(r => [fFecha(r.fecha), r.tipo, r.descripcion || r.detalle, L(r.valor)]) : [['', '', 'Sin ingresos', '']], foot: [['', '', 'Total', L(R.ingreso)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 110}, 3: {halign: 'right', cellWidth: 72}}});
+    if (c.porMes && S.micro) {
+      const filasMp = []; const grupos = [...new Set(eg.concat(ing).map(r => r.grupo).filter(g => g && microById(g)))];
+      for (const g of grupos) { const sub = {}; eg.filter(r => r.grupo === g).forEach(r => sub[r.tipo] = (sub[r.tipo] || 0) + r.valor); const ingG = ing.filter(r => r.grupo === g).reduce((a, r) => a + r.valor, 0);
+        Object.keys(sub).sort((x, z) => x === 'COMPARTIDO' ? -1 : z === 'COMPARTIDO' ? 1 : x.localeCompare(z)).forEach((t, k) => filasMp.push([k ? '' : microById(g).nombre, t, L(sub[t]), '']));
+        if (ingG) filasMp.push([Object.keys(sub).length ? '' : microById(g).nombre, 'Ingresos', '', L(ingG)]); }
+      if (filasMp.length) { titulo('Micro proyectos del mes'); tabla({head: [['Micro proyecto', 'Responsable', 'Egresos', 'Ingresos']], body: filasMp, columnStyles: der([2, 3])}); }
+    }
     if (R.pendientes) { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...gris); doc.text(`No incluye ${R.pendientes} registros por validar.`, M, Math.min(y, H - 40)); }
     const n = doc.getNumberOfPages();
     for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gris); doc.text(`Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''} · página ${i} de ${n}`, W / 2, H - 22, {align: 'center'}); }
@@ -1634,13 +1708,13 @@ function abrirDetalleTx(id) {
 }
 
 /* ================= acciones ================= */
-async function asignar(ids, ctrlId, tipo, mesFijo) {
+async function asignar(ids, ctrlId, tipo, mesFijo, grupo) {
   const c = ctrlById(ctrlId); if (!c) return toast('Elige un control o proyecto.'); if (cerrado(c)) return toast('Ese proyecto está cerrado.');
   S.enCurso = S.enCurso || new Set();
   ids = ids.filter(id => !S.enCurso.has(id));
   const rows = ids.map(id => D.byId.get(id)).filter(t => t && restante(t) > 0.005).map(t => ({
     control: c.id, mes: c.porMes ? (mesFijo || t.mes) : 'general', lado: t.code === 0 ? 'ingreso' : 'egreso', fecha: t.fecha, tipo,
-    cat: t.code === 0 ? '' : t.sub, sub: t.code === 0 ? '' : t.nota, descripcion: t.det, detalle: '', valor: restante(t), tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t)}));
+    cat: t.code === 0 ? '' : t.sub, sub: t.code === 0 ? '' : t.nota, descripcion: t.det, detalle: '', valor: restante(t), tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t), ...(grupo && c.porMes ? {grupo} : {})}));
   if (!rows.length) return;
   ids.forEach(id => { S.sel.delete(id); S.enCurso.add(id); });
   try { await insertarMovs(rows, `${rows.length === 1 ? 'Asignado' : rows.length + ' asignados'} a ${c.corto || c.nombre}`); } catch (e) {} finally { ids.forEach(id => S.enCurso.delete(id)); }
@@ -1736,9 +1810,9 @@ document.addEventListener('click', async e => {
   if (act === 'sync') return abrirSync(true);
   if (act === 'syncDirecto') return syncDirecto();
   if (act === 'mas') { S.limite += 300; return render(); }
-  if (act === 'asignar') { const tr = b.closest('tr'); const ctrl = $('[data-f=ctrl]', tr).value; const c = ctrlById(ctrl); return asignar([b.dataset.id], ctrl, $('[data-f=tipo]', tr).value, c && c.porMes ? $('[data-f=mes]', tr).value : null); }
+  if (act === 'asignar') { const tr = b.closest('tr'); const ctrl = $('[data-f=ctrl]', tr).value; const c = ctrlById(ctrl); const g = $('[data-f=grupo]', tr); return asignar([b.dataset.id], ctrl, $('[data-f=tipo]', tr).value, c && c.porMes ? $('[data-f=mes]', tr).value : null, c && c.porMes && g ? g.value : ''); }
   if (act === 'ignorar') return ignorar([b.dataset.id]);
-  if (act === 'bulkAsignar') return asignar([...S.sel], $('#bCtrl').value, $('#bTipo').value, null);
+  if (act === 'bulkAsignar') { const g = $('#bGrupo'); return asignar([...S.sel], $('#bCtrl').value, $('#bTipo').value, null, g ? g.value : ''); }
   if (act === 'bulkIgnorar') return ignorar([...S.sel]);
   if (act === 'bulkClear') { S.sel.clear(); return render(); }
   if (act === 'restaurar') { await q(sb.from('ignorados').delete().eq('tx_id', b.dataset.id), 'Devuelto a la bandeja').catch(() => null); S.ign.delete(b.dataset.id); derive(); return render(); }
@@ -1773,11 +1847,22 @@ document.addEventListener('click', async e => {
     const fecha = $('[data-new=fecha]', tr).value || null; const desc = $('[data-new=desc]', tr).value.trim();
     if (!esAdmin() && !desc) return toast('Escribe una descripción para que se pueda validar.');
     const mes = c.porMes ? (fecha && fecha.slice(0, 7) !== tr.dataset.m && tr.dataset.m !== 'general' ? tr.dataset.m : tr.dataset.m) : 'general';
-    const row = {control: c.id, mes, lado: tr.dataset.lado, fecha, tipo: $('[data-new=tipo]', tr).value, descripcion: desc, valor: v};
+    const row = {control: c.id, mes, lado: tr.dataset.lado, fecha, tipo: $('[data-new=tipo]', tr).value, descripcion: desc, valor: v}; const gsel = $('[data-new=grupo]', tr); if (gsel && gsel.value) row.grupo = gsel.value;
     if (esAdmin()) Object.assign(row, {estado: 'valido', origen: 'manual', validado_por: S.me.id, validado_el: new Date().toISOString()});
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'mpToggle') { S.mpAbierto = S.mpAbierto || {}; S.mpAbierto[b.dataset.k] = !S.mpAbierto[b.dataset.k]; return render(); }
+  if (act === 'microVer') return abrirMicro(b.dataset.id);
+  if (act === 'microNuevo') {
+    const c = ctrlById(b.dataset.c); const nombre = ($('#mpNombre-' + c.id).value || '').trim(); const clave = ($('#mpClave-' + c.id).value || '').trim().toUpperCase();
+    if (!nombre) return toast('Escribe el nombre del micro proyecto.');
+    const id = 'MP' + Date.now().toString(36).toUpperCase();
+    try { const d = await q(sb.from('microproyectos').insert({id, control: c.id, nombre, clave, estado: 'abierto'}).select(), 'Micro proyecto creado'); if (d && d[0]) S.micro.push(d[0]); } catch (e) {}
+    return render();
+  }
+  if (act === 'microEstado') { const x = microById(b.dataset.id); try { const d = await q(sb.from('microproyectos').update({estado: b.dataset.v, cerrado_el: b.dataset.v === 'cerrado' ? hoy() : null}).eq('id', x.id).select(), b.dataset.v === 'cerrado' ? 'Micro proyecto cerrado' : 'Micro proyecto reabierto'); if (d && d[0]) Object.assign(x, d[0]); } catch (e) {} return render(); }
+  if (act === 'microBorrar') { if (S.confirmMicro !== b.dataset.id) { S.confirmMicro = b.dataset.id; b.textContent = '¿Eliminar? Sí'; return; } S.confirmMicro = null; try { await q(sb.from('microproyectos').delete().eq('id', b.dataset.id), 'Micro proyecto eliminado'); S.micro = S.micro.filter(x => x.id !== b.dataset.id); } catch (e) {} return render(); }
   if (act === 'prevTodo') { const X = S.syncPend; if (!X) return; X.mods.forEach(x => X.dec[x.id] = b.dataset.v === 'app' ? 'app' : 'web'); X.dels.forEach(x => X.dec[x.id] = b.dataset.v === 'app' ? 'borrar' : 'mantener'); return pintarPrevia(); }
   if (act === 'prevCancelar') { S.syncPend = null; $('#syncMsg').innerHTML = '<span class="muted">Sincronización cancelada. No se guardó nada.</span>'; return; }
   if (act === 'prevGuardar') { const X = S.syncPend; if (!X) return; b.disabled = true; return aplicarSync(X); }
@@ -1883,8 +1968,9 @@ document.addEventListener('change', async e => {
   if (t.id === 'otroMes' && t.value) { S.mesSel[t.dataset.c] = t.value; lsSet('mes-' + t.dataset.c, t.value); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
   if (t.id === 'selAll') { document.querySelectorAll('[data-sel]').forEach(x => t.checked ? S.sel.add(x.dataset.sel) : S.sel.delete(x.dataset.sel)); return render(); }
-  if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); return; }
-  if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; return; }
+  if (t.id === 'bCtrl') { const c = ctrlById(t.value); $('#bTipo').innerHTML = tipoOptions(c, c.tipoDefecto || 'COMPARTIDO', 'egreso'); const g = $('#bGrupo'); if (g) { const mps = c && c.porMes ? microsDe(c.id, true) : []; g.innerHTML = c && c.porMes ? microOptions(c.id, '') : ''; g.hidden = !mps.length; } return; }
+  if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; const g = $('[data-f=grupo]', tr); if (g) { const mps = c && c.porMes ? microsDe(c.id, true) : []; g.innerHTML = c && c.porMes ? microOptions(c.id, microSugerido(c, tx)) : '<option value=""></option>'; g.style.display = mps.length ? 'block' : 'none'; } return; }
+  if (t.dataset.movGrupo) { const id = t.dataset.movGrupo; await actualizarMov(id, {grupo: t.value || null}, t.value ? 'Asignado al micro proyecto' : 'Quitado del micro proyecto').catch(() => {}); return abrirDetalle(id); }
   if (t.dataset.dec && S.syncPend) { S.syncPend.dec[t.dataset.dec] = t.value; return pintarPrevia(); }
   if (t.hasAttribute('data-adj-up') && t.files.length) { const f = [...t.files]; t.value = ''; return subirAdjuntos(f, t.dataset.tx, t.dataset.mov); }
   if (S.asoc && (t.dataset.asocUsar || t.hasAttribute('data-asoc-mes'))) { if (t.dataset.asocUsar) S.asoc.usar[t.dataset.asocUsar] = t.checked; else S.asoc.moverMes = t.checked; return pintarAsoc(); }
