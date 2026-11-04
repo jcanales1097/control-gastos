@@ -14,6 +14,8 @@ Plataforma web para llevar los gastos de la familia, de los padres y de proyecto
 - **Usuarios:** activa cuentas, indica cómo aparece cada persona en TIPO y marca qué controles y proyectos puede ver.
 - **Proyectos:** crea proyectos, dales una clave para que la bandeja los reconozca, y ciérralos al terminar.
 - **Exporta a Excel** con el formato de las hojas mensuales y sus fórmulas de distribución, y genera un **reporte PDF** del mes o del proyecto.
+- **Vehículos:** ficha de cada vehículo (datos, foto, tanque), recargas de combustible con medidor de nivel, mantenimientos con fotos y facturas, recorridos (lecturas del odómetro) y planes de mantenimiento con avisos. Los registros se vinculan a los gastos de la app: el costo sale del gasto, y la plataforma detecta sola los gastos de combustible y mantenimiento que mencionan el vehículo en el detalle (por ejemplo `FORD FOCUS 2016 | 223123 km 335 km - SHELL`). Gráficos de rendimiento (km/L o km/gal), gasto y kilómetros por mes.
+- **Comprobantes:** en el detalle de cada fila o movimiento se adjuntan fotos o PDF (factura, depósito, transferencia). Quedan ligados al registro de la app, así que aparecen en todas sus partes y en Movimientos. Se guardan en Supabase Storage (carpeta privada `comprobantes`) y solo los ve quien tiene acceso a ese registro.
 - Al hacer clic en la descripción de cualquier fila se abre su **detalle**: cuenta, categoría, subcategoría, contenido, monto en la app, en qué partes se repartió, quién lo registró y validó.
 
 **Los demás usuarios (por ejemplo tu esposa o tus papás):**
