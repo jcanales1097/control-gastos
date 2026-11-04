@@ -131,6 +131,40 @@ th.num .ordb{flex-direction:row-reverse}
 .grp-sub td.num{color:var(--fg)}
 tr.en-grupo td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .chip.mp{background:var(--accent-soft);color:var(--accent)}
+.vsel{display:flex;gap:10px;flex-wrap:wrap}
+.vcard{display:flex;gap:12px;align-items:center;padding:8px 14px 8px 8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;text-align:left;min-width:0;font:inherit;color:inherit}
+.vcard[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.vcard small{display:block;color:var(--muted);font-size:12px}
+.vcard.vnew{border-style:dashed;color:var(--muted)}
+.vph{width:64px;height:44px;border-radius:8px;flex:none;overflow:hidden;background:var(--sunk);display:block}
+.ficha{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.ficha{grid-template-columns:1fr}}
+.vfoto{aspect-ratio:16/10;max-width:100%;border-radius:10px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}
+.datos{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin:0}
+.datos dt{color:var(--muted)} .datos dd{margin:0;font-family:var(--f-num);overflow-wrap:anywhere}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.vchart{position:relative}
+.subtabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);width:100%}
+.subtabs button{border:0;background:none;padding:8px 12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.subtabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.form input,.form select{border:1px solid var(--line);border-radius:7px;padding:7px 9px;background:var(--panel);font-weight:400;font-size:13.5px;min-width:0;color:var(--fg)}
+.form input:disabled{opacity:.7}
+.calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.calc>div{background:var(--sunk);border-radius:8px;padding:8px 10px}
+.calc b{display:block;font:600 16px var(--f-num)}
+.callout{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--sunk);display:flex;flex-direction:column;gap:2px}
+.prox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
+.pbar{height:8px;border-radius:999px;background:var(--sunk);overflow:hidden}.pbar>span{display:block;height:100%;border-radius:999px}
+.gmini{display:inline-block;width:46px;height:8px;border-radius:999px;background:var(--sunk);overflow:hidden;vertical-align:middle}.gmini>span{display:block;height:100%;background:var(--ca)}
+.fuelbox{grid-column:1/-1;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--sunk)}
+.fuelg{width:200px;max-width:100%;touch-action:none;cursor:grab;border-radius:10px;outline:none;flex:none}
+.fuelg:focus-visible{box-shadow:0 0 0 2px var(--accent)} .fuelg.drag{cursor:grabbing} .fuelg svg{display:block;width:100%;height:auto}
+.fuelinfo{display:flex;flex-direction:column;gap:4px;min-width:150px;flex:1}
+.fuelinfo b{font:600 20px var(--f-num)} .fuelinfo #vfNivelSub{min-height:2.8em}
+.fuelinfo .btns{display:flex;gap:6px;flex-wrap:wrap}.fuelinfo .btns button{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;color:var(--fg)}
 .menu{position:relative;display:inline-block}
 .menu>summary{list-style:none;cursor:pointer}.menu>summary::-webkit-details-marker{display:none}
 .menu-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;min-width:240px;display:flex;flex-direction:column}
@@ -411,6 +445,7 @@ async function cargarTodo() {
   S.ctrls = ctr.map(fromC); S.movs = new Map(movs.map(m => [m.id, normMov(m)]));
   try { S.adj = await todo('adjuntos', 'subido_el'); } catch (e) { S.adj = null; }
   try { S.micro = await todo('microproyectos', 'creado_el'); } catch (e) { S.micro = null; }
+  try { S.veh = await todo('vehiculos', 'creado_el'); S.vreg = await todo('veh_registros', 'fecha'); S.vplan = await todo('veh_planes'); } catch (e) { S.veh = null; S.vreg = null; S.vplan = null; }
   if (esAdmin()) {
     const [tx, ign, aj, pf, ac] = await Promise.all([todo('tx_mes', 'mes'), todo('ignorados'), todo('ajustes'), todo('perfiles', 'creado_el'), todo('accesos')]);
     S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
@@ -516,7 +551,7 @@ function route() {
   const h = (location.hash || '').slice(1);
   const ok = id => { const c = ctrlById(id); return !!c; };
   if ((h.startsWith('c-') || h.startsWith('p-')) && ok(h.slice(2))) S.view = h;
-  else if (['inicio', 'proyectos'].includes(h)) S.view = h;
+  else if (['inicio', 'proyectos', 'vehiculos'].includes(h)) S.view = h;
   else if (esAdmin() && ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes'].includes(h)) S.view = h;
   else S.view = 'inicio';
 }
@@ -529,6 +564,7 @@ function renderTabs() {
   const nc = a ? cambios().length : 0; if (nc || S.view === 'cambios') items.push(['cambios', `Cambios ${nc ? `<span class="count bad-bg">${nc}</span>` : ''}`]);
   familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
   if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
+  if (S.veh !== undefined && (a || vehs().length)) items.push(['vehiculos', `Vehículos${a && detectados().length ? ` <span class="count warn-bg">${detectados().length}</span>` : ''}`]);
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
   const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
   $('#tabs').innerHTML = items.map(([h, l]) => `<a href="#${h}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`).join('');
@@ -551,10 +587,11 @@ function render() {
   else if (S.view === 'usuarios') html = vUsuarios();
   else if (S.view === 'ajustes') html = vAjustes();
   else if (S.view === 'proyectos') html = vProyectos();
+  else if (S.view === 'vehiculos') html = vVehiculos();
   else html = vControl(ctrlById(S.view.slice(2)));
   app().innerHTML = html;
   window.scrollTo(0, keep);
-  dibujarGraficos();
+  dibujarGraficos(); dibujarVeh();
   if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
@@ -594,7 +631,7 @@ function asignarCells(t) {
 function txCells(t) {
   const ing = t.code === 0;
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
-    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button>${clipN(adjDeTx(t.id))}${t.borradoApp ? ` <span class="chip bad" title="Ya no existe en Registro Contable; lo mantuviste en la web">Borrado en la app</span> <button class="btn sm ghost danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? (partes(t.id).length ? '¿Eliminar también de los controles? Sí' : '¿Eliminar? Sí') : 'Eliminar'}</button>` : t.versionWeb ? ' <span class="chip" title="Conservaste la versión web; en la app es distinta">Versión web</span>' : ''}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
+    <td class="desc"><div><button class="linkish" data-act="detalleTx" data-id="${esc(t.id)}" title="Ver todos los datos">${esc(t.det || '(sin detalle)')}</button>${clipN(adjDeTx(t.id))}${(() => { const rg = S.vreg && regDeTx(t.id); const v = rg && vehById(rg.vehiculo); return v ? ` <a class="chip app" href="#vehiculos" data-act="vehSel" data-id="${esc(v.id)}" title="Registrado en Vehículos">${esc(v.nombre)}</a>` : ''; })()}${t.borradoApp ? ` <span class="chip bad" title="Ya no existe en Registro Contable; lo mantuviste en la web">Borrado en la app</span> <button class="btn sm ghost danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? (partes(t.id).length ? '¿Eliminar también de los controles? Sí' : '¿Eliminar? Sí') : 'Eliminar'}</button>` : t.versionWeb ? ' <span class="chip" title="Conservaste la versión web; en la app es distinta">Versión web</span>' : ''}</div><div class="cat">${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></td>
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
     <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${fxTxt(t)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
@@ -1043,6 +1080,359 @@ async function guardarReparto() {
   S.rep = null; $('#modalRoot').innerHTML = ''; derive(); render(); toast('Reparto guardado');
 }
 
+/* ================= vehículos ================= */
+const GALON = 3.78541;
+const vUnidad = () => lsGet('veh-unidad') === 'G' ? 'G' : 'L';
+const vVol = l => vUnidad() === 'L' ? l : l / GALON;
+const vU = () => vUnidad() === 'L' ? 'L' : 'gal';
+const vRU = () => vUnidad() === 'L' ? 'km/L' : 'km/gal';
+const vR = r => vUnidad() === 'L' ? r : r * GALON;
+const nf = (v, d = 0) => (+v || 0).toLocaleString('es-HN', {minimumFractionDigits: d, maximumFractionDigits: d});
+const vehs = () => (S.veh || []).filter(v => v.activo !== false);
+const vehById = id => (S.veh || []).find(v => v.id === id);
+const regsDe = (id, tipo) => (S.vreg || []).filter(r => r.vehiculo === id && (!tipo || r.tipo === tipo)).sort((a, b) => (a.fecha + String(a.odometro || 0).padStart(9, '0')) < (b.fecha + String(b.odometro || 0).padStart(9, '0')) ? -1 : 1);
+const regDeTx = id => (S.vreg || []).find(r => r.tx_id === id);
+function costoReg(r) {
+  if (r.tx_id) { const t = D.byId.get(r.tx_id); if (t) return t.monto; }
+  if (r.mov_id) { const m = S.movs.get(r.mov_id); if (m) return +m.valor || 0; }
+  return +r.costo || 0;
+}
+function gastoTxt(r) {
+  if (r.tx_id) { const t = D.byId.get(r.tx_id); const pp = partes(r.tx_id); const c = pp[0] && ctrlById(pp[0].control); return t ? `<span class="chip app" title="${esc(t.det)}">${c ? esc(c.corto || c.nombre) : 'Gasto de la app'}</span>` : '<span class="chip warn">Gasto no encontrado</span>'; }
+  if (r.mov_id) { const m = S.movs.get(r.mov_id); const c = m && ctrlById(m.control); return m ? `<span class="chip">${c ? esc(c.corto || c.nombre) : 'Fila manual'}</span>` : '<span class="chip warn">Fila borrada</span>'; }
+  return r.tipo === 'recorrido' ? '' : '<span class="chip warn">Sin vincular</span>';
+}
+/* recargas con km, consumo y rendimiento */
+function recargas(v) {
+  const tq = +v.tanque_l || 0; const l = regsDe(v.id, 'combustible');
+  return l.map((r, i) => {
+    const p = l[i - 1]; const km = p && r.odometro != null && p.odometro != null ? r.odometro - p.odometro : null;
+    const nv = r.nivel == null ? 100 : +r.nivel, np = !p || p.nivel == null ? 100 : +p.nivel;
+    const consumo = (+r.litros || 0) + (tq ? tq * (np - nv) / 100 : 0);
+    const rend = km > 0 && consumo > 0 ? km / consumo : null;
+    return Object.assign({}, r, {km, consumo, rend, estimado: nv < 99 || np < 99, costoV: costoReg(r), ppl: +r.litros ? costoReg(r) / r.litros : null});
+  });
+}
+function lecturas(v) { return regsDe(v.id).filter(r => r.odometro != null).map(r => ({fecha: r.fecha, odo: +r.odometro, tipo: r.tipo, id: r.id})).sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.odo - b.odo); }
+function vStats(v) {
+  const rc = recargas(v); const val = rc.filter(r => r.rend); const km = val.reduce((a, r) => a + r.km, 0), cons = val.reduce((a, r) => a + r.consumo, 0);
+  const lec = lecturas(v); const odo = lec.length ? Math.max(...lec.map(x => x.odo)) : null; const odo0 = lec.length ? Math.min(...lec.map(x => x.odo)) : null;
+  const mants = regsDe(v.id, 'mantenimiento'); const cC = rc.reduce((a, r) => a + r.costoV, 0), cM = mants.reduce((a, r) => a + costoReg(r), 0);
+  const mes = hoy().slice(0, 7); const gMes = rc.filter(r => r.fecha.startsWith(mes)).reduce((a, r) => a + r.costoV, 0) + mants.filter(r => r.fecha.startsWith(mes)).reduce((a, r) => a + costoReg(r), 0);
+  const ult = [...rc].reverse().find(r => r.ppl);
+  return {rc, prom: cons ? km / cons : null, odo, recorrido: odo != null && odo0 != null ? odo - odo0 : 0, cC, cM, cxkm: odo - odo0 > 0 ? (cC + cM) / (odo - odo0) : null, gMes, ppl: ult ? ult.ppl : null, mants};
+}
+function vPorMes(v) {
+  const m = {}; const add = (f, k, x) => { const key = f.slice(0, 7); m[key] = m[key] || {c: 0, m: 0, km: 0}; m[key][k] += x; };
+  recargas(v).forEach(r => add(r.fecha, 'c', r.costoV)); regsDe(v.id, 'mantenimiento').forEach(r => add(r.fecha, 'm', costoReg(r)));
+  const lec = lecturas(v); for (let i = 1; i < lec.length; i++) { const d = lec[i].odo - lec[i - 1].odo; if (d > 0) add(lec[i].fecha, 'km', d); }
+  return Object.keys(m).sort().slice(-12).map(k => Object.assign({mes: k}, m[k]));
+}
+function vProximos(v) {
+  const odo = vStats(v).odo || 0; const hoyD = new Date(hoy() + 'T12:00:00');
+  return (S.vplan || []).filter(p => p.vehiculo === v.id).map(p => {
+    const ult = regsDe(v.id, 'mantenimiento').filter(r => r.mant_tipo.trim().toUpperCase() === p.servicio.trim().toUpperCase()).pop();
+    const uf = ult ? ult.fecha : p.ultimo_fecha; const uo = ult ? +ult.odometro : (p.ultimo_odo != null ? +p.ultimo_odo : null);
+    const kmPct = +p.cada_km && uo != null ? (odo - uo) / p.cada_km : 0; const meses = uf ? (hoyD - new Date(uf + 'T12:00:00')) / (30.44 * 864e5) : 0; const mPct = +p.cada_meses && uf ? meses / p.cada_meses : 0;
+    return {p, pct: Math.max(kmPct, mPct), faltaKm: +p.cada_km && uo != null ? p.cada_km - (odo - uo) : null, faltaM: +p.cada_meses && uf ? p.cada_meses - meses : null, porTiempo: mPct > kmPct, uf, uo, sinDatos: !uf && uo == null};
+  }).sort((a, b) => b.pct - a.pct);
+}
+/* detección de gastos de vehículos en la app */
+const NORM = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+function parseDet(det) {
+  const d = String(det || ''); const nums = [...d.matchAll(/(\d{1,3}(?:[.,]\d{3})+|\d+)\s*km\b/gi)].map(m => +m[1].replace(/[.,]/g, ''));
+  const prov = (d.split(/\s+-\s+/).slice(1).join(' - ') || '').trim();
+  return {odo: nums.length ? Math.max(...nums) : null, kmUlt: nums.length > 1 ? Math.min(...nums) : null, prov};
+}
+function tipoDetectado(t) { const c = NORM([t.cat, t.sub, t.nota].join(' ')); if (/COMBUSTIBLE|GASOLINA|DIESEL/.test(c)) return 'combustible'; if (/MANTEN|REPARAC|TALLER|REPUESTO|LLANTA|ACEITE|LUBRIC/.test(c)) return 'mantenimiento'; return null; }
+function detectados() {
+  if (!S.vreg || !esAdmin()) return [];
+  const ligados = new Set((S.vreg || []).map(r => r.tx_id).filter(Boolean)); const ign = new Set((S.aj.vehIgnorar || []));
+  const out = [];
+  for (const t of D.txs) {
+    if (t.code !== 1 || ligados.has(t.id) || ign.has(t.id)) continue;
+    const det = NORM(t.det); const v = vehs().find(v => { const a = NORM(v.alias || v.nombre); return a && det.includes(a); }); if (!v) continue;
+    const tipo = tipoDetectado(t); if (!tipo) continue;
+    out.push(Object.assign({t, v, tipo}, parseDet(t.det)));
+  }
+  return out.sort((a, b) => a.t.fecha < b.t.fecha ? 1 : -1);
+}
+/* foto del vehículo */
+S.vfotos = S.vfotos || {};
+async function cargarFotosVeh() {
+  for (const el of document.querySelectorAll('[data-vfoto]:not([data-ok])')) {
+    const ruta = el.dataset.vfoto; el.dataset.ok = '1';
+    try { if (!S.vfotos[ruta]) { const {data} = await sb.storage.from('comprobantes').createSignedUrl(ruta, 3600); if (data) S.vfotos[ruta] = data.signedUrl; } if (S.vfotos[ruta]) el.innerHTML = `<img src="${esc(S.vfotos[ruta])}" alt="" style="width:100%;height:100%;object-fit:cover">`; } catch (_) {}
+  }
+}
+const CARRO = `<svg viewBox="0 0 320 200" aria-hidden="true" style="width:100%;height:100%;display:block"><rect width="320" height="200" fill="var(--sunk)"/><path d="M30 140 L36 112 Q60 98 98 96 L130 70 Q160 62 200 68 L240 96 Q282 100 292 118 L294 140 Z" fill="var(--line)"/><circle cx="88" cy="142" r="22" fill="var(--muted)"/><circle cx="240" cy="142" r="22" fill="var(--muted)"/></svg>`;
+const fotoVeh = v => v.foto ? `<div data-vfoto="${esc(v.foto)}" style="width:100%;height:100%">${S.vfotos[v.foto] ? `<img src="${esc(S.vfotos[v.foto])}" alt="" style="width:100%;height:100%;object-fit:cover">` : CARRO}</div>` : CARRO;
+
+/* ---------- vista ---------- */
+function vVehiculos() {
+  if (S.veh === null) return `<div class="stack"><div><div class="eyebrow">Vehículos</div><h1>Gestión de vehículos</h1></div><div class="panel"><div class="bd note">${esAdmin() ? 'Para usar este apartado, corre en Supabase el SQL de vehículos.' : 'Este apartado todavía no está disponible.'}</div></div></div>`;
+  const a = esAdmin(); const lista = vehs(); const det = detectados();
+  if (!S.vehSel || !vehById(S.vehSel)) S.vehSel = lista[0] ? lista[0].id : null;
+  const v = vehById(S.vehSel);
+  const cards = lista.map(x => { const st = vStats(x); return `<button class="vcard" type="button" data-act="vehSel" data-id="${esc(x.id)}" aria-pressed="${x.id === S.vehSel}"><span class="vph">${fotoVeh(x)}</span><span style="min-width:0"><b>${esc(x.nombre)}</b><small class="mono">${st.odo != null ? nf(st.odo) + ' km' : 'sin lecturas'}${st.prom ? ' · ' + nf(vR(st.prom), 1) + ' ' + vRU() : ''}</small></span></button>`; }).join('');
+  return `<div class="stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px"><div><div class="eyebrow">Vehículos</div><h1>Gestión de vehículos</h1><div class="note">Combustible, kilometraje y mantenimiento, vinculados a los gastos.</div></div>
+      <div class="row" style="gap:10px"><span class="note">Unidad</span><div class="seg" role="group" aria-label="Unidad de volumen"><button data-act="vehUnidad" data-v="L" aria-pressed="${vUnidad() === 'L'}">Litros</button><button data-act="vehUnidad" data-v="G" aria-pressed="${vUnidad() === 'G'}">Galones</button></div></div></div>
+    ${a && det.length ? `<a class="panel" href="#vehiculos" data-act="vehTab" data-t="det" style="text-decoration:none;color:inherit"><div class="bd row" style="gap:10px"><span class="chip warn">${det.length}</span><span><b>${det.length === 1 ? 'Gasto de vehículo detectado' : 'Gastos de vehículos detectados'}</b> en la app sin registrar en este apartado. <u>Revisar</u></span></div></a>` : ''}
+    <div class="vsel">${cards}${a ? `<button class="vcard vnew" type="button" data-act="vehForm"><span style="font-size:22px;line-height:1">+</span><span>Agregar vehículo</span></button>` : ''}</div>
+    ${v ? vFicha(v) : `<div class="panel"><div class="bd note">${a ? 'Agrega tu primer vehículo con "Agregar vehículo". En "Texto en la app" escribe cómo lo nombras en el detalle de Registro Contable (por ejemplo FORD FOCUS 2016) para que la plataforma reconozca sus gastos.' : 'No tienes vehículos asignados.'}</div></div>`}
+  </div>`;
+}
+function vFicha(v) {
+  const a = esAdmin(); const st = vStats(v); const c = v.control && ctrlById(v.control); const px = vProximos(v); const tab = S.vehTab || 'comb';
+  const urg = px.filter(p => p.pct >= 0.85); const sinV = [...st.rc, ...st.mants].filter(r => !r.tx_id && !r.mov_id && r.costo == null).length;
+  const ultRc = st.rc[st.rc.length - 1];
+  return `<div class="panel"><div class="bd"><div class="ficha">
+      <div class="stack" style="gap:10px"><div class="vfoto">${fotoVeh(v)}</div>
+        <dl class="datos">${[['Marca', v.marca], ['Modelo', v.modelo], ['Año', v.anio], ['Placa', v.placa], ['VIN', v.vin], ['Tanque', v.tanque_l ? `${nf(vVol(+v.tanque_l), vUnidad() === 'L' ? 0 : 1)} ${vU()}` : ''], ['Combustible', v.combustible], ['Control', c ? c.nombre : ''], ['Texto en la app', v.alias]].filter(x => x[1] !== '' && x[1] != null).map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('')}</dl></div>
+      <div class="stack" style="gap:12px;min-width:0">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><span class="eyebrow">Ficha del vehículo</span><h2 style="font-size:22px">${esc(v.nombre)}</h2></div>
+          ${a ? `<div class="row" style="gap:6px"><button class="btn sm" data-act="vehTab" data-t="nuevo">Registrar recarga</button><button class="btn sm" data-act="vehTab" data-t="nmant">Registrar mantenimiento</button><button class="btn sm" data-act="vehTab" data-t="rec">Registrar recorrido</button><button class="btn sm ghost" data-act="vehForm" data-id="${esc(v.id)}">Editar</button></div>` : ''}</div>
+        <div class="kpis">
+          <div class="kpi"><div class="eyebrow">Odómetro</div><div class="v">${st.odo != null ? nf(st.odo) : '—'}</div><div class="note">km · última lectura</div></div>
+          <div class="kpi"><div class="eyebrow">Rendimiento</div><div class="v">${st.prom ? nf(vR(st.prom), 1) : '—'}</div><div class="note">${vRU()} promedio</div></div>
+          <div class="kpi"><div class="eyebrow">Costo por km</div><div class="v">${st.cxkm ? L(st.cxkm) : '—'}</div><div class="note">combustible + mantenimiento</div></div>
+          <div class="kpi"><div class="eyebrow">Gasto ${esc(mesLargo(hoy().slice(0, 7)).split(' ')[0].toLowerCase())}</div><div class="v">${L(st.gMes)}</div><div class="note">de este vehículo</div></div>
+          <div class="kpi"><div class="eyebrow">Precio por ${vUnidad() === 'L' ? 'litro' : 'galón'}</div><div class="v">${st.ppl ? L(vUnidad() === 'L' ? st.ppl : st.ppl * GALON) : '—'}</div><div class="note">última recarga</div></div>
+        </div>
+        <div class="row" style="gap:6px">${urg.map(p => `<span class="chip ${p.pct >= 1 ? 'bad' : 'warn'}">${p.pct >= 1 ? 'Vencido' : 'Pronto'}: ${esc(p.p.servicio)}</span>`).join('')}${sinV ? `<span class="chip warn">${sinV} sin gasto vinculado</span>` : ''}${ultRc && ultRc.rend && st.prom && ultRc.rend < st.prom * 0.85 && !ultRc.estimado ? '<span class="chip bad">Última recarga con rendimiento bajo</span>' : ''}</div>
+      </div></div></div></div>
+    ${st.rc.length || st.mants.length ? `<div class="grid2">
+      <div class="panel"><div class="hd"><h2>Rendimiento por recarga</h2><span class="note">${st.rc.filter(r => r.rend).length} recargas${st.prom ? ` · promedio ${nf(vR(st.prom), 1)} ${vRU()}` : ''}</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca);height:3px"></i>${vRU()} por recarga</span><span><i style="background:var(--bad);border-radius:50%"></i>15% bajo el promedio</span><span><i style="background:var(--muted);border-radius:50%;opacity:.5"></i>estimado (tanque no lleno)</span></div><div class="vchart" data-vchart="rend"></div></div></div>
+      <div class="panel"><div class="hd"><h2>Gasto por mes</h2><span class="note">últimos 12 meses</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca)"></i>Combustible</span><span><i style="background:var(--cc)"></i>Mantenimiento</span></div><div class="vchart" data-vchart="gasto"></div></div></div>
+      <div class="panel"><div class="hd"><h2>Kilómetros por mes</h2><span class="note">${nf(st.recorrido)} km registrados</span></div><div class="bd"><div class="vchart" data-vchart="km"></div></div></div>
+      ${vPanelPlanes(v, px)}
+    </div>` : vPanelPlanes(v, px)}
+    <div class="panel"><div class="hd" style="padding-bottom:0;border-bottom:0"><div class="subtabs" role="tablist">
+      ${[['comb', 'Combustible'], ['mant', 'Mantenimiento'], ['rec', 'Recorridos'], ...(a ? [['nuevo', 'Nueva recarga'], ['nmant', 'Nuevo mantenimiento'], ['det', `Detectados${detectados().filter(d => d.v.id === v.id).length ? ` <span class="count warn-bg">${detectados().filter(d => d.v.id === v.id).length}</span>` : ''}`]] : [])].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-act="vehTab" data-t="${k}">${l}</button>`).join('')}
+    </div></div><div class="bd" id="vehLista">${vVehLista(v, tab)}</div></div>`;
+}
+function vPanelPlanes(v, px) {
+  const a = esAdmin(); const odo = vStats(v).odo;
+  return `<div class="panel"><div class="hd"><h2>Próximos mantenimientos</h2>${odo != null ? `<span class="note">odómetro ${nf(odo)} km</span>` : ''}</div><div class="bd">
+    ${px.length ? px.map(x => { const pc = Math.min(1, x.pct); const col = x.pct >= 1 ? 'var(--bad)' : x.pct >= 0.85 ? 'var(--warn)' : 'var(--ca)';
+      const txt = x.sinDatos ? 'sin último servicio' : x.pct >= 1 ? 'Vencido' : x.porTiempo || x.faltaKm == null ? `en ${nf(Math.max(0, x.faltaM))} meses` : `faltan ${nf(x.faltaKm)} km`;
+      return `<div class="prox"><b>${esc(x.p.servicio)}</b><span class="mono" style="color:${col};font-size:12.5px">${txt}</span><div class="pbar" style="grid-column:1/-1"><span style="width:${pc * 100}%;background:${col}"></span></div><span class="note" style="grid-column:1/-1">Cada ${[x.p.cada_km ? nf(x.p.cada_km) + ' km' : '', x.p.cada_meses ? x.p.cada_meses + ' meses' : ''].filter(Boolean).join(' o ')}${x.uf ? ` · último ${fFecha(x.uf)}` : ''}${x.uo != null ? ` a ${nf(x.uo)} km` : ''}${a ? ` · <button class="linkish" data-act="vplanBorrar" data-id="${esc(x.p.id)}"><u>${S.confirmPlan === x.p.id ? '¿Quitar? Sí' : 'Quitar'}</u></button>` : ''}</span></div>`; }).join('') : '<div class="note">Sin planes de mantenimiento. Agrega uno para recibir avisos (por ejemplo, aceite cada 5,000 km o 6 meses).</div>'}
+    ${a ? `<div class="form" style="border-top:1px solid var(--line);padding-top:10px"><label>Servicio<input id="vpServ" list="vpServs" placeholder="Aceite y filtro"><datalist id="vpServs">${['Aceite y filtro', 'Rotación de llantas', 'Frenos', 'Batería', 'Alineación y balanceo', 'Filtro de aire', 'Servicio mayor'].map(x => `<option value="${x}">`).join('')}</datalist></label><label>Cada (km)<input id="vpKm" inputmode="numeric" placeholder="5000"></label><label>Cada (meses)<input id="vpMes" inputmode="numeric" placeholder="6"></label><label>Último servicio (si no está registrado)<input id="vpUlt" type="date"></label><label>Odómetro de ese servicio<input id="vpUltOdo" inputmode="numeric"></label><label style="justify-content:flex-end"><button class="btn sm pri" data-act="vplanNuevo" data-id="${esc(v.id)}">Agregar plan</button></label></div><div class="note">El último servicio se toma solo de los mantenimientos registrados con el mismo tipo.</div>` : ''}
+  </div></div>`;
+}
+function vVehLista(v, tab) {
+  const a = esAdmin(); const st = vStats(v);
+  if (tab === 'comb') {
+    const rc = [...st.rc].reverse();
+    return rc.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Gasolinera</th><th class="num">Odómetro</th><th class="num">Km desde la última</th><th>Combustible</th><th class="num">${vUnidad() === 'L' ? 'Litros' : 'Galones'}</th><th>Tanque</th><th class="num">${vRU()}</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
+      ${rc.map(r => { const bajo = r.rend && st.prom && r.rend < st.prom * 0.85 && !r.estimado; return `<tr><td class="mono small">${fFecha(r.fecha)}</td><td>${esc(r.proveedor)}</td><td class="num">${r.odometro != null ? nf(r.odometro) : '—'}</td><td class="num">${r.km != null ? nf(r.km) : '—'}</td><td>${esc(r.combustible)}</td><td class="num">${r.litros != null ? nf(vVol(+r.litros), 1) : '—'}</td><td>${nivelMini(r.nivel)}</td><td class="num" ${bajo ? 'style="color:var(--bad);font-weight:600"' : ''}>${r.rend ? nf(vR(r.rend), 1) + (r.estimado ? '<span class="muted" title="Estimado: el tanque no quedó lleno">*</span>' : '') : '—'}</td><td class="num">${L(r.costoV)}</td><td>${gastoTxt(r)}</td><td>${a ? vRegAcciones(r) : ''}</td></tr>`; }).join('')}
+    </tbody></table></div><p class="note">El costo viene del gasto vinculado. * rendimiento estimado porque el tanque no quedó lleno.</p>` : '<div class="note">Sin recargas registradas.</div>';
+  }
+  if (tab === 'mant') {
+    const ms = [...st.mants].reverse();
+    return ms.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Taller</th><th>Descripción</th><th class="num">Odómetro</th><th>Fotos</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
+      ${ms.map(r => { const n = adjDeReg(r).length; return `<tr><td class="mono small">${fFecha(r.fecha)}</td><td><b>${esc(r.mant_tipo)}</b></td><td>${esc(r.proveedor)}</td><td class="small">${esc(r.descripcion)}</td><td class="num">${r.odometro != null ? nf(r.odometro) : '—'}</td><td><button class="linkish" data-act="vregVer" data-id="${esc(r.id)}">${n ? `<span class="chip">${n} ${n === 1 ? 'archivo' : 'archivos'}</span>` : '<u>Ver</u>'}</button></td><td class="num">${L(costoReg(r))}</td><td>${gastoTxt(r)}</td><td>${a ? vRegAcciones(r) : ''}</td></tr>`; }).join('')}
+    </tbody></table></div>` : '<div class="note">Sin mantenimientos registrados.</div>';
+  }
+  if (tab === 'rec') {
+    const lec = lecturas(v).reverse().slice(0, 40); const u = lec[0];
+    return `${a ? `<div class="callout"><b>Registrar un recorrido</b><span class="note">Un recorrido es solo una lectura del odómetro, sin costo. Sirve para llevar el kilometraje entre recargas, por ejemplo al terminar un viaje o una vez por semana.</span></div>
+      <div class="form"><label>Fecha<input type="date" id="vrFecha" value="${hoy()}"></label><label>Odómetro (km)<input id="vrOdo" inputmode="numeric" placeholder="${u ? nf(u.odo + 100).replace(/,/g, '') : ''}"></label><label>Motivo (opcional)<input id="vrNota" placeholder="Ej.: viaje a Comayagua"></label><label style="justify-content:flex-end"><button class="btn sm pri" data-act="vrGuardar" data-id="${esc(v.id)}">Registrar recorrido</button></label></div>
+      <div class="calc" id="vrCalc"></div>` : ''}
+      <div class="eyebrow" style="margin-top:10px">Lecturas del odómetro</div>
+      ${lec.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Origen</th><th class="num">Odómetro</th><th class="num">Km desde la lectura anterior</th><th>Motivo</th><th></th></tr></thead><tbody>${lec.map((x, i) => { const r = (S.vreg || []).find(z => z.id === x.id); return `<tr><td class="mono small">${fFecha(x.fecha)}</td><td><span class="chip ${x.tipo === 'recorrido' ? '' : 'app'}">${{recorrido: 'Recorrido', combustible: 'Recarga', mantenimiento: 'Mantenimiento'}[x.tipo]}</span></td><td class="num">${nf(x.odo)}</td><td class="num">${lec[i + 1] ? nf(x.odo - lec[i + 1].odo) : '—'}</td><td class="small">${x.tipo === 'recorrido' ? esc(r.descripcion) : ''}</td><td>${a && x.tipo === 'recorrido' ? vRegAcciones(r, true) : ''}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="note">Sin lecturas todavía.</div>'}`;
+  }
+  if (tab === 'nuevo' || tab === 'nmant') return vFormReg(v, tab === 'nuevo' ? 'combustible' : 'mantenimiento');
+  if (tab === 'edit') { const rg = (S.vreg || []).find(x => x.id === S.vehEdit); return rg ? `<div class="eyebrow">Editar ${rg.tipo === 'combustible' ? 'recarga' : 'mantenimiento'} del ${fFecha(rg.fecha)}</div>` + vFormReg(v, rg.tipo, rg) : '<div class="note">Ese registro ya no existe.</div>'; }
+  if (tab === 'det') {
+    const ds = detectados().filter(d => d.v.id === v.id);
+    return ds.length ? `<p class="note">Gastos de la app que mencionan "${esc(v.alias || v.nombre)}" en el detalle y son de combustible o mantenimiento. Vehículo, odómetro y proveedor se leen del detalle.</p>
+      <div class="tbl-wrap"><table><thead><tr><th>Gasto de la app</th><th>Tipo</th><th class="num">Odómetro</th><th>Proveedor</th><th class="num">Costo</th><th class="num">${vUnidad() === 'L' ? 'Litros' : 'Galones'}</th><th></th></tr></thead><tbody>
+      ${ds.map(d => `<tr data-det="${esc(d.t.id)}"><td><span class="mono small">${fFecha(d.t.fecha)}</span><div class="small">${esc(d.t.det)}</div><div class="cat">${esc([d.t.cat, d.t.sub, d.t.nota].filter(Boolean).join(' › '))}</div></td><td><span class="chip ${d.tipo === 'combustible' ? 'app' : 'warn'}">${d.tipo === 'combustible' ? 'Combustible' : 'Mantenimiento'}</span></td><td class="num">${d.odo != null ? nf(d.odo) : '—'}</td><td>${esc(d.prov)}</td><td class="num">${L(d.t.monto)}</td>
+        <td class="num">${d.tipo === 'combustible' ? `<input class="in num" data-detlit inputmode="decimal" placeholder="0.0" style="width:80px" aria-label="${vUnidad() === 'L' ? 'Litros' : 'Galones'}">` : ''}</td>
+        <td style="white-space:nowrap">${d.tipo === 'combustible' ? `<button class="btn sm pri" data-act="detConfirmar" data-id="${esc(d.t.id)}">Confirmar</button>` : `<button class="btn sm pri" data-act="detMant" data-id="${esc(d.t.id)}">Completar</button>`} <button class="btn sm ghost" data-act="detIgnorar" data-id="${esc(d.t.id)}">No es del vehículo</button></td></tr>`).join('')}
+      </tbody></table></div><p class="note">Confirmar registra la recarga con tanque lleno; si no quedó lleno, usa "Nueva recarga" y vincula el gasto ahí.</p>` : `<div class="note">No hay gastos pendientes de este vehículo. La plataforma busca en el detalle de la app el texto "${esc(v.alias || v.nombre)}" en gastos de combustible o mantenimiento.</div>`;
+  }
+  return '';
+}
+const nivelMini = n => { const p = n == null ? 100 : +n; return `<span class="gmini" title="${Math.round(p)}%"><span style="width:${Math.max(0, Math.min(100, p))}%"></span></span>`; };
+function vRegAcciones(r, soloBorrar) {
+  return `${soloBorrar ? '' : `<button class="btn sm ghost" data-act="vregEditar" data-id="${esc(r.id)}">Editar</button>`}<button class="btn sm ghost danger" data-act="vregBorrar" data-id="${esc(r.id)}">${S.confirmVreg === r.id ? '¿Borrar? Sí' : 'Borrar'}</button>`;
+}
+const adjDeReg = r => (S.adj || []).filter(x => x.veh_reg === r.id || (r.tx_id && x.tx_id === r.tx_id) || (r.mov_id && x.mov_id === r.mov_id));
+/* candidatos de gasto para vincular */
+function gastosParaVincular(v, tipo, actual) {
+  const usados = new Set((S.vreg || []).filter(r => r.tx_id && r.tx_id !== actual).map(r => r.tx_id)); const al = NORM(v.alias || v.nombre);
+  return D.txs.filter(t => t.code === 1 && !usados.has(t.id) && (t.id === actual || tipoDetectado(t) === tipo || (al && NORM(t.det).includes(al))))
+    .sort((a, b) => { const sa = (al && NORM(a.det).includes(al) ? 0 : 1), sb2 = (al && NORM(b.det).includes(al) ? 0 : 1); return sa - sb2 || (a.fecha < b.fecha ? 1 : -1); }).slice(0, 80);
+}
+function vFormReg(v, tipo, r) {
+  const st = vStats(v); const ed = r || S.vehDraft || {}; const comb = tipo === 'combustible';
+  const gastos = gastosParaVincular(v, tipo, ed.tx_id);
+  return `<form class="form" id="vregForm" data-veh="${esc(v.id)}" data-tipo="${tipo}" data-id="${esc(ed.id || '')}" novalidate>
+      <label style="grid-column:1/-1">Gasto vinculado<select id="vfGasto"><option value="">Sin gasto de la app (escribo el costo)</option>${gastos.map(t => `<option value="${esc(t.id)}" ${ed.tx_id === t.id ? 'selected' : ''}>${fFecha(t.fecha)} · ${esc(t.det.slice(0, 70))} · ${L(t.monto)}</option>`).join('')}</select></label>
+      <label>Fecha<input type="date" id="vfFecha" value="${esc(ed.fecha || hoy())}"></label>
+      <label>Odómetro (km)<input id="vfOdo" inputmode="numeric" value="${ed.odometro != null ? ed.odometro : ''}" placeholder="${st.odo != null ? st.odo : ''}"></label>
+      <label>${comb ? 'Gasolinera' : 'Taller o proveedor'}<input id="vfProv" value="${esc(ed.proveedor || '')}"></label>
+      ${comb ? `<label>Tipo de combustible<input id="vfComb" list="vfCombs" value="${esc(ed.combustible || v.combustible || '')}"><datalist id="vfCombs"><option value="Súper"><option value="Regular"><option value="Diésel"></datalist></label>
+        <label>${vUnidad() === 'L' ? 'Litros' : 'Galones'}<input id="vfLit" inputmode="decimal" value="${ed.litros != null ? nf(vVol(+ed.litros), 2).replace(/,/g, '') : ''}"></label>`
+      : `<label>Tipo de mantenimiento<input id="vfMtipo" list="vpServs2" value="${esc(ed.mant_tipo || '')}" placeholder="Aceite y filtro"><datalist id="vpServs2">${[...new Set([...(S.vplan || []).filter(p => p.vehiculo === v.id).map(p => p.servicio), 'Aceite y filtro', 'Frenos', 'Llantas', 'Batería', 'Alineación y balanceo', 'Servicio mayor', 'Reparación'])].map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+        <label style="grid-column:span 2">Descripción<input id="vfDesc" value="${esc(ed.descripcion || '')}" placeholder="Qué se hizo, repuestos, observaciones"></label>`}
+      <label id="vfCostoL">Costo (L)<input id="vfCosto" inputmode="decimal" value="${ed.costo != null ? ed.costo : ''}"></label>
+      ${comb ? `<div class="fuelbox"><div class="fuelg" id="vfNivel" role="slider" tabindex="0" aria-label="Nivel del tanque al terminar de cargar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></div>
+        <div class="fuelinfo"><span class="note" style="font-weight:600">Nivel del tanque al terminar</span><b id="vfNivelTxt"></b><span class="note" id="vfNivelSub"></span><span class="note">Arrastra la aguja a la posición que ves en el tablero; las flechas la mueven de a 1%.</span>
+        <div class="btns">${[[100, 'F'], [75, '¾'], [50, '½'], [25, '¼']].map(([n, t]) => `<button type="button" data-vnivel="${n}">${t}</button>`).join('')}</div></div></div>` : ''}
+    </form>
+    <div class="calc" id="vfCalc"></div>
+    ${!comb && ed.id ? vAdjuntos(adjDeReg(ed), ed.tx_id ? {tx: ed.tx_id, mov: ''} : {veh: ed.id, vehiculo: v.id}, true) : ''}
+    ${!comb && !ed.id ? '<div class="note">Podrás adjuntar fotos y facturas después de guardar.</div>' : ''}
+    <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" data-act="vehTab" data-t="${comb ? 'comb' : 'mant'}">Cancelar</button><button class="btn pri" data-act="vregGuardar">${ed.id ? 'Guardar cambios' : comb ? 'Guardar recarga' : 'Guardar mantenimiento'}</button></div>`;
+}
+/* medidor */
+const GA = {cx: 34, cy: 150, r: 124, aF: 98, aE: 4};
+const gRad = a => a * Math.PI / 180;
+const gPt = (a, rr) => [GA.cx + rr * Math.cos(gRad(a)), GA.cy - rr * Math.sin(gRad(a))];
+const gAng = p => GA.aE + (GA.aF - GA.aE) * p / 100;
+function dibujarMedidor(el, p) {
+  const tk = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => { const a = gAng(k * 12.5), may = k % 2 === 0; const [x1, y1] = gPt(a, GA.r - (may ? 22 : 14)), [x2, y2] = gPt(a, GA.r); return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${k === 0 ? '#E2533F' : '#E9E2C8'}" stroke-linecap="round" stroke-width="${may ? 4 : 2.5}"/>`; }).join('');
+  const a = gAng(p); const [tx, ty] = gPt(a, GA.r - 8), [b1x, b1y] = gPt(a + 90, 7), [b2x, b2y] = gPt(a - 90, 7), [tlx, tly] = gPt(a + 180, 18);
+  const [fx, fy] = gPt(GA.aF, GA.r - 40), [ex, ey] = gPt(GA.aE - 2, GA.r - 34), [px, py] = gPt(42, 74);
+  el.innerHTML = `<svg viewBox="0 0 200 170" aria-hidden="true"><rect x="0" y="0" width="200" height="170" rx="12" fill="#151a17"/>
+    <path d="M${gPt(GA.aF, GA.r + 6).map(v => v.toFixed(1)).join(',')} A${GA.r + 6},${GA.r + 6} 0 0 1 ${gPt(GA.aE, GA.r + 6).map(v => v.toFixed(1)).join(',')}" fill="none" stroke="#E9E2C8" stroke-width="1" opacity=".25"/>${tk}
+    <text x="${(fx - 2).toFixed(1)}" y="${(fy + 6).toFixed(1)}" text-anchor="middle" fill="#E9E2C8" style="font:700 17px var(--f-ui)">F</text><text x="${(ex + 2).toFixed(1)}" y="${(ey + 6).toFixed(1)}" fill="#E2533F" style="font:700 17px var(--f-ui)">E</text>
+    <g transform="translate(${(px - 9).toFixed(1)},${(py - 11).toFixed(1)})" fill="none" stroke="#E9E2C8" stroke-width="1.8" stroke-linejoin="round"><rect x="0" y="2" width="11" height="18" rx="1.5"/><rect x="2.5" y="5" width="6" height="5" fill="#E9E2C8" stroke="none"/><path d="M11 8 h3 l3 3 v8 a1.5 1.5 0 0 1 -3 0 v-5 h-3"/></g>
+    <path d="M${tx.toFixed(1)},${ty.toFixed(1)} L${b1x.toFixed(1)},${b1y.toFixed(1)} L${tlx.toFixed(1)},${tly.toFixed(1)} L${b2x.toFixed(1)},${b2y.toFixed(1)} Z" fill="#5DA9F0"/><circle cx="${GA.cx}" cy="${GA.cy}" r="11" fill="#2a312d"/><circle cx="${GA.cx}" cy="${GA.cy}" r="4" fill="#5DA9F0"/></svg>`;
+}
+const FRAC = ['Vacío', '1/8', '¼', '3/8', '½', '5/8', '¾', '7/8', 'Lleno'];
+const nivTxt = p => { if (p >= 99) return 'Lleno'; if (p <= 1) return 'Vacío'; const k = Math.round(p / 12.5); return `${Math.round(p)}% · ${Math.abs(p / 12.5 - k) < 0.12 ? '' : 'cerca de '}${FRAC[k]}`; };
+function montarFormReg() {
+  const f = $('#vregForm'); if (!f || f.dataset.montado) return; f.dataset.montado = '1';
+  const v = vehById(f.dataset.veh); const comb = f.dataset.tipo === 'combustible'; const r = f.dataset.id ? (S.vreg || []).find(x => x.id === f.dataset.id) : null;
+  let nivel = r && r.nivel != null ? +r.nivel : 100;
+  const el = $('#vfNivel');
+  const calc = () => {
+    const gid = $('#vfGasto').value; const t = gid && D.byId.get(gid);
+    $('#vfCosto').disabled = !!t; if (t) $('#vfCosto').value = t.monto.toFixed(2);
+    if (!comb) { $('#vfCalc').innerHTML = ''; return; }
+    const odo = parseFloat(($('#vfOdo').value || '').replace(/,/g, '')); let lit = parseFloat(($('#vfLit').value || '').replace(/,/g, '')) || 0; if (vUnidad() === 'G') lit *= GALON;
+    const costo = parseFloat(($('#vfCosto').value || '').replace(/,/g, '')) || 0; const tq = +v.tanque_l || 0;
+    const prev = recargas(v).filter(x => x.id !== (r && r.id) && x.fecha <= $('#vfFecha').value && x.odometro != null).pop();
+    const km = prev && isFinite(odo) ? odo - prev.odometro : null; const np = prev && prev.nivel != null ? +prev.nivel : 100;
+    const cons = lit + (tq ? tq * (np - nivel) / 100 : 0); const rend = km > 0 && cons > 0 ? km / cons : null; const prom = vStats(v).prom;
+    const av = []; if (prev && isFinite(odo) && km <= 0) av.push(`El odómetro es menor o igual al de la recarga anterior (${nf(prev.odometro)} km).`); if (tq && lit > tq * 1.02) av.push('Más combustible que la capacidad del tanque.'); if (rend && prom && rend < prom * 0.85 && nivel >= 99 && np >= 99) av.push('Rendimiento 15% bajo el promedio.');
+    $('#vfCalc').innerHTML = `<div><span class="note">Km desde la última recarga</span><b>${km != null ? nf(km) + ' km' : '—'}</b></div><div><span class="note">Rendimiento${nivel < 99 || np < 99 ? ' (estimado)' : ''}</span><b>${rend ? nf(vR(rend), 1) + ' ' + vRU() : '—'}</b></div><div><span class="note">Precio por ${vUnidad() === 'L' ? 'litro' : 'galón'}</span><b>${lit ? L(vUnidad() === 'L' ? costo / lit : costo / lit * GALON) : '—'}</b></div><div><span class="note">Costo por km</span><b>${km > 0 ? L(costo / km) : '—'}</b></div>` + (av.length ? `<div style="grid-column:1/-1;background:var(--warn-soft);color:var(--warn)">${av.join(' ')}</div>` : '');
+    if (el) { $('#vfNivelTxt').textContent = nivTxt(nivel); $('#vfNivelSub').textContent = tq ? (nivel >= 99 ? `${nf(vVol(tq), 1)} ${vU()} en el tanque` : `≈ ${nf(vVol(tq * nivel / 100), 1)} ${vU()} en el tanque · faltan ≈ ${nf(vVol(tq * (100 - nivel) / 100), 1)} ${vU()} para llenar`) : 'Agrega la capacidad del tanque en el vehículo para calcular litros.'; }
+  };
+  f.addEventListener('input', calc); f.addEventListener('change', e => {
+    if (e.target.id === 'vfGasto' && e.target.value) { const t = D.byId.get(e.target.value); const pd = parseDet(t.det); $('#vfFecha').value = t.fecha; if (pd.odo && !$('#vfOdo').value) $('#vfOdo').value = pd.odo; if (pd.prov && !$('#vfProv').value) $('#vfProv').value = pd.prov; if (!comb && !$('#vfDesc').value) $('#vfDesc').value = t.det; }
+    calc();
+  });
+  if (el) {
+    const fijar = p => { nivel = Math.round(Math.max(0, Math.min(100, p)) * 10) / 10; dibujarMedidor(el, nivel); el.setAttribute('aria-valuenow', String(Math.round(nivel))); el.setAttribute('aria-valuetext', nivTxt(nivel)); calc(); };
+    const desde = e => { const rc = el.getBoundingClientRect(); const s = 200 / rc.width; const x = (e.clientX - rc.left) * s - GA.cx, y = GA.cy - (e.clientY - rc.top) * s; let a = Math.atan2(y, x) * 180 / Math.PI; if (a < -45) a = 180; a = Math.max(GA.aE, Math.min(GA.aF, a)); fijar((a - GA.aE) / (GA.aF - GA.aE) * 100); };
+    el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); el.classList.add('drag'); desde(e); });
+    el.addEventListener('pointermove', e => { if (el.hasPointerCapture(e.pointerId)) desde(e); });
+    el.addEventListener('pointerup', () => el.classList.remove('drag'));
+    el.addEventListener('keydown', e => { const m = {ArrowUp: 1, ArrowLeft: 1, ArrowDown: -1, ArrowRight: -1, PageUp: 12.5, PageDown: -12.5}; if (e.key in m) { e.preventDefault(); fijar(nivel + m[e.key]); } });
+    document.querySelectorAll('[data-vnivel]').forEach(b => b.addEventListener('click', () => fijar(+b.dataset.vnivel)));
+    f.dataset.nivelRef = '1'; f._nivel = () => nivel; fijar(nivel);
+  } else calc();
+}
+async function guardarReg() {
+  const f = $('#vregForm'); const v = vehById(f.dataset.veh); const comb = f.dataset.tipo === 'combustible'; const id = f.dataset.id;
+  const num = s => { const x = parseFloat(String(s || '').replace(/,/g, '')); return isFinite(x) ? x : null; };
+  const gid = $('#vfGasto').value || null; const row = {vehiculo: v.id, tipo: f.dataset.tipo, fecha: $('#vfFecha').value, odometro: num($('#vfOdo').value), proveedor: $('#vfProv').value.trim(), tx_id: gid, costo: gid ? null : num($('#vfCosto').value)};
+  if (!row.fecha) return toast('Escribe la fecha.');
+  if (comb) { let lit = num($('#vfLit').value); if (lit != null && vUnidad() === 'G') lit = lit * GALON; Object.assign(row, {combustible: $('#vfComb').value.trim(), litros: lit, nivel: f._nivel ? f._nivel() : 100}); if (!lit) return toast('Escribe los litros cargados.'); }
+  else { Object.assign(row, {mant_tipo: $('#vfMtipo').value.trim(), descripcion: $('#vfDesc').value.trim()}); if (!row.mant_tipo) return toast('Escribe el tipo de mantenimiento.'); }
+  try {
+    const d = id ? await q(sb.from('veh_registros').update(row).eq('id', id).select(), 'Registro actualizado') : await q(sb.from('veh_registros').insert(row).select(), comb ? 'Recarga registrada' : 'Mantenimiento registrado');
+    if (d && d[0]) { S.vreg = S.vreg.filter(x => x.id !== d[0].id); S.vreg.push(d[0]); if (!comb && !id) { S.vehEdit = d[0].id; S.vehTab = 'edit'; S.vehDraft = null; toast('Ahora puedes adjuntar fotos y facturas'); return render(); } }
+  } catch (e) { return; }
+  S.vehTab = comb ? 'comb' : 'mant'; S.vehEdit = null; S.vehDraft = null; render();
+}
+/* gráficos */
+function vBarras(box, datos, series, fmt) {
+  const W = Math.max(280, box.clientWidth), H = 190, ml = 44, mr = 6, mt = 18, mb = 24; const n = datos.length; if (!n) { box.innerHTML = '<div class="note">Sin datos.</div>'; return; }
+  const tot = datos.map(d => series.reduce((a, s) => a + d[s.k], 0)); const mx = Math.max(1, ...tot); const raw = mx * 1.08 / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), fr = raw / e, st = (fr <= 1 ? 1 : fr <= 2 ? 2 : fr <= 5 ? 5 : 10) * e; const hi = Math.ceil(mx * 1.08 / st) * st;
+  const tk = []; for (let x = 0; x <= hi + st / 2; x += st) tk.push(x);
+  const bw = (W - ml - mr) / n; const Y = v => mt + (hi - v) / hi * (H - mt - mb);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Gráfico por mes" style="display:block;width:100%;overflow:visible">
+    ${tk.map(v => `<line x1="${ml}" x2="${W - mr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${ml - 6}" y="${Y(v) + 4}" text-anchor="end" fill="var(--muted)" style="font:11px var(--f-num)">${corto(v)}</text>`).join('')}
+    ${datos.map((d, i) => { let base = 0; const x = ml + i * bw + bw * 0.22, w = bw * 0.56;
+      const segs = series.map(s => { const v = d[s.k]; if (!v) return ''; const y0 = Y(base), y1 = Y(base + v); base += v; return `<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, y0 - y1 - (base < tot[i] ? 2 : 0)).toFixed(1)}" rx="3" fill="${s.c}"/>`; }).join('');
+      return segs + (tot[i] ? `<text x="${(x + w / 2).toFixed(1)}" y="${(Y(tot[i]) - 5).toFixed(1)}" text-anchor="middle" fill="var(--fg)" style="font:11px var(--f-num)">${corto(tot[i])}</text>` : '') + `<text x="${(x + w / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="var(--muted)" style="font:11px var(--f-num)">${(MES[+d.mes.slice(5) - 1].charAt(0) + MES[+d.mes.slice(5) - 1].slice(1, 3).toLowerCase())}</text><rect x="${ml + i * bw}" y="0" width="${bw}" height="${H}" fill="transparent" data-i="${i}"/>`; }).join('')}
+  </svg><div class="chart-tip" hidden></div>`;
+  const tip = box.querySelector('.chart-tip'); const sc = box.clientWidth / W;
+  box.querySelectorAll('rect[data-i]').forEach(el => el.addEventListener('mouseenter', () => { const i = +el.dataset.i, d = datos[i]; tip.innerHTML = `<b>${esc(mesLargo(d.mes))}</b>${series.map(s => `<div class="r"><span>${s.n}</span><span>${fmt(d[s.k])}</span></div>`).join('')}`; tip.hidden = false; let left = (ml + i * bw + bw / 2) * sc - tip.offsetWidth / 2; tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, left)) + 'px'; tip.style.top = '0px'; }));
+  box.querySelector('svg').addEventListener('mouseleave', () => { tip.hidden = true; });
+}
+function vRend(box, v) {
+  const st = vStats(v); const r = st.rc.filter(x => x.rend); if (r.length < 2) { box.innerHTML = '<div class="note">Hacen falta al menos dos recargas con odómetro y litros para calcular el rendimiento.</div>'; return; }
+  const W = Math.max(280, box.clientWidth), H = 190, ml = 38, mr = 10, mt = 10, mb = 24; const vals = r.map(x => vR(x.rend)); const prom = vR(st.prom);
+  let lo = Math.min(...vals, prom) * 0.95, hi = Math.max(...vals, prom) * 1.03; const raw = (hi - lo) / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), fr = raw / e, stp = (fr <= 1 ? 1 : fr <= 2 ? 2 : fr <= 5 ? 5 : 10) * e; lo = Math.floor(lo / stp) * stp; hi = Math.ceil(hi / stp) * stp;
+  const tk = []; for (let x = lo; x <= hi + stp / 2; x += stp) tk.push(x);
+  const X = i => ml + i * (W - ml - mr) / (r.length - 1), Y = val => mt + (hi - val) / (hi - lo) * (H - mt - mb); const pts = vals.map((val, i) => [X(i), Y(val)]);
+  let mesAnt = ''; const cada = Math.max(1, Math.ceil(r.length / Math.floor((W - ml) / 40)));
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Rendimiento por recarga" style="display:block;width:100%;overflow:visible">
+    ${tk.map(val => `<line x1="${ml}" x2="${W - mr}" y1="${Y(val)}" y2="${Y(val)}" stroke="var(--line)"/><text x="${ml - 6}" y="${Y(val) + 4}" text-anchor="end" fill="var(--muted)" style="font:11px var(--f-num)">${nf(val, stp < 1 ? 1 : 0)}</text>`).join('')}
+    <line x1="${ml}" x2="${W - mr}" y1="${Y(prom)}" y2="${Y(prom)}" stroke="var(--muted)" stroke-dasharray="4 4"/><text x="${ml + 4}" y="${mt + 2}" dominant-baseline="hanging" fill="var(--muted)" style="font:11px var(--f-num);paint-order:stroke;stroke:var(--panel);stroke-width:3px">- - promedio ${nf(prom, 1)}</text>
+    <path d="${curva(pts)}" fill="none" stroke="var(--ca)" stroke-width="2.25" stroke-linecap="round"/>
+    ${pts.map(([x, y], i) => { const bajo = !r[i].estimado && r[i].rend < st.prom * 0.85; return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${bajo ? 5 : 3.5}" fill="${bajo ? 'var(--bad)' : r[i].estimado ? 'var(--muted)' : 'var(--ca)'}" stroke="var(--panel)" stroke-width="2"/>`; }).join('')}
+    ${r.map((x, i) => { const m = x.fecha.slice(0, 7); if (m === mesAnt || i % cada) return ''; mesAnt = m; return `<text x="${X(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="var(--muted)" style="font:11px var(--f-num)">${(MES[+m.slice(5) - 1].charAt(0) + MES[+m.slice(5) - 1].slice(1, 3).toLowerCase())}</text>`; }).join('')}
+    ${r.map((x, i) => `<rect x="${(X(i) - (W - ml - mr) / r.length / 2).toFixed(1)}" y="0" width="${((W - ml - mr) / r.length).toFixed(1)}" height="${H}" fill="transparent" data-i="${i}"/>`).join('')}
+  </svg><div class="chart-tip" hidden></div>`;
+  const tip = box.querySelector('.chart-tip'); const sc = box.clientWidth / W;
+  box.querySelectorAll('rect[data-i]').forEach(el => el.addEventListener('mouseenter', () => { const i = +el.dataset.i, x = r[i]; tip.innerHTML = `<b>${fFecha(x.fecha)} · ${esc(x.proveedor || 'Recarga')}</b><div class="r"><span>Rendimiento${x.estimado ? ' (estimado)' : ''}</span><span>${nf(vals[i], 1)} ${vRU()}</span></div><div class="r"><span>Recorrido</span><span>${nf(x.km)} km</span></div><div class="r"><span>Cargado</span><span>${nf(vVol(+x.litros), 1)} ${vU()}</span></div>`; tip.hidden = false; tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, pts[i][0] * sc - tip.offsetWidth / 2)) + 'px'; tip.style.top = '0px'; }));
+  box.querySelector('svg').addEventListener('mouseleave', () => { tip.hidden = true; });
+}
+function dibujarVeh() {
+  const v = S.view === 'vehiculos' && vehById(S.vehSel); if (!v) return;
+  document.querySelectorAll('[data-vchart]').forEach(box => {
+    const k = box.dataset.vchart; const pm = vPorMes(v);
+    if (k === 'rend') vRend(box, v);
+    else if (k === 'gasto') vBarras(box, pm, [{k: 'c', n: 'Combustible', c: 'var(--ca)'}, {k: 'm', n: 'Mantenimiento', c: 'var(--cc)'}], x => L(x));
+    else vBarras(box, pm, [{k: 'km', n: 'Kilómetros', c: 'var(--azul)'}], x => nf(x) + ' km');
+  });
+  cargarFotosVeh(); montarFormReg();
+  const vr = $('#vrOdo'); if (vr && !vr.dataset.m) { vr.dataset.m = '1'; const upd = () => { const l = lecturas(v); const u = l[l.length - 1]; const odo = parseFloat((vr.value || '').replace(/,/g, '')); const rc = recargas(v).pop(); const st = vStats(v);
+    $('#vrCalc').innerHTML = !isFinite(odo) ? '' : `<div><span class="note">Desde la lectura anterior${u ? ` (${fFecha(u.fecha)})` : ''}</span><b>${u ? nf(odo - u.odo) + ' km' : '—'}</b></div><div><span class="note">Desde la última recarga</span><b>${rc && rc.odometro != null ? nf(odo - rc.odometro) + ' km' : '—'}</b></div><div><span class="note">Autonomía estimada</span><b>${rc && st.prom && v.tanque_l ? nf(Math.max(0, (+v.tanque_l * (rc.nivel == null ? 100 : +rc.nivel) / 100) * st.prom - (odo - rc.odometro))) + ' km' : '—'}</b></div>` + (u && odo <= u.odo ? `<div style="grid-column:1/-1;background:var(--warn-soft);color:var(--warn)">El odómetro es menor o igual a la lectura anterior (${nf(u.odo)} km).</div>` : ''); };
+    vr.addEventListener('input', upd); }
+}
+/* formulario de vehículo */
+function abrirVehForm(id) {
+  const v = id ? vehById(id) : {}; const ctrls = S.ctrls.filter(c => !cerrado(c));
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="vfT" style="max-width:720px">
+    <div class="hd"><h2 id="vfT" style="margin-right:auto">${id ? 'Editar vehículo' : 'Agregar vehículo'}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd"><div class="form" id="vehForm" data-id="${esc(id || '')}">
+      <label>Nombre<input id="vNombre" value="${esc(v.nombre || '')}" placeholder="Ford Focus 2016"></label>
+      <label>Texto en la app<input id="vAlias" value="${esc(v.alias || '')}" placeholder="FORD FOCUS 2016" title="Cómo aparece en el detalle de Registro Contable"></label>
+      <label>Marca<input id="vMarca" value="${esc(v.marca || '')}"></label><label>Modelo<input id="vModelo" value="${esc(v.modelo || '')}"></label>
+      <label>Año<input id="vAnio" inputmode="numeric" value="${esc(v.anio || '')}"></label><label>Placa<input id="vPlaca" value="${esc(v.placa || '')}"></label>
+      <label>VIN<input id="vVin" value="${esc(v.vin || '')}" style="font-family:var(--f-num)"></label><label>Capacidad del tanque (litros)<input id="vTanque" inputmode="decimal" value="${esc(v.tanque_l || '')}" placeholder="47"></label>
+      <label>Combustible<input id="vComb" list="vfCombs3" value="${esc(v.combustible || '')}"><datalist id="vfCombs3"><option value="Súper"><option value="Regular"><option value="Diésel"></datalist></label>
+      <label>Control<select id="vCtrl"><option value="">Solo el administrador</option>${ctrls.map(c => `<option value="${c.id}" ${v.control === c.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></label>
+      <label style="grid-column:1/-1">Foto del vehículo<input type="file" id="vFoto" accept="image/*"></label>
+    </div><div class="note">"Texto en la app" es como escribes el vehículo en el detalle de Registro Contable; con él se detectan sus gastos. "Control" define quién lo ve: las personas con acceso a ese control.</div>
+    <div class="row" style="justify-content:space-between">${id ? `<button class="btn ghost danger" data-act="vehBorrar" data-id="${esc(id)}">${S.confirmVeh === id ? (regsDe(id).length ? '¿Archivar? Sí' : '¿Eliminar? Sí') : regsDe(id).length ? 'Archivar vehículo' : 'Eliminar vehículo'}</button>` : '<span></span>'}<button class="btn pri" data-act="vehGuardar">${id ? 'Guardar cambios' : 'Agregar vehículo'}</button></div></div></div></div>`;
+}
+async function guardarVeh() {
+  const f = $('#vehForm'); const id = f.dataset.id; const g = s => $(s).value.trim(); const num = s => { const x = parseFloat(g(s).replace(/,/g, '')); return isFinite(x) ? x : null; };
+  const row = {nombre: g('#vNombre'), alias: g('#vAlias').toUpperCase(), marca: g('#vMarca'), modelo: g('#vModelo'), anio: num('#vAnio'), placa: g('#vPlaca').toUpperCase(), vin: g('#vVin').toUpperCase(), tanque_l: num('#vTanque'), combustible: g('#vComb'), control: $('#vCtrl').value || null};
+  if (!row.nombre) return toast('Escribe el nombre del vehículo.');
+  if (!row.alias) row.alias = row.nombre.toUpperCase();
+  const nuevoId = id || 'V' + Date.now().toString(36).toUpperCase();
+  const file = $('#vFoto').files[0];
+  try {
+    if (file) { if (!/^image\//.test(file.type)) return toast('La foto debe ser una imagen.'); if (file.size > 10485760) return toast('La foto pesa más de 10 MB.');
+      const ruta = `v/${nuevoId}/foto-${Date.now()}${(file.name.match(/\.[a-z0-9]{1,5}$/i) || [''])[0].toLowerCase()}`; const up = await sb.storage.from('comprobantes').upload(ruta, file, {contentType: file.type}); if (up.error) return toast('No se pudo subir la foto: ' + errMsg(up.error)); row.foto = ruta; }
+    const d = id ? await q(sb.from('vehiculos').update(row).eq('id', id).select(), 'Vehículo actualizado') : await q(sb.from('vehiculos').insert(Object.assign({id: nuevoId, activo: true}, row)).select(), 'Vehículo agregado');
+    if (d && d[0]) { S.veh = S.veh.filter(x => x.id !== d[0].id); S.veh.push(d[0]); S.vehSel = d[0].id; }
+  } catch (e) { return; }
+  $('#modalRoot').innerHTML = ''; render();
+}
+
 /* ================= micro proyectos ================= */
 const microsDe = (cid, soloAbiertos) => (S.micro || []).filter(x => x.control === cid && (!soloAbiertos || x.estado === 'abierto'));
 const microById = id => (S.micro || []).find(x => x.id === id);
@@ -1099,7 +1489,7 @@ function vAdjuntos(lista, destino, puedeSubir) {
       <div class="nm"><b title="${esc(x.nombre)}">${esc(x.nombre)}</b><span class="cat">${tam(+x.tamano || 0)} · ${esc(nombreDe(x.subido_por))} · ${cuando(x.subido_el)}</span></div>
       <button class="btn sm" data-act="adjVer" data-id="${esc(x.id)}">Ver</button>
       ${esAdmin() || x.subido_por === S.me.id ? `<button class="btn sm ghost danger" data-act="adjQuitar" data-id="${esc(x.id)}">${S.confirmAdj === x.id ? '¿Quitar? Sí' : 'Quitar'}</button>` : ''}</div>`).join('')}</div>` : '<div class="note">Sin comprobantes todavía.</div>'}
-    ${puedeSubir ? `<label class="btn sm" style="align-self:flex-start">Adjuntar comprobante<input type="file" hidden multiple accept="image/*,application/pdf" data-adj-up data-tx="${esc(destino.tx || '')}" data-mov="${esc(destino.mov || '')}"></label>
+    ${puedeSubir ? `<label class="btn sm" style="align-self:flex-start">Adjuntar comprobante<input type="file" hidden multiple accept="image/*,application/pdf" data-adj-up data-tx="${esc(destino.tx || '')}" data-mov="${esc(destino.mov || '')}" data-veh="${esc(destino.veh || '')}" data-vehiculo="${esc(destino.vehiculo || '')}"></label>
       <div class="note">Foto o PDF de la factura, depósito o transferencia (máx. 10 MB). ${destino.tx ? 'Queda ligado al registro de la app: aparece en todas sus partes.' : ''}</div>` : ''}`;
 }
 async function cargarMiniaturas() {
@@ -1108,17 +1498,17 @@ async function cargarMiniaturas() {
   }
 }
 function reabrirDetalle() { const d = S.detAbierto; if (!d) return; if (d.tipo === 'tx') abrirDetalleTx(d.id); else abrirDetalle(d.id); }
-async function subirAdjuntos(files, tx, mov) {
+async function subirAdjuntos(files, tx, mov, vreg, vehiculo) {
   const ok = []; for (const f of files) {
     if (f.size > 10485760) { toast(`${f.name}: pesa más de 10 MB`); continue; }
     if (!/^image\//.test(f.type) && f.type !== 'application/pdf') { toast(`${f.name}: solo imágenes o PDF`); continue; }
     const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
     const ext = (f.name.match(/\.[a-z0-9]{1,5}$/i) || [''])[0].toLowerCase();
-    const ruta = `${mov ? 'm/' + mov : 't/' + tx}/${id}${ext}`;
+    const ruta = vreg ? `v/${vehiculo}/${id}${ext}` : `${mov ? 'm/' + mov : 't/' + tx}/${id}${ext}`;
     toast(`Subiendo ${f.name}…`);
     const up = await sb.storage.from('comprobantes').upload(ruta, f, {contentType: f.type, upsert: false});
     if (up.error) { toast('No se pudo subir: ' + errMsg(up.error)); continue; }
-    try { const d = await q(sb.from('adjuntos').insert({id, tx_id: tx || null, mov_id: mov || null, nombre: f.name, ruta, tipo: f.type, tamano: f.size, subido_por: S.me.id}).select()); if (d && d[0]) { S.adj.push(d[0]); ok.push(d[0]); } }
+    try { const d = await q(sb.from('adjuntos').insert({id, tx_id: tx || null, mov_id: mov || null, ...(vreg ? {veh_reg: vreg} : {}), nombre: f.name, ruta, tipo: f.type, tamano: f.size, subido_por: S.me.id}).select()); if (d && d[0]) { S.adj.push(d[0]); ok.push(d[0]); } }
     catch (e) { await sb.storage.from('comprobantes').remove([ruta]); }
   }
   if (ok.length) toast(ok.length === 1 ? 'Comprobante adjuntado' : `${ok.length} comprobantes adjuntados`);
@@ -1853,6 +2243,24 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'vehSel') { S.vehSel = b.dataset.id; S.vehTab = 'comb'; S.vehEdit = null; S.vehDraft = null; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } return render(); }
+  if (act === 'vehTab') { e.preventDefault(); S.vehTab = b.dataset.t; if (b.dataset.t !== 'edit') S.vehEdit = null; if (!['nuevo', 'nmant'].includes(b.dataset.t)) S.vehDraft = null; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } render(); const el = $('#vehLista'); if (el && !['comb', 'mant', 'rec'].includes(b.dataset.t)) el.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'vehUnidad') { lsSet('veh-unidad', b.dataset.v); return render(); }
+  if (act === 'vehForm') return abrirVehForm(b.dataset.id);
+  if (act === 'vehGuardar') return guardarVeh();
+  if (act === 'vehBorrar') { const id = b.dataset.id; if (S.confirmVeh !== id) { S.confirmVeh = id; return abrirVehForm(id); } S.confirmVeh = null; try { if (regsDe(id).length) { const d = await q(sb.from('vehiculos').update({activo: false}).eq('id', id).select(), 'Vehículo archivado'); if (d && d[0]) Object.assign(vehById(id), d[0]); } else { await q(sb.from('vehiculos').delete().eq('id', id), 'Vehículo eliminado'); S.veh = S.veh.filter(x => x.id !== id); } } catch (e) {} S.vehSel = null; $('#modalRoot').innerHTML = ''; return render(); }
+  if (act === 'vregGuardar') return guardarReg();
+  if (act === 'vregEditar' || act === 'vregVer') { S.vehEdit = b.dataset.id; S.vehTab = 'edit'; render(); const el = $('#vehLista'); if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'vregBorrar') { const id = b.dataset.id; if (S.confirmVreg !== id) { S.confirmVreg = id; b.textContent = '¿Borrar? Sí'; return; } S.confirmVreg = null; try { await q(sb.from('veh_registros').delete().eq('id', id), 'Registro borrado'); S.vreg = S.vreg.filter(x => x.id !== id); } catch (e) {} return render(); }
+  if (act === 'vrGuardar') { const odo = parseFloat(($('#vrOdo').value || '').replace(/,/g, '')); if (!isFinite(odo)) return toast('Escribe el odómetro.'); try { const d = await q(sb.from('veh_registros').insert({vehiculo: b.dataset.id, tipo: 'recorrido', fecha: $('#vrFecha').value || hoy(), odometro: odo, descripcion: $('#vrNota').value.trim()}).select(), 'Recorrido registrado'); if (d && d[0]) S.vreg.push(d[0]); } catch (e) {} return render(); }
+  if (act === 'vplanNuevo') { const serv = $('#vpServ').value.trim(); const km = parseFloat(($('#vpKm').value || '').replace(/,/g, '')), ms = parseInt($('#vpMes').value, 10); if (!serv) return toast('Escribe el servicio.'); if (!isFinite(km) && !isFinite(ms)) return toast('Escribe cada cuántos km o meses.'); const uo = parseFloat(($('#vpUltOdo').value || '').replace(/,/g, ''));
+    try { const d = await q(sb.from('veh_planes').insert({vehiculo: b.dataset.id, servicio: serv, cada_km: isFinite(km) ? km : null, cada_meses: isFinite(ms) ? ms : null, ultimo_fecha: $('#vpUlt').value || null, ultimo_odo: isFinite(uo) ? uo : null}).select(), 'Plan agregado'); if (d && d[0]) S.vplan.push(d[0]); } catch (e) {} return render(); }
+  if (act === 'vplanBorrar') { const id = b.dataset.id; if (S.confirmPlan !== id) { S.confirmPlan = id; return render(); } S.confirmPlan = null; try { await q(sb.from('veh_planes').delete().eq('id', id), 'Plan quitado'); S.vplan = S.vplan.filter(x => x.id !== id); } catch (e) {} return render(); }
+  if (act === 'detConfirmar' || act === 'detMant') { const d = detectados().find(x => x.t.id === b.dataset.id); if (!d) return;
+    if (act === 'detMant') { S.vehSel = d.v.id; S.vehDraft = {tx_id: d.t.id, fecha: d.t.fecha, odometro: d.odo, proveedor: d.prov, descripcion: d.t.det}; S.vehTab = 'nmant'; return render(); }
+    let lit = parseFloat((b.closest('tr').querySelector('[data-detlit]').value || '').replace(/,/g, '')); if (!isFinite(lit) || lit <= 0) return toast('Escribe los litros cargados.'); if (vUnidad() === 'G') lit *= GALON;
+    try { const r2 = await q(sb.from('veh_registros').insert({vehiculo: d.v.id, tipo: 'combustible', fecha: d.t.fecha, odometro: d.odo, proveedor: d.prov, combustible: d.v.combustible || '', litros: lit, nivel: 100, tx_id: d.t.id}).select(), 'Recarga registrada'); if (r2 && r2[0]) S.vreg.push(r2[0]); } catch (e) {} return render(); }
+  if (act === 'detIgnorar') { const l = [...(S.aj.vehIgnorar || []), b.dataset.id]; await guardarAjuste('vehIgnorar', l).catch(() => {}); return render(); }
   if (act === 'mpToggle') { S.mpAbierto = S.mpAbierto || {}; S.mpAbierto[b.dataset.k] = !S.mpAbierto[b.dataset.k]; return render(); }
   if (act === 'microVer') return abrirMicro(b.dataset.id);
   if (act === 'microNuevo') {
@@ -1973,7 +2381,7 @@ document.addEventListener('change', async e => {
   if (t.dataset.f === 'ctrl') { const tr = t.closest('tr'); const tx = D.byId.get(tr.dataset.tx); const c = ctrlById(t.value); $('[data-f=tipo]', tr).innerHTML = tipoOptions(c, tipoSugerido(c, tx), tx.code === 0 ? 'ingreso' : 'egreso', tx.mes); $('[data-f=mes]', tr).disabled = c && !c.porMes; const g = $('[data-f=grupo]', tr); if (g) { const mps = c && c.porMes ? microsDe(c.id, true) : []; g.innerHTML = c && c.porMes ? microOptions(c.id, microSugerido(c, tx)) : '<option value=""></option>'; g.style.display = mps.length ? 'block' : 'none'; } return; }
   if (t.dataset.movGrupo) { const id = t.dataset.movGrupo; await actualizarMov(id, {grupo: t.value || null}, t.value ? 'Asignado al micro proyecto' : 'Quitado del micro proyecto').catch(() => {}); return abrirDetalle(id); }
   if (t.dataset.dec && S.syncPend) { S.syncPend.dec[t.dataset.dec] = t.value; return pintarPrevia(); }
-  if (t.hasAttribute('data-adj-up') && t.files.length) { const f = [...t.files]; t.value = ''; return subirAdjuntos(f, t.dataset.tx, t.dataset.mov); }
+  if (t.hasAttribute('data-adj-up') && t.files.length) { const f = [...t.files]; t.value = ''; return subirAdjuntos(f, t.dataset.tx, t.dataset.mov, t.dataset.veh, t.dataset.vehiculo); }
   if (S.asoc && (t.dataset.asocUsar || t.hasAttribute('data-asoc-mes'))) { if (t.dataset.asocUsar) S.asoc.usar[t.dataset.asocUsar] = t.checked; else S.asoc.moverMes = t.checked; return pintarAsoc(); }
   if (t.dataset.rp && S.rep) {
     const i = +t.closest('tr').dataset.i; const p = S.rep.partes[i]; const f = t.dataset.rp;
