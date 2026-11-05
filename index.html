@@ -156,6 +156,10 @@ tr.en-grupo td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .calc>div{background:var(--sunk);border-radius:8px;padding:8px 10px}
 .calc b{display:block;font:600 16px var(--f-num)}
 .callout{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--sunk);display:flex;flex-direction:column;gap:2px}
+.vgbox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--sunk);display:flex;flex-direction:column;gap:8px}
+.vgl{display:grid;grid-template-columns:minmax(120px,180px) minmax(0,1fr) 110px auto;gap:6px;align-items:center}
+.vgl .in{width:100%;max-width:none;border:1px solid var(--line);border-radius:7px;padding:6px 8px;background:var(--panel);font-size:13px;color:var(--fg)}
+@media (max-width:700px){.vgl{grid-template-columns:1fr 110px}.vgl .vgTx{grid-column:1/-1;order:-1}}
 .prox{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
 .pbar{height:8px;border-radius:999px;background:var(--sunk);overflow:hidden}.pbar>span{display:block;height:100%;border-radius:999px}
 .gmini{display:inline-block;width:46px;height:8px;border-radius:999px;background:var(--sunk);overflow:hidden;vertical-align:middle}.gmini>span{display:block;height:100%;background:var(--ca)}
@@ -1091,13 +1095,18 @@ const nf = (v, d = 0) => (+v || 0).toLocaleString('es-HN', {minimumFractionDigit
 const vehs = () => (S.veh || []).filter(v => v.activo !== false);
 const vehById = id => (S.veh || []).find(v => v.id === id);
 const regsDe = (id, tipo) => (S.vreg || []).filter(r => r.vehiculo === id && (!tipo || r.tipo === tipo)).sort((a, b) => (a.fecha + String(a.odometro || 0).padStart(9, '0')) < (b.fecha + String(b.odometro || 0).padStart(9, '0')) ? -1 : 1);
-const regDeTx = id => (S.vreg || []).find(r => r.tx_id === id);
-function costoReg(r) {
-  if (r.tx_id) { const t = D.byId.get(r.tx_id); if (t) return t.monto; }
-  if (r.mov_id) { const m = S.movs.get(r.mov_id); if (m) return +m.valor || 0; }
-  return +r.costo || 0;
+const lineasDe = r => Array.isArray(r.gastos) && r.gastos.length ? r.gastos : (r.tx_id || r.mov_id || r.costo != null ? [{concepto: '', tx_id: r.tx_id || null, mov_id: r.mov_id || null, costo: r.costo}] : []);
+const txsDeReg = r => lineasDe(r).map(g => g.tx_id).filter(Boolean);
+const regDeTx = id => (S.vreg || []).find(r => txsDeReg(r).includes(id));
+function costoLinea(g) {
+  if (g.tx_id) { const t = D.byId.get(g.tx_id); if (t) return t.monto; }
+  if (g.mov_id) { const m = S.movs.get(g.mov_id); if (m) return +m.valor || 0; }
+  return +g.costo || 0;
 }
+const costoReg = r => lineasDe(r).reduce((a, g) => a + costoLinea(g), 0);
 function gastoTxt(r) {
+  const ls = lineasDe(r); if (ls.length > 1) { const n = ls.filter(g => g.tx_id || g.mov_id).length; return `<span class="chip ${n ? 'app' : ''}" title="${n} vinculados a gastos de la app">${ls.length} costos · ${n} de la app</span>`; }
+  if (ls.length === 1 && !r.tx_id && !r.mov_id) r = Object.assign({}, r, ls[0]);
   if (r.tx_id) { const t = D.byId.get(r.tx_id); const pp = partes(r.tx_id); const c = pp[0] && ctrlById(pp[0].control); return t ? `<span class="chip app" title="${esc(t.det)}">${c ? esc(c.corto || c.nombre) : 'Gasto de la app'}</span>` : '<span class="chip warn">Gasto no encontrado</span>'; }
   if (r.mov_id) { const m = S.movs.get(r.mov_id); const c = m && ctrlById(m.control); return m ? `<span class="chip">${c ? esc(c.corto || c.nombre) : 'Fila manual'}</span>` : '<span class="chip warn">Fila borrada</span>'; }
   return r.tipo === 'recorrido' ? '' : '<span class="chip warn">Sin vincular</span>';
@@ -1147,7 +1156,7 @@ function parseDet(det) {
 function tipoDetectado(t) { const c = NORM([t.cat, t.sub, t.nota].join(' ')); if (/COMBUSTIBLE|GASOLINA|DIESEL/.test(c)) return 'combustible'; if (/MANTEN|REPARAC|TALLER|REPUESTO|LLANTA|ACEITE|LUBRIC/.test(c)) return 'mantenimiento'; return null; }
 function detectados() {
   if (!S.vreg || !esAdmin()) return [];
-  const ligados = new Set((S.vreg || []).map(r => r.tx_id).filter(Boolean)); const ign = new Set((S.aj.vehIgnorar || []));
+  const ligados = new Set((S.vreg || []).flatMap(txsDeReg)); const ign = new Set((S.aj.vehIgnorar || []));
   const out = [];
   for (const t of D.txs) {
     if (t.code !== 1 || ligados.has(t.id) || ign.has(t.id)) continue;
@@ -1232,7 +1241,7 @@ function vVehLista(v, tab) {
   if (tab === 'mant') {
     const ms = [...st.mants].reverse();
     return ms.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Taller</th><th>Descripción</th><th class="num">Odómetro</th><th>Fotos</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
-      ${ms.map(r => { const n = adjDeReg(r).length; return `<tr><td class="mono small">${fFecha(r.fecha)}</td><td><b>${esc(r.mant_tipo)}</b></td><td>${esc(r.proveedor)}</td><td class="small">${esc(r.descripcion)}</td><td class="num">${r.odometro != null ? nf(r.odometro) : '—'}</td><td><button class="linkish" data-act="vregVer" data-id="${esc(r.id)}">${n ? `<span class="chip">${n} ${n === 1 ? 'archivo' : 'archivos'}</span>` : '<u>Ver</u>'}</button></td><td class="num">${L(costoReg(r))}</td><td>${gastoTxt(r)}</td><td>${a ? vRegAcciones(r) : ''}</td></tr>`; }).join('')}
+      ${ms.map(r => { const n = adjDeReg(r).length; return `<tr><td class="mono small">${fFecha(r.fecha)}</td><td><b>${esc(r.mant_tipo)}</b></td><td>${esc(r.proveedor)}</td><td class="small">${esc(r.descripcion)}</td><td class="num">${r.odometro != null ? nf(r.odometro) : '—'}</td><td><button class="linkish" data-act="vregVer" data-id="${esc(r.id)}">${n ? `<span class="chip">${n} ${n === 1 ? 'archivo' : 'archivos'}</span>` : '<u>Ver</u>'}</button></td><td class="num">${L(costoReg(r))}${lineasDe(r).length > 1 ? `<div class="cat" style="text-align:right">${lineasDe(r).map(g => `${esc(g.concepto || 'Costo')} ${L(costoLinea(g))}`).join('<br>')}</div>` : ''}</td><td>${gastoTxt(r)}</td><td>${a ? vRegAcciones(r) : ''}</td></tr>`; }).join('')}
     </tbody></table></div>` : '<div class="note">Sin mantenimientos registrados.</div>';
   }
   if (tab === 'rec') {
@@ -1260,18 +1269,32 @@ const nivelMini = n => { const p = n == null ? 100 : +n; return `<span class="gm
 function vRegAcciones(r, soloBorrar) {
   return `${soloBorrar ? '' : `<button class="btn sm ghost" data-act="vregEditar" data-id="${esc(r.id)}">Editar</button>`}<button class="btn sm ghost danger" data-act="vregBorrar" data-id="${esc(r.id)}">${S.confirmVreg === r.id ? '¿Borrar? Sí' : 'Borrar'}</button>`;
 }
-const adjDeReg = r => (S.adj || []).filter(x => x.veh_reg === r.id || (r.tx_id && x.tx_id === r.tx_id) || (r.mov_id && x.mov_id === r.mov_id));
+const adjDeReg = r => { const tx = txsDeReg(r); return (S.adj || []).filter(x => x.veh_reg === r.id || (x.tx_id && tx.includes(x.tx_id)) || (r.mov_id && x.mov_id === r.mov_id)); };
 /* candidatos de gasto para vincular */
 function gastosParaVincular(v, tipo, actual) {
-  const usados = new Set((S.vreg || []).filter(r => r.tx_id && r.tx_id !== actual).map(r => r.tx_id)); const al = NORM(v.alias || v.nombre);
-  return D.txs.filter(t => t.code === 1 && !usados.has(t.id) && (t.id === actual || tipoDetectado(t) === tipo || (al && NORM(t.det).includes(al))))
+  const act = [].concat(actual || []); const usados = new Set((S.vreg || []).flatMap(txsDeReg).filter(id => !act.includes(id))); const al = NORM(v.alias || v.nombre);
+  return D.txs.filter(t => t.code === 1 && !usados.has(t.id) && (act.includes(t.id) || tipoDetectado(t) === tipo || (al && NORM(t.det).includes(al))))
     .sort((a, b) => { const sa = (al && NORM(a.det).includes(al) ? 0 : 1), sb2 = (al && NORM(b.det).includes(al) ? 0 : 1); return sa - sb2 || (a.fecha < b.fecha ? 1 : -1); }).slice(0, 80);
+}
+function lineaCostoHTML(g) {
+  const ops = S._vgOpts || []; const sel = g.tx_id || '';
+  const extra = sel && !ops.some(t => t.id === sel) && D.byId.get(sel) ? [D.byId.get(sel)] : [];
+  return `<div class="vgl">
+    <input class="in vgConc" list="vgConceptos" value="${esc(g.concepto || '')}" placeholder="Concepto (ej.: Mano de obra)" aria-label="Concepto">
+    <select class="in vgTx" aria-label="Gasto vinculado"><option value="">Sin gasto de la app (escribo el costo)</option>${[...extra, ...ops].map(t => `<option value="${esc(t.id)}" ${t.id === sel ? 'selected' : ''}>${fFecha(t.fecha)} · ${esc(t.det.slice(0, 60))} · ${L(t.monto)}</option>`).join('')}</select>
+    <input class="in num vgCosto" inputmode="decimal" value="${g.costo != null && !g.tx_id ? g.costo : ''}" placeholder="0.00" aria-label="Costo">
+    <button type="button" class="btn sm ghost danger vgQuitar" aria-label="Quitar costo">Quitar</button></div>`;
 }
 function vFormReg(v, tipo, r) {
   const st = vStats(v); const ed = r || S.vehDraft || {}; const comb = tipo === 'combustible';
-  const gastos = gastosParaVincular(v, tipo, ed.tx_id);
+  const gastos = gastosParaVincular(v, tipo, comb ? ed.tx_id : txsDeReg(ed));
+  const lineas = comb ? [] : (lineasDe(ed).length ? lineasDe(ed) : [{concepto: '', tx_id: null, costo: null}]);
+  S._vgOpts = gastos;
   return `<form class="form" id="vregForm" data-veh="${esc(v.id)}" data-tipo="${tipo}" data-id="${esc(ed.id || '')}" novalidate>
-      <label style="grid-column:1/-1">Gasto vinculado<select id="vfGasto"><option value="">Sin gasto de la app (escribo el costo)</option>${gastos.map(t => `<option value="${esc(t.id)}" ${ed.tx_id === t.id ? 'selected' : ''}>${fFecha(t.fecha)} · ${esc(t.det.slice(0, 70))} · ${L(t.monto)}</option>`).join('')}</select></label>
+      ${comb ? '' : `<div class="vgbox" style="grid-column:1/-1"><div class="row" style="justify-content:space-between"><b class="small" style="color:var(--fg)">Costos del mantenimiento</b><span class="note">Un mantenimiento puede tener varios costos, por ejemplo mano de obra y repuestos.</span></div>
+        <div id="vgLineas" class="stack" style="gap:6px">${lineas.map(g => lineaCostoHTML(g)).join('')}</div>
+        <div class="row" style="justify-content:space-between"><button type="button" class="btn sm" id="vgAgregar">Agregar costo</button><span class="small">Total <b class="mono" id="vgTotal">L 0.00</b></span></div></div>`}
+      <label style="grid-column:1/-1${comb ? '' : ';display:none'}">Gasto vinculado<select id="vfGasto"><option value="">Sin gasto de la app (escribo el costo)</option>${gastos.map(t => `<option value="${esc(t.id)}" ${ed.tx_id === t.id ? 'selected' : ''}>${fFecha(t.fecha)} · ${esc(t.det.slice(0, 70))} · ${L(t.monto)}</option>`).join('')}</select></label>
       <label>Fecha<input type="date" id="vfFecha" value="${esc(ed.fecha || hoy())}"></label>
       <label>Odómetro (km)<input id="vfOdo" inputmode="numeric" value="${ed.odometro != null ? ed.odometro : ''}" placeholder="${st.odo != null ? st.odo : ''}"></label>
       <label>${comb ? 'Gasolinera' : 'Taller o proveedor'}<input id="vfProv" value="${esc(ed.proveedor || '')}"></label>
@@ -1279,11 +1302,12 @@ function vFormReg(v, tipo, r) {
         <label>${vUnidad() === 'L' ? 'Litros' : 'Galones'}<input id="vfLit" inputmode="decimal" value="${ed.litros != null ? nf(vVol(+ed.litros), 2).replace(/,/g, '') : ''}"></label>`
       : `<label>Tipo de mantenimiento<input id="vfMtipo" list="vpServs2" value="${esc(ed.mant_tipo || '')}" placeholder="Aceite y filtro"><datalist id="vpServs2">${[...new Set([...(S.vplan || []).filter(p => p.vehiculo === v.id).map(p => p.servicio), 'Aceite y filtro', 'Frenos', 'Llantas', 'Batería', 'Alineación y balanceo', 'Servicio mayor', 'Reparación'])].map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
         <label style="grid-column:span 2">Descripción<input id="vfDesc" value="${esc(ed.descripcion || '')}" placeholder="Qué se hizo, repuestos, observaciones"></label>`}
-      <label id="vfCostoL">Costo (L)<input id="vfCosto" inputmode="decimal" value="${ed.costo != null ? ed.costo : ''}"></label>
+      ${comb ? `<label id="vfCostoL">Costo (L)<input id="vfCosto" inputmode="decimal" value="${ed.costo != null ? ed.costo : ''}"></label>` : ''}
       ${comb ? `<div class="fuelbox"><div class="fuelg" id="vfNivel" role="slider" tabindex="0" aria-label="Nivel del tanque al terminar de cargar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></div>
         <div class="fuelinfo"><span class="note" style="font-weight:600">Nivel del tanque al terminar</span><b id="vfNivelTxt"></b><span class="note" id="vfNivelSub"></span><span class="note">Arrastra la aguja a la posición que ves en el tablero; las flechas la mueven de a 1%.</span>
         <div class="btns">${[[100, 'F'], [75, '¾'], [50, '½'], [25, '¼']].map(([n, t]) => `<button type="button" data-vnivel="${n}">${t}</button>`).join('')}</div></div></div>` : ''}
     </form>
+    <datalist id="vgConceptos"><option value="Mano de obra"><option value="Repuestos"><option value="Lubricantes"><option value="Llantas"><option value="Diagnóstico"><option value="Otro"></datalist>
     <div class="calc" id="vfCalc"></div>
     ${!comb && ed.id ? vAdjuntos(adjDeReg(ed), ed.tx_id ? {tx: ed.tx_id, mov: ''} : {veh: ed.id, vehiculo: v.id}, true) : ''}
     ${!comb && !ed.id ? '<div class="note">Podrás adjuntar fotos y facturas después de guardar.</div>' : ''}
@@ -1312,9 +1336,13 @@ function montarFormReg() {
   let nivel = r && r.nivel != null ? +r.nivel : 100;
   const el = $('#vfNivel');
   const calc = () => {
+    if (!comb) {
+      let tot = 0; const vistos = new Set(); let dup = false;
+      f.querySelectorAll('.vgl').forEach(l => { const tid = l.querySelector('.vgTx').value; const c = l.querySelector('.vgCosto'); const t = tid && D.byId.get(tid); c.disabled = !!t; if (t) c.value = t.monto.toFixed(2); if (tid) { if (vistos.has(tid)) dup = true; vistos.add(tid); } tot += parseFloat((c.value || '').replace(/,/g, '')) || 0; });
+      $('#vgTotal').textContent = L(tot); $('#vfCalc').innerHTML = dup ? '<div style="grid-column:1/-1;background:var(--warn-soft);color:var(--warn)">El mismo gasto está en dos líneas.</div>' : ''; return;
+    }
     const gid = $('#vfGasto').value; const t = gid && D.byId.get(gid);
     $('#vfCosto').disabled = !!t; if (t) $('#vfCosto').value = t.monto.toFixed(2);
-    if (!comb) { $('#vfCalc').innerHTML = ''; return; }
     const odo = parseFloat(($('#vfOdo').value || '').replace(/,/g, '')); let lit = parseFloat(($('#vfLit').value || '').replace(/,/g, '')) || 0; if (vUnidad() === 'G') lit *= GALON;
     const costo = parseFloat(($('#vfCosto').value || '').replace(/,/g, '')) || 0; const tq = +v.tanque_l || 0;
     const prev = recargas(v).filter(x => x.id !== (r && r.id) && x.fecha <= $('#vfFecha').value && x.odometro != null).pop();
@@ -1324,7 +1352,12 @@ function montarFormReg() {
     $('#vfCalc').innerHTML = `<div><span class="note">Km desde la última recarga</span><b>${km != null ? nf(km) + ' km' : '—'}</b></div><div><span class="note">Rendimiento${nivel < 99 || np < 99 ? ' (estimado)' : ''}</span><b>${rend ? nf(vR(rend), 1) + ' ' + vRU() : '—'}</b></div><div><span class="note">Precio por ${vUnidad() === 'L' ? 'litro' : 'galón'}</span><b>${lit ? L(vUnidad() === 'L' ? costo / lit : costo / lit * GALON) : '—'}</b></div><div><span class="note">Costo por km</span><b>${km > 0 ? L(costo / km) : '—'}</b></div>` + (av.length ? `<div style="grid-column:1/-1;background:var(--warn-soft);color:var(--warn)">${av.join(' ')}</div>` : '');
     if (el) { $('#vfNivelTxt').textContent = nivTxt(nivel); $('#vfNivelSub').textContent = tq ? (nivel >= 99 ? `${nf(vVol(tq), 1)} ${vU()} en el tanque` : `≈ ${nf(vVol(tq * nivel / 100), 1)} ${vU()} en el tanque · faltan ≈ ${nf(vVol(tq * (100 - nivel) / 100), 1)} ${vU()} para llenar`) : 'Agrega la capacidad del tanque en el vehículo para calcular litros.'; }
   };
+  f.addEventListener('click', e => {
+    if (e.target.id === 'vgAgregar') { $('#vgLineas').insertAdjacentHTML('beforeend', lineaCostoHTML({concepto: '', tx_id: null, costo: null})); calc(); }
+    if (e.target.classList.contains('vgQuitar')) { const ls = f.querySelectorAll('.vgl'); if (ls.length > 1) e.target.closest('.vgl').remove(); else { const l = ls[0]; l.querySelector('.vgTx').value = ''; l.querySelector('.vgCosto').value = ''; l.querySelector('.vgConc').value = ''; } calc(); }
+  });
   f.addEventListener('input', calc); f.addEventListener('change', e => {
+    if (e.target.classList.contains('vgTx') && e.target.value) { const t = D.byId.get(e.target.value); const pd = parseDet(t.det); if (!$('#vfOdo').value && pd.odo) $('#vfOdo').value = pd.odo; if (!$('#vfProv').value && pd.prov) $('#vfProv').value = pd.prov; if (!$('#vfDesc').value) $('#vfDesc').value = t.det; const cc = e.target.closest('.vgl').querySelector('.vgConc'); if (!cc.value) cc.value = /REPUEST|PIEZA|FILTRO|ACEITE|LLANTA|BATER/.test(NORM(t.det + ' ' + t.nota)) ? 'Repuestos' : /MANO DE OBRA|TALLER|SERVICIO/.test(NORM(t.det + ' ' + t.nota)) ? 'Mano de obra' : ''; if (f.querySelectorAll('.vgl').length === 1 && (!$('#vfFecha').value || $('#vfFecha').value === hoy())) $('#vfFecha').value = t.fecha; }
     if (e.target.id === 'vfGasto' && e.target.value) { const t = D.byId.get(e.target.value); const pd = parseDet(t.det); $('#vfFecha').value = t.fecha; if (pd.odo && !$('#vfOdo').value) $('#vfOdo').value = pd.odo; if (pd.prov && !$('#vfProv').value) $('#vfProv').value = pd.prov; if (!comb && !$('#vfDesc').value) $('#vfDesc').value = t.det; }
     calc();
   });
@@ -1342,7 +1375,12 @@ function montarFormReg() {
 async function guardarReg() {
   const f = $('#vregForm'); const v = vehById(f.dataset.veh); const comb = f.dataset.tipo === 'combustible'; const id = f.dataset.id;
   const num = s => { const x = parseFloat(String(s || '').replace(/,/g, '')); return isFinite(x) ? x : null; };
-  const gid = $('#vfGasto').value || null; const row = {vehiculo: v.id, tipo: f.dataset.tipo, fecha: $('#vfFecha').value, odometro: num($('#vfOdo').value), proveedor: $('#vfProv').value.trim(), tx_id: gid, costo: gid ? null : num($('#vfCosto').value)};
+  const gid = comb ? ($('#vfGasto').value || null) : null; const row = {vehiculo: v.id, tipo: f.dataset.tipo, fecha: $('#vfFecha').value, odometro: num($('#vfOdo').value), proveedor: $('#vfProv').value.trim(), tx_id: gid, costo: comb ? (gid ? null : num($('#vfCosto').value)) : null};
+  if (!comb) {
+    const ls = [...f.querySelectorAll('.vgl')].map(l => { const tid = l.querySelector('.vgTx').value || null; return {concepto: l.querySelector('.vgConc').value.trim(), tx_id: tid, costo: tid ? null : num(l.querySelector('.vgCosto').value)}; }).filter(g => g.tx_id || g.costo != null || g.concepto);
+    const ids = ls.map(g => g.tx_id).filter(Boolean); if (new Set(ids).size !== ids.length) return toast('El mismo gasto está en dos líneas.');
+    row.gastos = ls; row.tx_id = ids[0] || null; row.mov_id = null;
+  }
   if (!row.fecha) return toast('Escribe la fecha.');
   if (comb) { let lit = num($('#vfLit').value); if (lit != null && vUnidad() === 'G') lit = lit * GALON; Object.assign(row, {combustible: $('#vfComb').value.trim(), litros: lit, nivel: f._nivel ? f._nivel() : 100}); if (!lit) return toast('Escribe los litros cargados.'); }
   else { Object.assign(row, {mant_tipo: $('#vfMtipo').value.trim(), descripcion: $('#vfDesc').value.trim()}); if (!row.mant_tipo) return toast('Escribe el tipo de mantenimiento.'); }
@@ -2257,7 +2295,7 @@ document.addEventListener('click', async e => {
     try { const d = await q(sb.from('veh_planes').insert({vehiculo: b.dataset.id, servicio: serv, cada_km: isFinite(km) ? km : null, cada_meses: isFinite(ms) ? ms : null, ultimo_fecha: $('#vpUlt').value || null, ultimo_odo: isFinite(uo) ? uo : null}).select(), 'Plan agregado'); if (d && d[0]) S.vplan.push(d[0]); } catch (e) {} return render(); }
   if (act === 'vplanBorrar') { const id = b.dataset.id; if (S.confirmPlan !== id) { S.confirmPlan = id; return render(); } S.confirmPlan = null; try { await q(sb.from('veh_planes').delete().eq('id', id), 'Plan quitado'); S.vplan = S.vplan.filter(x => x.id !== id); } catch (e) {} return render(); }
   if (act === 'detConfirmar' || act === 'detMant') { const d = detectados().find(x => x.t.id === b.dataset.id); if (!d) return;
-    if (act === 'detMant') { S.vehSel = d.v.id; S.vehDraft = {tx_id: d.t.id, fecha: d.t.fecha, odometro: d.odo, proveedor: d.prov, descripcion: d.t.det}; S.vehTab = 'nmant'; return render(); }
+    if (act === 'detMant') { S.vehSel = d.v.id; S.vehDraft = {tx_id: d.t.id, gastos: [{concepto: '', tx_id: d.t.id, costo: null}], fecha: d.t.fecha, odometro: d.odo, proveedor: d.prov, descripcion: d.t.det}; S.vehTab = 'nmant'; return render(); }
     let lit = parseFloat((b.closest('tr').querySelector('[data-detlit]').value || '').replace(/,/g, '')); if (!isFinite(lit) || lit <= 0) return toast('Escribe los litros cargados.'); if (vUnidad() === 'G') lit *= GALON;
     try { const r2 = await q(sb.from('veh_registros').insert({vehiculo: d.v.id, tipo: 'combustible', fecha: d.t.fecha, odometro: d.odo, proveedor: d.prov, combustible: d.v.combustible || '', litros: lit, nivel: 100, tx_id: d.t.id}).select(), 'Recarga registrada'); if (r2 && r2[0]) S.vreg.push(r2[0]); } catch (e) {} return render(); }
   if (act === 'detIgnorar') { const l = [...(S.aj.vehIgnorar || []), b.dataset.id]; await guardarAjuste('vehIgnorar', l).catch(() => {}); return render(); }
