@@ -1879,12 +1879,52 @@ function vUsuarios() {
 }
 
 /* ================= vista: ajustes (admin) ================= */
+function nombresPersonas() {
+  const m = new Map(); const add = (n, k) => { n = String(n || '').trim(); if (!n || n === 'COMPARTIDO') return; if (!m.has(n)) m.set(n, {n, filas: 0, ctrls: new Set(), perfiles: 0}); const x = m.get(n); if (k === 'f') x.filas++; else if (k === 'p') x.perfiles++; else x.ctrls.add(k); };
+  for (const mv of S.movs.values()) add(mv.tipo, 'f');
+  for (const c of S.ctrls) { (c.personas || []).forEach(n => add(n, c.corto || c.nombre)); Object.values(c.personasMes || {}).forEach(l => (l || []).forEach(n => add(n, c.corto || c.nombre))); }
+  (S.perfiles || []).forEach(p => add(p.persona, 'p'));
+  const lista = [...m.values()]; const clave = n => NORM(n).replace(/[^A-Z]/g, '');
+  const dist = (a, b) => { const d = Array.from({length: a.length + 1}, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
+  lista.forEach(x => { x.parecido = lista.filter(y => y !== x && dist(clave(x.n), clave(y.n)) <= 2).map(y => y.n); });
+  return lista.sort((a, b) => a.n.localeCompare(b.n, 'es'));
+}
+function vNombres() {
+  if (!esAdmin()) return '';
+  const l = nombresPersonas(); if (!l.length) return '';
+  const dudosos = l.filter(x => x.parecido.length);
+  return `<div class="panel"><div class="hd"><h2>Nombres de personas</h2><span class="note">Cómo aparece cada persona en TIPO, en los participantes y en los perfiles.</span></div>
+    ${dudosos.length ? `<div class="bd"><div class="callout"><b class="neg">Hay nombres parecidos que podrían ser la misma persona</b><span class="note">${dudosos.map(x => esc(x.n)).join(' · ')}. Si es la misma persona, unifícalos: así cuenta una sola vez en la distribución.</span></div></div>` : ''}
+    <div class="tbl-wrap"><table><thead><tr><th>Nombre</th><th class="num">Filas</th><th>Participa en</th><th>Perfil</th><th>Cambiar por</th><th></th></tr></thead><tbody>
+    ${l.map((x, i) => `<tr ${x.parecido.length ? 'style="background:var(--warn-soft)"' : ''}><td><b>${esc(x.n)}</b>${x.parecido.length ? `<div class="cat">Parecido a ${x.parecido.map(esc).join(', ')}</div>` : ''}</td><td class="num">${x.filas}</td><td class="small">${esc([...x.ctrls].join(', ')) || '—'}</td><td class="small">${x.perfiles ? 'Sí' : '—'}</td>
+      <td><input class="in" id="unif-${i}" list="unifNombres" value="${esc(x.parecido[0] || '')}" placeholder="Nombre correcto" style="max-width:240px"></td>
+      <td><button class="btn sm" data-act="unificar" data-n="${esc(x.n)}" data-i="${i}">${S.confirmUnif === x.n ? '¿Seguro? Unificar' : 'Unificar'}</button></td></tr>`).join('')}
+    </tbody></table></div><datalist id="unifNombres">${l.map(x => `<option value="${esc(x.n)}">`).join('')}</datalist>
+    <div class="bd note">Unificar cambia el nombre en todas las filas (TIPO de egresos y persona de ingresos), en los participantes de cada control y mes, y en el perfil del usuario.</div></div>`;
+}
+async function unificarNombre(de, a) {
+  a = a.trim().toUpperCase(); if (!a || a === de) return toast('Escribe el nombre correcto, distinto al actual.');
+  try {
+    const d = await q(sb.from('movimientos').update({tipo: a}).eq('tipo', de).select());
+    (d || []).forEach(m => S.movs.set(m.id, normMov(m)));
+    for (const c of S.ctrls) {
+      const fix = l => { const n = (l || []).map(x => x === de ? a : x); return [...new Set(n)]; };
+      const antes = JSON.stringify([c.personas, c.personasMes]);
+      c.personas = fix(c.personas); const pm = {}; Object.entries(c.personasMes || {}).forEach(([k, v]) => pm[k] = fix(v)); c.personasMes = pm;
+      if (JSON.stringify([c.personas, c.personasMes]) !== antes) await guardarControl(c);
+    }
+    for (const pf of (S.perfiles || []).filter(p => p.persona === de)) { const r2 = await q(sb.from('perfiles').update({persona: a}).eq('id', pf.id).select()); if (r2 && r2[0]) Object.assign(pf, r2[0]); if (S.me && S.me.id === pf.id) S.me.persona = a; }
+    toast(`"${de}" ahora es "${a}" (${(d || []).length} filas)`);
+  } catch (e) {}
+  derive(); render();
+}
 function vAjustes() {
   return `<div class="stack">
     <div><div class="eyebrow">Ajustes</div><h1>Controles y sincronización</h1></div>
     <div class="panel"><div class="hd"><h2>General</h2></div><div class="bd form-grid">
       <label>Mostrar en la bandeja movimientos desde<input type="date" id="cfgInicio" value="${esc(S.aj.inicio || '')}"></label>
       <div class="note" style="align-self:end">Lo anterior a esa fecha no aparece como pendiente.</div></div></div>
+    ${vNombres()}
     ${familiares().map(c => `<div class="panel" data-cid="${c.id}"><div class="hd"><span class="dot ${colorClass(c)}" style="width:10px;height:10px;border-radius:50%;display:inline-block"></span><h2>${esc(c.nombre)}</h2></div><div class="bd form-grid">
       <label>Nombre<input data-cf="nombre" value="${esc(c.nombre)}"></label>
       <label>Nombre corto (pestaña)<input data-cf="corto" value="${esc(c.corto || '')}"></label>
@@ -2305,6 +2345,7 @@ document.addEventListener('click', async e => {
     else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
     return insertarMovs([row], esAdmin() ? 'Fila agregada' : 'Registrado. Queda por validar.').catch(() => {});
   }
+  if (act === 'unificar') { const de = b.dataset.n; const a = ($('#unif-' + b.dataset.i).value || ''); if (S.confirmUnif !== de) { if (!a.trim()) return toast('Escribe el nombre correcto.'); S.confirmUnif = de; b.textContent = '¿Seguro? Unificar'; return; } S.confirmUnif = null; return unificarNombre(de, a); }
   if (act === 'vehSel') { S.vehSel = b.dataset.id; S.vehTab = 'comb'; S.vehEdit = null; S.vehDraft = null; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } return render(); }
   if (act === 'vehTab') { e.preventDefault(); S.vehTab = b.dataset.t; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } render(); const el = $('#vehLista'); if (el && !['comb', 'mant', 'rec'].includes(b.dataset.t)) el.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   if (act === 'vehUnidad') { lsSet('veh-unidad', b.dataset.v); return render(); }
