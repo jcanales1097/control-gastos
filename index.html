@@ -1039,22 +1039,22 @@ function vCambios() {
 }
 
 /* ================= reparto de un movimiento ================= */
-function abrirReparto(txId) {
+function abrirReparto(txId, base) {
   const t = D.byId.get(txId); if (!t) return toast('Ese movimiento ya no está en lo sincronizado.');
-  const ps = partes(txId).map(m => ({id: m.id, control: m.control, tipo: m.tipo, mes: m.mes, valor: m.valor, orig: m}));
-  if (!ps.length) { const c = sugerido(t) || familiares()[0]; ps.push({control: c.id, tipo: tipoSugerido(c, t), mes: c.porMes ? t.mes : 'general', valor: t.monto}); }
+  const ps = partes(txId).map(m => ({id: m.id, control: m.control, tipo: m.tipo, mes: m.mes, valor: m.valor, grupo: m.grupo || '', orig: m}));
+  if (!ps.length) { const c = (base && ctrlById(base.control)) || sugerido(t) || familiares()[0]; ps.push({control: c.id, tipo: (base && base.tipo) || tipoSugerido(c, t), mes: c.porMes ? ((base && base.mes) || t.mes) : 'general', valor: t.monto, grupo: c.porMes ? ((base && base.grupo) || microSugerido(c, t)) : ''}); }
   S.rep = {t, partes: ps, borrar: []}; pintarReparto();
 }
 function pintarReparto() {
   const {t, partes: ps} = S.rep; const lado = t.code === 0 ? 'ingreso' : 'egreso';
   const suma = ps.reduce((s, p) => s + (+p.valor || 0), 0); const resto = Math.round((t.monto - suma) * 100) / 100;
-  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="repT" style="max-width:780px">
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="repT" style="max-width:980px">
     <div class="hd"><h2 id="repT" style="margin-right:auto">Repartir movimiento</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
     <div class="bd">
       <div class="small"><b>${esc(t.det || '(sin detalle)')}</b><div class="cat">${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></div>
       <div class="kpis"><div class="kpi"><div class="eyebrow">Monto en la app</div><div class="v">${L(t.monto)}</div></div><div class="kpi"><div class="eyebrow">Repartido</div><div class="v">${L(suma)}</div></div><div class="kpi"><div class="eyebrow">Sin repartir</div><div class="v ${resto < -0.005 ? 'neg' : resto > 0.005 ? 'warn-t' : 'pos'}">${L(resto)}</div></div></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Control o proyecto</th><th>Tipo</th><th>Mes</th><th class="num">Monto</th><th></th></tr></thead><tbody>
-      ${ps.map((p, i) => { const c = ctrlById(p.control); return `<tr data-i="${i}"><td>${ctrlSelect(p.control, 'class="in" data-rp="control" aria-label="Control o proyecto"')}</td>
+      <div class="tbl-wrap"><table><thead><tr><th>Control o proyecto</th>${S.micro && ps.some(p => { const c = ctrlById(p.control); return c && c.porMes && microsDe(c.id).length; }) ? '<th>Micro proyecto</th>' : ''}<th>Tipo</th><th>Mes</th><th class="num">Monto</th><th></th></tr></thead><tbody>
+      ${ps.map((p, i) => { const c = ctrlById(p.control); const conMp = S.micro && ps.some(q => { const cc = ctrlById(q.control); return cc && cc.porMes && microsDe(cc.id).length; }); return `<tr data-i="${i}"><td>${ctrlSelect(p.control, 'class="in" data-rp="control" aria-label="Control o proyecto"')}</td>${conMp ? `<td>${c && c.porMes && microsDe(c.id).length ? `<select class="in" data-rp="grupo" aria-label="Micro proyecto">${microOptions(c.id, p.grupo || '')}</select>` : '<span class="muted small">—</span>'}</td>` : ''}
         <td><select class="in" data-rp="tipo" aria-label="Tipo">${tipoOptions(c, p.tipo, lado, p.mes)}</select></td>
         <td><select class="in" data-rp="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(p.mes === 'general' ? t.mes : p.mes)}</select></td>
         <td class="num"><input class="in num" data-rp="valor" value="${(+p.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Monto"></td>
@@ -1075,9 +1075,9 @@ async function guardarReparto() {
       const c = ctrlById(p.control); const mes = c.porMes ? (p.mes === 'general' ? t.mes : p.mes) : 'general';
       if (p.id) {
         const o = p.orig; const ch = {};
-        if (o.control !== p.control) ch.control = p.control; if (o.tipo !== p.tipo) ch.tipo = p.tipo; if (o.mes !== mes) ch.mes = mes; if (cents(o.valor) !== cents(p.valor)) ch.valor = +p.valor;
+        if (o.control !== p.control) ch.control = p.control; if (o.tipo !== p.tipo) ch.tipo = p.tipo; if (o.mes !== mes) ch.mes = mes; if (cents(o.valor) !== cents(p.valor)) ch.valor = +p.valor; const g = c.porMes ? (p.grupo || null) : null; if ((o.grupo || null) !== g) ch.grupo = g;
         if (Object.keys(ch).length) { const d = await q(sb.from('movimientos').update(ch).eq('id', p.id).select()); if (d && d[0]) S.movs.set(p.id, normMov(d[0])); }
-      } else nuevos.push({control: c.id, mes, lado, fecha: t.fecha, tipo: p.tipo, cat: lado === 'ingreso' ? '' : t.sub, sub: lado === 'ingreso' ? '' : t.nota, descripcion: t.det, detalle: '', valor: +p.valor, tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t)});
+      } else nuevos.push({control: c.id, mes, lado, fecha: t.fecha, tipo: p.tipo, cat: lado === 'ingreso' ? '' : t.sub, sub: lado === 'ingreso' ? '' : t.nota, descripcion: t.det, detalle: '', valor: +p.valor, tx_id: t.id, estado: 'valido', origen: 'app', validado_por: S.me.id, validado_el: new Date().toISOString(), ...snapApp(t), ...(c.porMes && p.grupo ? {grupo: p.grupo} : {})});
     }
     if (nuevos.length) { const d = await q(sb.from('movimientos').insert(nuevos).select()); (d || []).forEach(m => S.movs.set(m.id, normMov(m))); }
   } catch (e) { derive(); render(); return; }
@@ -2349,7 +2349,7 @@ document.addEventListener('click', async e => {
   if (act === 'detalleTx') return abrirDetalleTx(b.dataset.id);
   if (act === 'detalleMovId') return abrirDetalle(b.dataset.id);
   if (act === 'detalle') { const m = movDe(b); if (m) abrirDetalle(m.id); return; }
-  if (act === 'dividir') return abrirReparto(b.dataset.id);
+  if (act === 'dividir') { const tr = b.closest('tr[data-tx]'); const sel = x => tr && tr.querySelector(`[data-f=${x}]`); return abrirReparto(b.dataset.id, tr && sel('ctrl') && sel('ctrl').value ? {control: sel('ctrl').value, tipo: sel('tipo') && sel('tipo').value, mes: sel('mes') && sel('mes').value, grupo: sel('grupo') && sel('grupo').value} : null); }
   if (act === 'dividirMov') { const m = movDe(b) || S.movs.get(b.dataset.movId); if (m && m.tx_id) abrirReparto(m.tx_id); return; }
   if (act === 'rpAgregar') { const t = S.rep.t; const resto = Math.round((t.monto - S.rep.partes.reduce((s, p) => s + (+p.valor || 0), 0)) * 100) / 100; const c = familiares()[0]; S.rep.partes.push({control: c.id, tipo: c.tipoDefecto || 'COMPARTIDO', mes: t.mes, valor: Math.max(resto, 0)}); return pintarReparto(); }
   if (act === 'rpQuitar') { const i = +b.closest('tr').dataset.i; const [p] = S.rep.partes.splice(i, 1); if (p && p.id) S.rep.borrar.push(p.id); return pintarReparto(); }
@@ -2449,7 +2449,7 @@ document.addEventListener('change', async e => {
   if (t.dataset.rp && S.rep) {
     const i = +t.closest('tr').dataset.i; const p = S.rep.partes[i]; const f = t.dataset.rp;
     if (f === 'valor') { const v = parseFloat(t.value.replace(/[^0-9.\-]/g, '')); p.valor = isFinite(v) ? Math.round(v * 100) / 100 : 0; }
-    else if (f === 'control') { const c = ctrlById(t.value); p.control = t.value; p.mes = c && c.porMes ? (p.mes === 'general' ? S.rep.t.mes : p.mes) : 'general'; p.tipo = tipoSugerido(c, S.rep.t); }
+    else if (f === 'control') { const c = ctrlById(t.value); p.control = t.value; p.mes = c && c.porMes ? (p.mes === 'general' ? S.rep.t.mes : p.mes) : 'general'; p.tipo = tipoSugerido(c, S.rep.t); p.grupo = c && c.porMes ? microSugerido(c, S.rep.t) : ''; }
     else p[f] = t.value;
     return pintarReparto();
   }
