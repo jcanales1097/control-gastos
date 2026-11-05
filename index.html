@@ -1209,7 +1209,7 @@ function vFicha(v) {
           <div class="kpi"><div class="eyebrow">Gasto ${esc(mesLargo(hoy().slice(0, 7)).split(' ')[0].toLowerCase())}</div><div class="v">${L(st.gMes)}</div><div class="note">de este vehículo</div></div>
           <div class="kpi"><div class="eyebrow">Precio por ${vUnidad() === 'L' ? 'litro' : 'galón'}</div><div class="v">${st.ppl ? L(vUnidad() === 'L' ? st.ppl : st.ppl * GALON) : '—'}</div><div class="note">última recarga</div></div>
         </div>
-        <div class="row" style="gap:6px">${urg.map(p => `<span class="chip ${p.pct >= 1 ? 'bad' : 'warn'}">${p.pct >= 1 ? 'Vencido' : 'Pronto'}: ${esc(p.p.servicio)}</span>`).join('')}${sinV ? `<span class="chip warn">${sinV} sin gasto vinculado</span>` : ''}${ultRc && ultRc.rend && st.prom && ultRc.rend < st.prom * 0.85 && !ultRc.estimado ? '<span class="chip bad">Última recarga con rendimiento bajo</span>' : ''}</div>
+        <div class="row" style="gap:6px">${urg.map(p => `<span class="chip ${p.pct >= 1 ? 'bad' : 'warn'}">${esc(p.p.servicio)}: ${p.pct >= 1 ? vencTxt(p).toLowerCase() : p.porTiempo || p.faltaKm == null ? `en ${nf(Math.max(0, p.faltaM))} meses` : `faltan ${nf(p.faltaKm)} km`}</span>`).join('')}${sinV ? `<span class="chip warn">${sinV} sin gasto vinculado</span>` : ''}${ultRc && ultRc.rend && st.prom && ultRc.rend < st.prom * 0.85 && !ultRc.estimado ? '<span class="chip bad">Última recarga con rendimiento bajo</span>' : ''}</div>
       </div></div></div></div>
     ${st.rc.length || st.mants.length ? `<div class="grid2">
       <div class="panel"><div class="hd"><h2>Rendimiento por recarga</h2><span class="note">${st.rc.filter(r => r.rend).length} recargas${st.prom ? ` · promedio ${nf(vR(st.prom), 1)} ${vRU()}` : ''}</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca);height:3px"></i>${vRU()} por recarga</span><span><i style="background:var(--bad);border-radius:50%"></i>15% bajo el promedio</span><span><i style="background:var(--muted);border-radius:50%;opacity:.5"></i>estimado (tanque no lleno)</span></div><div class="vchart" data-vchart="rend"></div></div></div>
@@ -1221,11 +1221,18 @@ function vFicha(v) {
       ${[['comb', 'Combustible'], ['mant', 'Mantenimiento'], ['rec', 'Recorridos'], ...(a ? [['det', `Detectados${detectados().filter(d => d.v.id === v.id).length ? ` <span class="count warn-bg">${detectados().filter(d => d.v.id === v.id).length}</span>` : ''}`]] : [])].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-act="vehTab" data-t="${k}">${l}</button>`).join('')}
     </div></div><div class="bd" id="vehLista">${vVehLista(v, tab)}</div></div>`;
 }
+function vencTxt(x) {
+  const partes = [];
+  if (x.faltaKm != null && x.faltaKm < 0) partes.push(`${nf(-x.faltaKm)} km`);
+  if (x.faltaM != null && x.faltaM < 0) { const m = -x.faltaM; partes.push(m < 1 ? `${Math.max(1, Math.round(m * 30.44))} ${Math.round(m * 30.44) === 1 ? 'día' : 'días'}` : `${nf(m, m < 10 ? 1 : 0)} ${Math.round(m) === 1 ? 'mes' : 'meses'}`); }
+  if (x.porTiempo) partes.reverse();
+  return partes.length ? `Vencido por ${partes.join(' y ')}` : 'Vencido';
+}
 function vPanelPlanes(v, px) {
   const a = esAdmin(); const odo = vStats(v).odo;
   return `<div class="panel"><div class="hd"><h2>Próximos mantenimientos</h2>${odo != null ? `<span class="note">odómetro ${nf(odo)} km</span>` : ''}</div><div class="bd">
     ${px.length ? px.map(x => { const pc = Math.min(1, x.pct); const col = x.pct >= 1 ? 'var(--bad)' : x.pct >= 0.85 ? 'var(--warn)' : 'var(--ca)';
-      const txt = x.sinDatos ? 'sin último servicio' : x.pct >= 1 ? 'Vencido' : x.porTiempo || x.faltaKm == null ? `en ${nf(Math.max(0, x.faltaM))} meses` : `faltan ${nf(x.faltaKm)} km`;
+      const txt = x.sinDatos ? 'sin último servicio' : x.pct >= 1 ? vencTxt(x) : x.porTiempo || x.faltaKm == null ? `en ${nf(Math.max(0, x.faltaM))} meses` : `faltan ${nf(x.faltaKm)} km`;
       return `<div class="prox"><b>${esc(x.p.servicio)}</b><span class="mono" style="color:${col};font-size:12.5px">${txt}</span><div class="pbar" style="grid-column:1/-1"><span style="width:${pc * 100}%;background:${col}"></span></div><span class="note" style="grid-column:1/-1">Cada ${[x.p.cada_km ? nf(x.p.cada_km) + ' km' : '', x.p.cada_meses ? x.p.cada_meses + ' meses' : ''].filter(Boolean).join(' o ')}${x.uf ? ` · último ${fFecha(x.uf)}` : ''}${x.uo != null ? ` a ${nf(x.uo)} km` : ''}${a ? ` · <button class="linkish" data-act="vplanBorrar" data-id="${esc(x.p.id)}"><u>${S.confirmPlan === x.p.id ? '¿Quitar? Sí' : 'Quitar'}</u></button>` : ''}</span></div>`; }).join('') : '<div class="note">Sin planes de mantenimiento. Agrega uno para recibir avisos (por ejemplo, aceite cada 5,000 km o 6 meses).</div>'}
     ${a ? `<div class="form" style="border-top:1px solid var(--line);padding-top:10px"><label>Servicio<input id="vpServ" list="vpServs" placeholder="Aceite y filtro"><datalist id="vpServs">${['Aceite y filtro', 'Rotación de llantas', 'Frenos', 'Batería', 'Alineación y balanceo', 'Filtro de aire', 'Servicio mayor'].map(x => `<option value="${x}">`).join('')}</datalist></label><label>Cada (km)<input id="vpKm" inputmode="numeric" placeholder="5000"></label><label>Cada (meses)<input id="vpMes" inputmode="numeric" placeholder="6"></label><label>Último servicio (si no está registrado)<input id="vpUlt" type="date"></label><label>Odómetro de ese servicio<input id="vpUltOdo" inputmode="numeric"></label><label style="justify-content:flex-end"><button class="btn sm pri" data-act="vplanNuevo" data-id="${esc(v.id)}">Agregar plan</button></label></div><div class="note">El último servicio se toma solo de los mantenimientos registrados con el mismo tipo.</div>` : ''}
   </div></div>`;
