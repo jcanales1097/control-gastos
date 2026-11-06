@@ -823,7 +823,7 @@ function vControl(c) {
     </div>
     ${c.porMes ? vDistribucion(c, R) : vResumenProy(c, R, h)}
     ${tablaFilas(c, h, 'egreso')}${tablaFilas(c, h, 'ingreso')}
-    ${c.porMes ? vMicros(c) : ''}
+    ${c.porMes ? vMicros(c, mes) : ''}
     ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
 }
 function porMesProy(h) {
@@ -1516,7 +1516,7 @@ function resumenMicro(id) {
   const meses = [...new Set(rows.map(m => m.mes))].sort();
   return {rows, eg, ing, porTipo, porPersona, egreso: e, ingreso: i, saldo: i - e, meses, pendientes: [...S.movs.values()].filter(m => m.grupo === id && m.estado === 'pendiente').length};
 }
-function vMicros(c) {
+function vMicros(c, mes) {
   if (S.micro === null) return esAdmin() ? '<div class="panel"><div class="hd"><h2>Micro proyectos</h2></div><div class="bd note">Para usar micro proyectos, corre en Supabase el SQL de micro proyectos.</div></div>' : '';
   const l = microsDe(c.id); const a = esAdmin();
   if (!l.length && !a) return '';
@@ -1525,7 +1525,11 @@ function vMicros(c) {
     <td><span class="chip ${x.estado === 'abierto' ? 'app' : ''}">${x.estado === 'abierto' ? 'Abierto' : 'Cerrado'}</span></td>
     <td style="white-space:nowrap">${a ? (x.estado === 'abierto' ? `<button class="btn sm ghost" data-act="microEstado" data-id="${esc(x.id)}" data-v="cerrado">Cerrar</button>` : `<button class="btn sm ghost" data-act="microEstado" data-id="${esc(x.id)}" data-v="abierto">Reabrir</button>`) + (R.rows.length || R.pendientes ? '' : ` <button class="btn sm ghost danger" data-act="microBorrar" data-id="${esc(x.id)}">${S.confirmMicro === x.id ? '¿Eliminar? Sí' : 'Eliminar'}</button>`) : ''}</td></tr>`; };
   return `<div class="panel"><div class="hd"><h2>Micro proyectos de ${esc(c.corto || c.nombre)}</h2><span class="note">Agrupan registros dentro del control; sus gastos se reparten en el mes como cualquier otro.</span></div>
-    ${l.length ? `<div class="tbl-wrap"><table><thead><tr><th>Micro proyecto</th><th>Meses</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>${l.map(fila).join('')}</tbody></table></div>` : '<div class="bd note">Todavía no hay micro proyectos en este control.</div>'}
+    ${(() => { if (!l.length) return '<div class="bd note">Todavía no hay micro proyectos en este control.</div>';
+      const activo = x => x.estado === 'abierto' || resumenMicro(x.id).meses.includes(mes); const vis = l.filter(activo), ocu = l.filter(x => !activo(x)); const ver = (S.microVerTodos || {})[c.id];
+      const filas = vis.concat(ver ? ocu : []);
+      return `${filas.length ? `<div class="tbl-wrap"><table><thead><tr><th>Micro proyecto</th><th>Meses</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>${vis.map(fila).join('')}${ver && ocu.length ? `<tr><td colspan="7" class="eyebrow" style="padding-top:14px">Cerrados</td></tr>${ocu.map(fila).join('')}` : ''}</tbody></table></div>` : `<div class="bd note">No hay micro proyectos abiertos ni con movimientos en ${esc(mesLargo(mes).toLowerCase())}.</div>`}
+      ${ocu.length ? `<div class="bd" style="border-top:1px solid var(--line);padding-top:10px;padding-bottom:10px"><button class="linkish small" data-act="microVerTodos" data-c="${c.id}">${ver ? '▾ Ocultar cerrados' : `▸ Ver ${ocu.length} ${ocu.length === 1 ? 'cerrado' : 'cerrados'}`}</button></div>` : ''}`; })()}
     ${a ? `<div class="bd row" style="border-top:1px solid var(--line)"><input class="in" id="mpNombre-${c.id}" placeholder="Nombre (ej.: Viaje a Santa Rosa)" style="max-width:280px"><input class="in" id="mpClave-${c.id}" placeholder="Clave opcional (ej.: SROSA)" style="max-width:200px" title="Si el detalle de un registro de la app contiene esta palabra, la bandeja lo sugiere"><button class="btn sm pri" data-act="microNuevo" data-c="${c.id}">Crear micro proyecto</button></div>` : ''}</div>`;
 }
 function abrirMicro(id) {
@@ -2399,6 +2403,7 @@ document.addEventListener('click', async e => {
   if (act === 'detalle') { const m = movDe(b); if (m) abrirDetalle(m.id); return; }
   if (act === 'dividir') { const tr = b.closest('tr[data-tx]'); const sel = x => tr && tr.querySelector(`[data-f=${x}]`); return abrirReparto(b.dataset.id, tr && sel('ctrl') && sel('ctrl').value ? {control: sel('ctrl').value, tipo: sel('tipo') && sel('tipo').value, mes: sel('mes') && sel('mes').value, grupo: sel('grupo') && sel('grupo').value} : null); }
   if (act === 'dividirMov') { const m = movDe(b) || S.movs.get(b.dataset.movId); if (m && m.tx_id) abrirReparto(m.tx_id); return; }
+  if (act === 'microVerTodos') { S.microVerTodos = S.microVerTodos || {}; S.microVerTodos[b.dataset.c] = !S.microVerTodos[b.dataset.c]; return render(); }
   if (act === 'rpAgregar') { const t = S.rep.t; const resto = Math.round((t.monto - S.rep.partes.reduce((s, p) => s + (+p.valor || 0), 0)) * 100) / 100; const c = familiares()[0]; S.rep.partes.push({control: c.id, tipo: c.tipoDefecto || 'COMPARTIDO', mes: t.mes, valor: Math.max(resto, 0)}); return pintarReparto(); }
   if (act === 'rpQuitar') { const i = +b.closest('tr').dataset.i; const [p] = S.rep.partes.splice(i, 1); if (p && p.id) S.rep.borrar.push(p.id); return pintarReparto(); }
   if (act === 'rpGuardar') return guardarReparto();
