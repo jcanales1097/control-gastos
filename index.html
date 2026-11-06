@@ -249,6 +249,10 @@ tr.st-rechazado td{opacity:.6}
 .linkish:hover{color:var(--accent);text-decoration:underline}
 .count.bad-bg{background:var(--bad);color:var(--panel)}
 a.chip{text-decoration:none}
+.rep-tbl{overflow:visible}.rep-tbl table{width:100%;table-layout:fixed;border-collapse:collapse}.rep-tbl th,.rep-tbl td{padding:6px 5px;white-space:nowrap}.rep-tbl th{position:static}
+.rep-tbl select.in,.rep-tbl input.in{width:100%;max-width:none;min-width:0;box-sizing:border-box;text-overflow:ellipsis}
+.rep-tbl .x{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1}
+@media (max-width:720px){.rep-tbl thead{display:none}.rep-tbl table,.rep-tbl tbody,.rep-tbl tr,.rep-tbl td{display:block;width:100%}.rep-tbl tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)}.rep-tbl td{padding:0}.rep-tbl td:last-child{text-align:right}}
 .modal .dist th{position:static;font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);white-space:normal}
 #userBox{display:flex;align-items:center;gap:6px}
 .top .wrap{row-gap:8px}
@@ -1048,17 +1052,17 @@ function abrirReparto(txId, base) {
 function pintarReparto() {
   const {t, partes: ps} = S.rep; const lado = t.code === 0 ? 'ingreso' : 'egreso';
   const suma = ps.reduce((s, p) => s + (+p.valor || 0), 0); const resto = Math.round((t.monto - suma) * 100) / 100;
-  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="repT" style="max-width:980px">
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="repT" style="max-width:1040px">
     <div class="hd"><h2 id="repT" style="margin-right:auto">Repartir movimiento</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
     <div class="bd">
       <div class="small"><b>${esc(t.det || '(sin detalle)')}</b><div class="cat">${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › '))}</div></div>
       <div class="kpis"><div class="kpi"><div class="eyebrow">Monto en la app</div><div class="v">${L(t.monto)}</div></div><div class="kpi"><div class="eyebrow">Repartido</div><div class="v">${L(suma)}</div></div><div class="kpi"><div class="eyebrow">Sin repartir</div><div class="v ${resto < -0.005 ? 'neg' : resto > 0.005 ? 'warn-t' : 'pos'}">${L(resto)}</div></div></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Control o proyecto</th>${S.micro && ps.some(p => { const c = ctrlById(p.control); return c && c.porMes && microsDe(c.id).length; }) ? '<th>Micro proyecto</th>' : ''}<th>Tipo</th><th>Mes</th><th class="num">Monto</th><th></th></tr></thead><tbody>
+      ${(() => { const mp = S.micro && ps.some(p => { const c = ctrlById(p.control); return c && c.porMes && microsDe(c.id).length; }); return `<div class="rep-tbl"><table><colgroup><col style="width:${mp ? 24 : 32}%">${mp ? '<col style="width:22%">' : ''}<col style="width:${mp ? 21 : 27}%"><col style="width:${mp ? 15 : 18}%"><col style="width:${mp ? 14 : 17}%"><col style="width:36px"></colgroup><thead><tr><th>Control o proyecto</th>${mp ? '<th>Micro proyecto</th>' : ''}<th>Tipo</th><th>Mes</th><th class="num">Monto</th><th></th></tr></thead><tbody>`; })()}
       ${ps.map((p, i) => { const c = ctrlById(p.control); const conMp = S.micro && ps.some(q => { const cc = ctrlById(q.control); return cc && cc.porMes && microsDe(cc.id).length; }); return `<tr data-i="${i}"><td>${ctrlSelect(p.control, 'class="in" data-rp="control" aria-label="Control o proyecto"')}</td>${conMp ? `<td>${c && c.porMes && microsDe(c.id).length ? `<select class="in" data-rp="grupo" aria-label="Micro proyecto">${microOptions(c.id, p.grupo || '')}</select>` : '<span class="muted small">—</span>'}</td>` : ''}
         <td><select class="in" data-rp="tipo" aria-label="Tipo">${tipoOptions(c, p.tipo, lado, p.mes)}</select></td>
         <td><select class="in" data-rp="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(p.mes === 'general' ? t.mes : p.mes)}</select></td>
         <td class="num"><input class="in num" data-rp="valor" value="${(+p.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Monto"></td>
-        <td><button class="btn sm ghost danger" data-act="rpQuitar">Quitar</button></td></tr>`; }).join('')}
+        <td><button class="btn sm ghost danger x" data-act="rpQuitar" title="Quitar parte" aria-label="Quitar parte">×</button></td></tr>`; }).join('')}
       </tbody></table></div>
       <div class="row"><button class="btn sm" data-act="rpAgregar">Agregar parte</button>${resto > 0.005 ? `<span class="note">Lo que no repartas (${L(resto)}) sigue en la bandeja.</span>` : ''}${resto < -0.005 ? `<span class="small neg">Repartiste ${L(-resto)} de más.</span>` : ''}</div>
       <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="rpGuardar" ${resto < -0.005 ? 'disabled' : ''}>Guardar reparto</button></div>
