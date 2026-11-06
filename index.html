@@ -201,6 +201,7 @@ tr.en-grupo td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .note{font-size:12px;color:var(--muted)}
 .bulk{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));margin-top:12px;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bulk .sel-tot{font-size:13px;opacity:.85;margin-right:6px}.bulk .sel-tot b{font-family:var(--f-num);opacity:1}
 .bulk select{background:var(--bg);color:var(--fg);border:0}
 .bulk .btn{background:var(--bg);color:var(--fg);border:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:50;max-width:90vw}
@@ -757,7 +758,7 @@ function vBandeja() {
         ${total > shown.length ? `<div class="bd"><button class="btn" data-act="mas">Mostrar ${Math.min(300, total - shown.length)} más (${total - shown.length} restantes)</button></div>` : ''}`
       : `<div class="empty"><b>No hay movimientos con estos filtros</b>Cuando sincronices, aquí aparecen los nuevos registros de la app.</div>`}
     </div>
-    ${S.sel.size ? `<div class="bulk" role="region" aria-label="Acciones para la selección"><b>${S.sel.size} seleccionados</b>
+    ${S.sel.size ? `<div class="bulk" role="region" aria-label="Acciones para la selección"><b>${S.sel.size} seleccionados</b>${(() => { let ing = 0, egr = 0; S.sel.forEach(id => { const t = D.byId.get(id); if (!t) return; const v = restante(t); t.code === 0 ? ing += v : egr += v; }); const r = x => Math.round(x * 100) / 100; return `<span class="sel-tot">${egr ? `Egresos <b class="num">${L(r(egr))}</b>` : ''}${ing && egr ? ' · ' : ''}${ing ? `Ingresos <b class="num">${L(r(ing))}</b>` : ''}</span>`; })()}
       ${ctrlSelect((familiares()[0] || {}).id, 'id="bCtrl" aria-label="Control o proyecto"')}
       <select id="bTipo" aria-label="Tipo">${tipoOptions(familiares()[0], 'COMPARTIDO', 'egreso')}</select>
       <select id="bGrupo" aria-label="Micro proyecto" ${familiares()[0] && microsDe(familiares()[0].id, true).length ? '' : 'hidden'}>${familiares()[0] ? microOptions(familiares()[0].id, '') : ''}</select>
