@@ -527,6 +527,7 @@ function renderAuth() {
     <div class="row small" style="justify-content:space-between">
       ${v === 'login' ? '<a href="#" data-auth="registro">Crear una cuenta</a><a href="#" data-auth="olvido">Olvidé mi contraseña</a>' : v === 'nueva' ? '' : '<a href="#" data-auth="login">Volver a entrar</a>'}
     </div></form></div>
+    <p class="small" style="text-align:center;margin-top:14px"><a href="guia.html" target="_blank" rel="noopener">¿Cómo funciona? Ver la guía de uso</a></p>
     ${v === 'registro' ? '<p class="note" style="text-align:center">Después de confirmar tu correo, el administrador te da acceso a los controles que te corresponden.</p>' : ''}</div>`;
   const f = $('#aEmail') || $('#aPass'); f && f.focus();
 }
@@ -581,7 +582,7 @@ function renderTabs() {
   $('#btnSync').hidden = !a;
   const ls = S.aj.ultimaSync;
   $('#syncMeta').textContent = a ? (ls ? `Sincronizado: ${new Date(ls.at).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}` : 'Sin sincronizar') : '';
-  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><button class="btn sm ghost" data-act="salir">Salir</button>`;
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost" href="guia.html" target="_blank" rel="noopener" title="Cómo funciona la plataforma">Guía</a><button class="btn sm ghost" data-act="salir">Salir</button>`;
 }
 function render() {
   if (!S.me) return renderAuth();
