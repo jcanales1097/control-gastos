@@ -254,6 +254,7 @@ a.chip{text-decoration:none}
 .rep-tbl select.in,.rep-tbl input.in{width:100%;max-width:none;min-width:0;box-sizing:border-box;text-overflow:ellipsis}
 .rep-tbl .x{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1}
 @media (max-width:720px){.rep-tbl thead{display:none}.rep-tbl table,.rep-tbl tbody,.rep-tbl tr,.rep-tbl td{display:block;width:100%}.rep-tbl tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)}.rep-tbl td{padding:0}.rep-tbl td:last-child{text-align:right}}
+.dist td.prev{opacity:.75;font-size:.95em}.dist td.prev .note{text-align:right}
 .modal .dist th{position:static;font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);white-space:normal}
 #userBox{display:flex;align-items:center;gap:6px}
 .top .wrap{row-gap:8px}
@@ -654,7 +655,7 @@ function resumen(c, h) {
   const n = Math.max(1, personasDe(c, h.mes).length || ps.length);
   const per = ps.map(p => { const g = -sum(eg, r => r.tipo === p); const r2 = x => Math.sign(x) * Math.round(Math.abs(x) * 100 + 1e-6) / 100; const pagar = r2(comp / n + g); const aporte = r2(sum(ing, r => r.tipo === p)); return {p, g, pagar, aporte, saldo: r2(pagar + aporte)}; });
   const todas = h.egresos.concat(h.ingresos);
-  return {comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
+  return {mes: h.mes, comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
     pendientes: todas.filter(r => r.estado === 'pendiente').length, pendienteValor: h.egresos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.valor, 0)};
 }
 function vSelMes(c, mes, meses) {
@@ -913,6 +914,7 @@ function vPorMes(c, h) {
     </tbody></table></div></div>`;
 }
 function vDistribucion(c, R) {
+  const P = (() => { if (!c.porMes || !R.mes || !/^\d{4}-\d{2}$/.test(R.mes)) return null; let [y, m] = R.mes.split('-').map(Number); m--; if (!m) { m = 12; y--; } const pm = `${y}-${String(m).padStart(2, '0')}`; const h = hoja(c.id, pm); if (!h.egresos.length && !h.ingresos.length) return null; return resumen(c, h); })();
   if (!c.porMes) return `<div class="panel"><div class="hd"><h2>Resumen del proyecto</h2></div><div class="bd"><table class="dist">
       <tr><td>Ingresos</td><td class="num">${L(R.ingreso)}</td></tr><tr><td>Egresos</td><td class="num">${L(-R.egreso)}</td></tr>
       <tr class="tot"><td>Saldo</td><td class="num ${R.ingreso - R.egreso < 0 ? 'neg' : 'pos'}">${L(R.ingreso - R.egreso)}</td></tr></table>
@@ -923,10 +925,10 @@ function vDistribucion(c, R) {
     ${R.per.map(x => `<tr><td>${esc(x.p)}</td><td class="num">${L(x.g)}</td></tr>`).join('')}
     <tr class="tot"><td>Saldo</td><td class="num">${L(R.comp + R.per.reduce((s, x) => s + x.g, 0))}</td></tr></tbody></table></div></div>
     <div class="panel"><div class="hd"><h2>Distribución por persona</h2></div><div class="tbl-wrap"><table class="dist">
-    <thead><tr><th>Persona</th><th class="num">Total a pagar</th><th class="num">Abonado</th><th class="num">Saldo</th></tr></thead><tbody>
-    ${R.per.map(x => `<tr><td>${esc(x.p)}<div class="note">${x.saldo < -0.004 ? `Le falta aportar ${L(-x.saldo)}` : x.saldo > 0.004 ? `Tiene ${L(x.saldo)} a favor` : 'Al día'}</div></td><td class="num">${L(x.pagar)}</td><td class="num ${x.aporte > 0.004 ? 'pos' : 'muted'}">${L(x.aporte)}</td><td class="num ${x.saldo < -0.004 ? 'neg' : 'pos'}">${L(x.saldo)}</td></tr>`).join('') || '<tr><td colspan="4" class="note">Agrega las personas de este control en Ajustes.</td></tr>'}
-    <tr class="tot"><td>Saldo total</td><td class="num">${L(R.per.reduce((s, x) => s + x.pagar, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.aporte, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.saldo, 0))}</td></tr></tbody></table></div>
-    <div class="bd note">Compartido dividido entre ${R.n} ${R.n === 1 ? 'persona' : 'personas'}, más lo individual de cada quien. Saldo = total a pagar + lo abonado.${R.pendientes ? ` No incluye ${R.pendientes} registros por validar.` : ''}</div></div></div>`;
+    <thead><tr><th>Persona</th>${P ? `<th class="num" title="Saldo con el que cerró cada persona el mes anterior">Saldo ${esc(mesLargo(P.mes).toLowerCase())}</th>` : ''}<th class="num">Total a pagar</th><th class="num">Abonado</th><th class="num">Saldo</th></tr></thead><tbody>
+    ${R.per.map(x => `<tr><td>${esc(x.p)}<div class="note">${x.saldo < -0.004 ? `Le falta aportar ${L(-x.saldo)}` : x.saldo > 0.004 ? `Tiene ${L(x.saldo)} a favor` : 'Al día'}</div></td>${P ? (() => { const a = P.per.find(y => y.p === x.p); return a ? `<td class="num prev ${a.saldo < -0.004 ? 'neg' : 'pos'}">${L(a.saldo)}<div class="note">${a.saldo < -0.004 ? 'quedó debiendo' : a.saldo > 0.004 ? 'quedó a favor' : 'al día'}</div></td>` : '<td class="num muted">—</td>'; })() : ''}<td class="num">${L(x.pagar)}</td><td class="num ${x.aporte > 0.004 ? 'pos' : 'muted'}">${L(x.aporte)}</td><td class="num ${x.saldo < -0.004 ? 'neg' : 'pos'}">${L(x.saldo)}</td></tr>`).join('') || '<tr><td colspan="${P ? 5 : 4}" class="note">Agrega las personas de este control en Ajustes.</td></tr>'}
+    <tr class="tot"><td>Saldo total</td>${P ? `<td class="num prev">${L(R.per.reduce((s, x) => { const a = P.per.find(y => y.p === x.p); return s + (a ? a.saldo : 0); }, 0))}</td>` : ''}<td class="num">${L(R.per.reduce((s, x) => s + x.pagar, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.aporte, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.saldo, 0))}</td></tr></tbody></table></div>
+    <div class="bd note">Compartido dividido entre ${R.n} ${R.n === 1 ? 'persona' : 'personas'}, más lo individual de cada quien. Saldo = total a pagar + lo abonado.${P ? ` El saldo de ${esc(mesLargo(P.mes).toLowerCase())} es solo referencia y no se suma a este mes.` : ''}${R.pendientes ? ` No incluye ${R.pendientes} registros por validar.` : ''}</div></div></div>`;
 }
 function origenChip(r) {
   if (r.estado === 'pendiente') return `<span class="chip warn" title="Registró ${esc(nombreDe(r.creado_por))}">Por validar</span>`;
