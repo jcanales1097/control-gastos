@@ -9,6 +9,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
+/* ================= ESTILOS =================
+   Colores como variables (--bg, --fg, --accent…) con versión clara y oscura.
+   Debajo: componentes (paneles, tablas, botones, chips, ventanas emergentes)
+   y estilos de cada módulo (vehículos, créditos…). */
 /* Layout: libro contable de trabajo — barra fija arriba, vistas por pestaña, tablas densas con cifras en mono */
 :root{
   --bg:#F4F6F3; --panel:#FFFFFF; --sunk:#EBEFEA; --line:#D7DDD6; --fg:#18211D; --muted:#5D6B64;
@@ -308,57 +312,120 @@ a.chip{text-decoration:none}
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
+/* =====================================================================
+   CONTROL DE GASTOS · código principal (versión comentada)
+   ---------------------------------------------------------------------
+   CÓMO FUNCIONA, EN RESUMEN
+   1. Datos: Supabase (base de datos + inicio de sesión + archivos).
+      config.js trae la dirección y la llave pública. Los permisos los
+      controla la base de datos (RLS): un usuario solo ve sus controles.
+   2. Arranque: init() → arrancar() → cargarTodo() lee todo una vez y lo
+      guarda en S (estado). derive() calcula D (datos derivados).
+   3. Pantalla: render() dibuja la vista según el #hash de la dirección
+      (route). Cada vista es una función vXxx() que devuelve HTML.
+   4. Acciones: un solo "escuchador" de clics (más abajo, "acciones de la
+      interfaz") revisa data-act="..." del botón tocado y ejecuta la acción.
+      Igual para cambios (change), escritura (input) y teclas (keydown).
+   5. Guardar: toda escritura usa q(sb.from('tabla')...) y luego actualiza
+      S y vuelve a dibujar con render().
+
+   DATOS PRINCIPALES
+   - Registros de la app (Registro Contable) → tabla tx_mes, uno por mes.
+     Se leen como "tx" (rowToTx) y viven en D.txs.
+   - Movimientos asignados a controles → tabla movimientos (S.movs).
+     Un registro de la app puede repartirse en varios movimientos.
+   - Reparto mensual → resumen(): compartido ÷ participantes + individual.
+
+   GLOSARIO DE NOMBRES CORTOS
+   S = estado · D = derivados · c = control · m = movimiento ·
+   t / tx = registro de la app · h = hoja del mes · R = resumen ·
+   a = esAdmin() · q() = consulta a Supabase · $() = buscar elemento.
+   ===================================================================== */
 (() => {
 'use strict';
 /* ================= utilidades ================= */
+// $: Atajo para buscar un elemento de la página: $("#id").
 const $ = (s, el = document) => el.querySelector(s);
+// esc: Escapa texto para insertarlo seguro en HTML (evita que un texto rompa la página).
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+// NF: Formateador de números con 2 decimales y separador de miles (formato en-US).
 const NF = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+// L: Da formato de lempiras: L(1234.5) → "L 1,234.50" (negativos con signo).
 const L = v => (v < 0 ? '-L ' : 'L ') + NF.format(Math.abs(v || 0));
+// MES: Nombres de los meses en mayúsculas, índice 0 = ENERO.
 const MES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+// mesLargo: Convierte "2026-11" en "Noviembre 2026".
 const mesLargo = m => { if (!m || m === 'general') return 'Todo el proyecto'; const [y, mm] = m.split('-'); return MES[+mm - 1].charAt(0) + MES[+mm - 1].slice(1).toLowerCase() + ' ' + y; };
+// mesHoja: Nombre de mes corto para pestañas de Excel.
 const mesHoja = m => { const [y, mm] = m.split('-'); return `${y.slice(2)} ${mm} | ${MES[+mm - 1]}`; };
+// fFecha: Convierte "2026-11-10" en "10/11/2026".
 const fFecha = d => d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '—';
+// hoy: Fecha de hoy en formato "AAAA-MM-DD" (hora local).
 const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// cents: Redondea a centavos y devuelve un entero (para comparar montos sin errores de decimales).
 const cents = v => Math.round(Math.abs(+v || 0) * 100);
+// dias: Días entre dos fechas.
 const dias = (a, b) => Math.abs((Date.parse(a) - Date.parse(b)) / 864e5);
+// lsGet: Lee una preferencia guardada en el navegador (localStorage), con valor por defecto.
 const lsGet = k => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+// lsSet: Guarda una preferencia en el navegador (localStorage).
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 let toastT;
+// toast: Muestra un aviso flotante abajo de la pantalla por unos segundos.
 function toast(msg) {
   let t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
   t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3600);
 }
+// app: Devuelve el contenedor principal donde se dibuja cada vista.
 const app = () => $('#app');
 
 /* ================= conexión ================= */
+// CFG: Configuración de Supabase leída de config.js (URL y llave pública).
 const CFG = Object.assign({supabaseUrl: '', supabaseAnonKey: ''}, window.CG_CONFIG || {});
 if (!CFG.supabaseUrl) { CFG.supabaseUrl = lsGet('cg-sb-url') || ''; CFG.supabaseAnonKey = lsGet('cg-sb-key') || ''; }
+// sb: Cliente de Supabase: todas las lecturas y escrituras a la base de datos pasan por aquí.
 let sb = null;
 
 /* ================= estado ================= */
+// S: ESTADO GLOBAL de la app: usuario, controles, movimientos, filtros, selección, datos de módulos, etc.
 const S = {
   me: null, ctrls: [], movs: new Map(), tx: new Map(), ign: new Map(), aj: {}, perfiles: [], accesos: [],
   view: 'inicio', sel: new Set(), mesSel: {}, filtros: {q: '', ctrl: '', mes: '', todos: false, estado: '', nat: '', cuenta: ''}, limite: 300,
   authView: 'login', recuperando: false, ligarAbierto: null, rechazoAbierto: null,
 };
+// D: DATOS DERIVADOS (se recalculan con derive()): registros de la app (txs), índice por id y asignaciones.
 let D = {txs: [], byId: new Map(), asig: new Map()};
+// esAdmin: true si el usuario actual es administrador.
 const esAdmin = () => !!(S.me && S.me.rol === 'admin' && S.me.activo);
+// ctrls: Lista de controles (centros de costo y proyectos) visibles.
 const ctrls = () => S.ctrls;
+// ctrlById: Busca un control por su id.
 const ctrlById = id => S.ctrls.find(c => c.id === id);
+// colorClass: Clase de color (punto de color) de un control.
 const colorClass = c => 'c-' + (c && c.color || 'e');
+// esProy: true si el control es un proyecto (no es mensual).
 const esProy = c => !!c && !c.porMes;
+// cerrado: true si el control/proyecto está cerrado (no admite cambios).
 const cerrado = c => esProy(c) && c.estado === 'cerrado';
+// familiares: Controles mensuales (Familia, Padres, Personales…).
 const familiares = () => S.ctrls.filter(c => !esProy(c));
+// proyectos: Controles de tipo proyecto.
 const proyectos = () => S.ctrls.filter(esProy);
+// abiertos: Controles que no están cerrados.
 const abiertos = () => S.ctrls.filter(c => !cerrado(c));
+// hrefC: Enlace (#c-ID o #p-ID) para abrir un control o proyecto.
 const hrefC = c => '#' + (esProy(c) ? 'p-' : 'c-') + c.id;
+// nombreDe: Nombre de una persona a partir de su id de usuario.
 const nombreDe = id => { if (S.me && id === S.me.id) return 'Tú'; const p = S.perfiles.find(x => x.id === id); return p ? (p.nombre || p.email) : 'Otro usuario'; };
 
+// fromC: Convierte un control tal como viene de la base de datos al formato que usa la app.
 const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, porMes: r.tipo === 'mensual', personas: r.personas || [], categorias: r.categorias || [], incluye: r.incluye || '', excluye: r.excluye || '', tipoDefecto: r.tipo_defecto || 'COMPARTIDO', sugerirPorNombre: !!r.sugerir_por_nombre, color: r.color || 'a', estado: r.estado || 'abierto', abiertoEl: r.abierto_el, cerradoEl: r.cerrado_el, orden: r.orden || 0, personasMes: r.personas_mes || {}});
+// toC: Convierte un control de la app al formato de la base de datos para guardarlo.
 const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo: c.porMes ? 'mensual' : 'proyecto', personas: c.personas, categorias: c.categorias, incluye: c.incluye, excluye: c.excluye, tipo_defecto: c.tipoDefecto, sugerir_por_nombre: c.sugerirPorNombre, color: c.color, estado: c.estado, abierto_el: c.abiertoEl || null, cerrado_el: c.cerradoEl || null, orden: c.orden || 0, personas_mes: c.personasMes || {}});
+// normMov: Normaliza un movimiento leído de la base (números, fechas, campos vacíos).
 const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha ? String(m.fecha).slice(0, 10) : null, app_monto: m.app_monto == null ? null : +m.app_monto, app_fecha: m.app_fecha ? String(m.app_fecha).slice(0, 10) : null});
 
+// rowToTx: Convierte una fila de Registro Contable [id, fecha, código, cuenta, …, monto] en un objeto "tx". Aplica la moneda extranjera si se importó.
 function rowToTx(r) {
   const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
   const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)};
@@ -367,6 +434,7 @@ function rowToTx(r) {
   else if (/\$\s*$/.test((cuenta || '').trim())) t.sinTasa = true;
   return t;
 }
+// decisionDe: Lee del historial de sincronización si un registro fue borrado en la app o se decidió conservar la versión web.
 function decisionDe(id) {
   const h = S.hist && S.hist.get(id); const l = (h && h.cambios) || []; let borrado = null, web = null;
   for (const e of l) {
@@ -376,6 +444,7 @@ function decisionDe(id) {
   }
   return {borrado, web};
 }
+// derive: Recalcula D: arma la lista de registros de la app (txs) a partir de los meses sincronizados y cuánto de cada uno ya está asignado.
 function derive() {
   const txs = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
@@ -387,11 +456,17 @@ function derive() {
   const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') { if (!asig.has(m.tx_id)) asig.set(m.tx_id, []); asig.get(m.tx_id).push(m); }
   D = {txs, byId: new Map(txs.map(t => [t.id, t])), asig};
 }
+// partes: Partes (movimientos) en que se asignó un registro de la app.
 const partes = id => D.asig.get(id) || [];
+// asignado: Total ya asignado de un registro de la app.
 const asignado = id => partes(id).reduce((s, m) => s + (+m.valor || 0), 0);
+// restante: Lo que falta por asignar de un registro de la app (monto − asignado).
 const restante = t => Math.round((t.monto - asignado(t.id)) * 100) / 100;
+// snapApp: Foto de los datos del registro de la app al momento de asignarlo (para detectar cambios después).
 const snapApp = t => ({app_monto: t.monto, app_fecha: t.fecha, app_detalle: t.det, app_cuenta: t.cuenta, app_categoria: t.cat});
+// personasDe: Participantes de un control en un mes: los del mes si se cambiaron, si no "los de siempre".
 const personasDe = (c, mes) => { if (!c) return []; const pm = c.personasMes || {}; return c.porMes && mes && Array.isArray(pm[mes]) ? pm[mes] : (c.personas || []); };
+// cambioDe: Detecta si un movimiento asignado cambió o se borró en la app, o si está duplicado / asignado de más.
 function cambioDe(m) {
   if (!esAdmin() || !m.tx_id || m.estado === 'rechazado') return null;
   const t = D.byId.get(m.tx_id);
@@ -414,7 +489,9 @@ function cambioDe(m) {
   if (m.app_categoria && t.cat !== m.app_categoria) d.push(['Categoría', m.app_categoria, t.cat]);
   return d.length ? {tipo: 'modificado', d, t} : null;
 }
+// cambios: Lista de movimientos con cambios pendientes de revisar (vista "Cambios").
 const cambios = () => esAdmin() ? [...S.movs.values()].map(m => ({m, c: cambioDe(m)})).filter(x => x.c).sort((a, b) => (a.m.fecha || '') < (b.m.fecha || '') ? -1 : 1) : [];
+// applies: true si un registro de la app cumple las reglas (categorías, cuentas, fechas) de un control.
 function applies(c, t) {
   const cat = (t.cat || '').trim();
   if (cerrado(c)) return false;
@@ -427,13 +504,16 @@ function applies(c, t) {
   if (c.excluye && t.det.toUpperCase().includes(c.excluye.toUpperCase())) return false;
   return true;
 }
+// sugerido: Control sugerido para un registro de la app según las reglas.
 const sugerido = t => proyectos().find(c => applies(c, t)) || familiares().find(c => applies(c, t));
+// tipoSugerido: Tipo (COMPARTIDO o persona) sugerido para un registro según su texto y el control.
 function tipoSugerido(c, t) {
   if (!c) return '';
   if (c.sugerirPorNombre) { const d = t.det.toUpperCase(); const p = personasDe(c, t.mes).find(p => d.includes(p.toUpperCase()) || d.includes(p.split(' ')[0].toUpperCase())); if (p) return p; }
   if (t.code === 0) return personasDe(c, t.mes)[0] || '';
   return c.tipoDefecto || 'COMPARTIDO';
 }
+// estadoTx: Estado de un registro de la app: sin asignar, parcial, asignado, ignorado…
 function estadoTx(t) {
   if (D.asig.has(t.id)) return restante(t) > 0.005 ? 'pendiente' : 'asignado';
   if (S.ign.has(t.id)) return 'noaplica';
@@ -442,16 +522,21 @@ function estadoTx(t) {
   if (t.fecha < (S.aj.inicio || '0000')) return 'anterior';
   return sugerido(t) ? 'pendiente' : 'otro';
 }
+// bandeja: Registros de la app pendientes de asignar (lo que muestra la Bandeja).
 const bandeja = () => esAdmin() ? D.txs.filter(t => estadoTx(t) === 'pendiente') : [];
+// porValidar: Movimientos registrados por usuarios que esperan validación del administrador.
 const porValidar = () => [...S.movs.values()].filter(m => m.estado === 'pendiente');
+// hoja: Arma la "hoja" de un control en un mes: egresos e ingresos válidos y pendientes.
 function hoja(controlId, mes) {
   const rows = [...S.movs.values()].filter(m => m.control === controlId && m.mes === mes);
   const ord = (a, b) => (a.fecha || '') < (b.fecha || '') ? -1 : (a.fecha || '') > (b.fecha || '') ? 1 : (a.creado_el < b.creado_el ? -1 : 1);
   return {control: controlId, mes, egresos: rows.filter(r => r.lado === 'egreso').sort(ord), ingresos: rows.filter(r => r.lado === 'ingreso').sort(ord)};
 }
+// mesesDe: Meses que tienen movimientos en un control.
 const mesesDe = id => [...new Set([...S.movs.values()].filter(m => m.control === id).map(m => m.mes))].sort().reverse();
 
 /* ================= base de datos ================= */
+// errMsg: Traduce errores de Supabase a mensajes entendibles.
 function errMsg(e) {
   const m = (e && (e.message || e.error_description || e.msg)) || String(e);
   if (/row-level security/i.test(m)) return 'No tienes permiso para hacer ese cambio.';
@@ -459,12 +544,14 @@ function errMsg(e) {
   if (/JWT expired/i.test(m)) return 'Tu sesión expiró. Vuelve a entrar.';
   return m;
 }
+// q: Ejecuta una consulta de Supabase; si falla muestra el error, si sale bien puede mostrar un aviso.
 async function q(promesa, okMsg) {
   const {data, error} = await promesa;
   if (error) { toast(errMsg(error)); throw error; }
   if (okMsg) toast(okMsg);
   return data;
 }
+// todo: Lee una tabla completa en bloques de 1,000 filas.
 async function todo(tabla, orden) {
   const out = [];
   for (let a = 0; ; a += 1000) {
@@ -475,6 +562,7 @@ async function todo(tabla, orden) {
   }
   return out;
 }
+// cargarTodo: CARGA INICIAL: perfil del usuario, controles, movimientos, adjuntos, micro proyectos, vehículos y, si es admin, datos de la app, ajustes, usuarios y créditos.
 async function cargarTodo() {
   const {data: u} = await sb.auth.getUser();
   const uid = u && u.user && u.user.id;
@@ -500,20 +588,26 @@ async function cargarTodo() {
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
   }
 }
+// guardarAjuste: Guarda un ajuste general (tabla ajustes).
 const guardarAjuste = (clave, valor) => { S.aj[clave] = valor; return q(sb.from('ajustes').upsert({clave, valor})); };
+// guardarControl: Guarda los cambios de un control (nombre, participantes, reglas…).
 const guardarControl = async c => { const r = await q(sb.from('controles').upsert(toC(c)).select()); return r; };
+// insertarMovs: Inserta uno o varios movimientos y los agrega al estado.
 async function insertarMovs(rows, okMsg) {
   const data = await q(sb.from('movimientos').insert(rows).select(), okMsg);
   (data || []).forEach(m => S.movs.set(m.id, normMov(m))); derive(); render(); return data;
 }
+// actualizarMov: Actualiza campos de un movimiento.
 async function actualizarMov(id, campos, okMsg) {
   const data = await q(sb.from('movimientos').update(campos).eq('id', id).select(), okMsg);
   if (data && data[0]) S.movs.set(id, normMov(data[0])); else toast('No se aplicó el cambio: no tienes permiso sobre esa fila.');
   derive(); render(); return data;
 }
+// borrarMov: Borra un movimiento.
 async function borrarMov(id, okMsg) { const solos = (S.adj || []).filter(x => x.mov_id === id && !x.tx_id); for (const x of solos) await quitarAdjunto(x.id, true).catch(() => {}); await q(sb.from('movimientos').delete().eq('id', id), okMsg); S.movs.delete(id); derive(); render(); }
 
 /* ================= arranque y sesión ================= */
+// init: Punto de entrada: revisa la configuración, la sesión y arranca la app.
 async function init() {
   if (!CFG.supabaseUrl || !CFG.supabaseAnonKey) return renderSetup();
   if (!window.supabase || !window.supabase.createClient) return fatal('No se pudo cargar la conexión con la base de datos. Revisa tu internet y recarga la página.');
@@ -524,7 +618,9 @@ async function init() {
     if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && !S.recuperando && (!S.me || S.me.id !== session.user.id)) arrancar();
   });
 }
+// arrancando: Bandera para no arrancar dos veces.
 let arrancando = false;
+// arrancar: Carga los datos y dibuja la primera vista.
 async function arrancar() {
   if (arrancando) return; arrancando = true;
   $('#topbar').hidden = false; app().innerHTML = '<div class="loading">Cargando tus datos…</div>';
@@ -532,9 +628,11 @@ async function arrancar() {
   catch (e) { fatal(errMsg(e)); }
   finally { arrancando = false; }
 }
+// fatal: Muestra un error grave que impide usar la app.
 function fatal(msg) { app().innerHTML = `<div class="empty"><b>No se puede abrir la plataforma</b>${esc(msg)}<div style="margin-top:12px"><button class="btn" data-act="recargar">Reintentar</button></div></div>`; }
 window.addEventListener('focus', () => { if (S.me && S.me.activo && !document.querySelector('input:focus,select:focus') && !$('#modalRoot').innerHTML && Date.now() - (S._ultimaCarga || 0) > 60000) { S._ultimaCarga = Date.now(); cargarTodo().then(() => { derive(); render(); }).catch(() => {}); } });
 
+// renderSetup: Pantalla de ayuda cuando falta config.js.
 function renderSetup() {
   $('#topbar').hidden = true;
   app().innerHTML = `<div class="auth"><div class="panel"><div class="bd stack">
@@ -544,6 +642,7 @@ function renderSetup() {
     <label>Clave anon public<input id="sbKey" placeholder="eyJhbGciOi…" autocomplete="off"></label></div>
     <div><button class="btn pri" data-act="guardarSetup">Conectar</button></div></div></div></div>`;
 }
+// renderAuth: Pantalla de entrada: iniciar sesión, crear cuenta u olvidé mi contraseña.
 function renderAuth() {
   $('#topbar').hidden = true; S.me = null;
   const v = S.recuperando ? 'nueva' : S.authView;
@@ -563,6 +662,7 @@ function renderAuth() {
     ${v === 'registro' ? '<p class="note" style="text-align:center">Después de confirmar tu correo, el administrador te da acceso a los controles que te corresponden.</p>' : ''}</div>`;
   const f = $('#aEmail') || $('#aPass'); f && f.focus();
 }
+// enviarAuth: Envía el formulario de entrada / registro / recuperar contraseña a Supabase.
 async function enviarAuth(form) {
   const v = form.dataset.v; const msg = $('#authMsg'); const btn = form.querySelector('[type=submit]');
   const email = $('#aEmail') && $('#aEmail').value.trim(); const pass = $('#aPass') && $('#aPass').value;
@@ -590,6 +690,7 @@ async function enviarAuth(form) {
 }
 
 /* ================= navegación ================= */
+// route: Lee el #hash de la dirección y decide qué vista mostrar (con permisos de admin).
 function route() {
   const h = (location.hash || '').slice(1);
   const ok = id => { const c = ctrlById(id); return !!c; };
@@ -600,6 +701,7 @@ function route() {
 }
 window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return; route(); S.sel.clear(); render(); window.scrollTo(0, 0); });
 
+// renderTabs: Dibuja la barra superior: pestañas, contadores, botón Sincronizar, usuario, Guía y Salir.
 function renderTabs() {
   const a = esAdmin(); const nb = bandeja().length, nv = porValidar().length;
   const items = [['inicio', 'Inicio']];
@@ -617,6 +719,7 @@ function renderTabs() {
   $('#syncMeta').textContent = a ? (ls ? `Sincronizado: ${new Date(ls.at).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}` : 'Sin sincronizar') : '';
   $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost" href="guia.html?n=${encodeURIComponent(((S.me.nombre || '').trim().split(/\s+/)[0]) || '')}&p=${encodeURIComponent(S.me.persona || '')}" target="_blank" rel="noopener" title="Cómo funciona la plataforma">Guía</a><button class="btn sm ghost" data-act="salir">Salir</button>`;
 }
+// render: DIBUJA LA PANTALLA: elige la vista según S.view y la pinta en el contenedor principal.
 function render() {
   if (!S.me) return renderAuth();
   if (!S.me.activo) return renderEspera();
@@ -641,6 +744,7 @@ function render() {
   if (S._focusCB) { const el = $('#credBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusCB = false; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
+// renderEspera: Pantalla para cuentas creadas que el administrador aún no activa.
 function renderEspera() {
   $('#topbar').hidden = false; $('#tabs').innerHTML = ''; $('#btnSync').hidden = true; $('#syncMeta').textContent = '';
   $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.email || '')}</b></span><button class="btn sm ghost" data-act="salir">Salir</button>`;
@@ -650,21 +754,25 @@ function renderEspera() {
 }
 
 /* ================= componentes ================= */
+// ctrlSelect: Lista desplegable de controles.
 function ctrlSelect(sel, attrs) {
   const fam = familiares(), pr = proyectos().filter(c => !cerrado(c));
   const o = c => `<option value="${c.id}" ${sel === c.id ? 'selected' : ''}>${esc(c.corto || c.nombre)}</option>`;
   return `<select ${attrs}><optgroup label="Controles">${fam.map(o).join('')}</optgroup>${pr.length ? `<optgroup label="Proyectos abiertos">${pr.map(o).join('')}</optgroup>` : ''}${sel ? '' : '<option value="" selected>Elegir…</option>'}</select>`;
 }
+// tipoOptions: Opciones de "Tipo" (COMPARTIDO + participantes) o "Persona" para ingresos.
 function tipoOptions(c, sel, lado, mes) {
   const ps = personasDe(c, mes);
   const opts = lado === 'ingreso' ? [...ps, 'COMPARTIDO'] : ['COMPARTIDO', ...ps];
   if (sel && !opts.includes(sel)) opts.push(sel);
   return opts.map(o => `<option ${o === sel ? 'selected' : ''}>${esc(o)}</option>`).join('');
 }
+// mesOptions: Opciones de mes para listas desplegables.
 function mesOptions(sel) {
   const s = new Set(D.txs.map(t => t.mes)); s.add(hoy().slice(0, 7)); if (sel) s.add(sel);
   return [...s].sort().reverse().map(m => `<option value="${m}" ${m === sel ? 'selected' : ''}>${mesLargo(m)}</option>`).join('');
 }
+// asignarCells: Celdas de control / tipo / mes para asignar un registro en la Bandeja.
 function asignarCells(t) {
   const c = sugerido(t) || null;
   const lado = t.code === 0 ? 'ingreso' : 'egreso';
@@ -674,6 +782,7 @@ function asignarCells(t) {
     <td><select class="in" data-f="mes" aria-label="Mes" ${c && !c.porMes ? 'disabled' : ''}>${mesOptions(t.mes)}</select></td>
     <td style="white-space:nowrap"><button class="btn sm pri" data-act="asignar" data-id="${esc(t.id)}">Asignar</button> <button class="btn sm" data-act="dividir" data-id="${esc(t.id)}" title="Repartir entre varios controles o proyectos">Dividir</button> <button class="btn sm ghost" data-act="ignorar" data-id="${esc(t.id)}" title="No va en ningún control">No aplica</button></td>`;
 }
+// txCells: Celdas con la información de un registro de la app (fecha, detalle, cuenta, monto).
 function txCells(t) {
   const ing = t.code === 0;
   return `<td class="mono small" style="white-space:nowrap">${fFecha(t.fecha)}</td>
@@ -681,6 +790,7 @@ function txCells(t) {
     <td class="small muted" style="white-space:nowrap">${esc(t.cuenta)}</td>
     <td class="num ${ing ? 'pos' : ''}">${ing ? '+' : ''}${L(t.monto)}${fxTxt(t)}${D.asig.has(t.id) && restante(t) > 0.005 ? `<div class="cat">Sin repartir ${L(restante(t))}</div>` : ''}</td>`;
 }
+// resumen: CÁLCULO DEL REPARTO de un mes: compartido ÷ participantes + lo individual = total a pagar; saldo = total a pagar + abonos.
 function resumen(c, h) {
   const val = r => r.estado === 'valido';
   const eg = h.egresos.filter(val), ing = h.ingresos.filter(val);
@@ -694,6 +804,7 @@ function resumen(c, h) {
   return {mes: h.mes, comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
     pendientes: todas.filter(r => r.estado === 'pendiente').length, pendienteValor: h.egresos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.valor, 0)};
 }
+// vSelMes: Selector de mes y año (con flechas) de un control.
 function vSelMes(c, mes, meses) {
   const [y, mm] = mes.split('-').map(Number); const anioHoy = +hoy().slice(0, 4);
   const anios = new Set([anioHoy - 1, anioHoy, anioHoy + 1, y]); [...meses].forEach(m => anios.add(+m.slice(0, 4))); [...S.tx.keys()].forEach(m => anios.add(+m.slice(0, 4)));
@@ -707,13 +818,16 @@ function vSelMes(c, mes, meses) {
     ${mes !== hoy().slice(0, 7) ? `<button class="btn sm ghost" data-act="mesHoy" data-c="${c.id}">Mes actual</button>` : ''}
     <span class="note">• = meses con movimientos</span></div>`;
 }
+// irMes: Cambia el mes visible de un control.
 function irMes(id, m) { S.mesSel[id] = m; lsSet('mes-' + id, m); S.editPart = null; render(); }
+// mesActualDe: Mes que se está viendo en un control (o el último con movimientos).
 function mesActualDe(c) {
   if (!c.porMes) return 'general';
   return S.mesSel[c.id] || hoy().slice(0, 7);
 }
 
 /* ================= vista: inicio ================= */
+// vInicio: VISTA INICIO: tarjetas de cada control con lo gastado y el saldo del usuario.
 function vInicio() {
   const a = esAdmin(); const yo = (S.me.persona || '').toUpperCase();
   const visibles = abiertos();
@@ -741,6 +855,7 @@ function vInicio() {
 }
 
 /* ================= vista: bandeja (admin) ================= */
+// vBandeja: VISTA BANDEJA (admin): registros de la app por asignar, con filtros y asignación masiva.
 function vBandeja() {
   if (!D.txs.length) return `<div class="panel"><div class="empty"><b>Aún no hay movimientos de la app</b>Sincroniza con Registro Contable para traerlos.<div style="margin-top:12px"><button class="btn pri" data-act="sync">Sincronizar</button></div></div></div>`;
   const f = S.filtros; const qq = f.q.toUpperCase();
@@ -805,12 +920,14 @@ function vBandeja() {
 }
 
 /* ================= vista: por validar (admin) ================= */
+// candidatos: Registros de la app parecidos a un movimiento pendiente (para validar).
 function candidatos(m) {
   const v = Math.abs(m.valor);
   return D.txs.filter(t => restante(t) > 0.005 && !S.ign.has(t.id) && t.code !== 3 && m.fecha && (
     (cents(t.monto) === cents(v) && dias(t.fecha, m.fecha) <= 20) || (dias(t.fecha, m.fecha) <= 3 && Math.abs(t.monto - v) <= 0.05 * v)))
     .sort((a, b) => (cents(a.monto) === cents(v) ? 0 : 1) - (cents(b.monto) === cents(v) ? 0 : 1) || dias(a.fecha, m.fecha) - dias(b.fecha, m.fecha)).slice(0, 5);
 }
+// vValidarFila: Fila de un movimiento pendiente en "Por validar".
 function vValidarFila(m, conControl) {
   const c = ctrlById(m.control);
   const cand = S.ligarAbierto === m.id ? candidatos(m) : null;
@@ -823,6 +940,7 @@ function vValidarFila(m, conControl) {
       ${cand.length ? cand.map(t => `<div class="row small" style="gap:10px"><span class="mono">${fFecha(t.fecha)}</span><span style="flex:1;min-width:180px">${esc(t.det)} <span class="cat">${esc(t.cuenta)}</span></span><span class="num">${L(t.monto)}</span><button class="btn sm pri" data-act="ligarTx" data-tx="${esc(t.id)}">Ligar</button></div>`).join('') : '<div class="small muted">No encontré registros parecidos sin asignar. Puedes aprobarlo como manual.</div>'}</div></td></tr>` : ''}
     ${S.rechazoAbierto === m.id ? `<tr class="addrow"><td colspan="${conControl ? 7 : 6}"><div class="row"><input class="in" id="notaRechazo" style="max-width:none;flex:1" placeholder="Motivo (lo verá quien lo registró)"><button class="btn sm danger" data-act="confirmarRechazo">Rechazar</button></div></td></tr>` : ''}`;
 }
+// vValidar: VISTA POR VALIDAR (admin): lo que registraron los usuarios.
 function vValidar() {
   const ps = porValidar().sort((a, b) => a.creado_el < b.creado_el ? -1 : 1);
   return `<div class="stack"><div><div class="eyebrow">Por validar</div><h1>${ps.length ? `${ps.length} registros esperan tu revisión` : 'No hay nada por validar'}</h1>
@@ -831,6 +949,7 @@ function vValidar() {
 }
 
 /* ================= vista: control / proyecto ================= */
+// vControl: VISTA DE UN CONTROL O PROYECTO: totales, distribución, detalle de egresos e ingresos, micro proyectos.
 function vControl(c) {
   const a = esAdmin();
   const mes = mesActualDe(c);
@@ -862,17 +981,20 @@ function vControl(c) {
     ${c.porMes ? vMicros(c, mes) : ''}
     ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
 }
+// porMesProy: Totales por mes de un proyecto.
 function porMesProy(h) {
   const val = r => r.estado === 'valido'; const g = new Map();
   const add = (r, k) => { const m = (r.fecha || '').slice(0, 7) || 'sin-fecha'; if (!g.has(m)) g.set(m, {mes: m, ing: 0, eg: 0, n: 0}); const x = g.get(m); x[k] += +r.valor || 0; x.n++; };
   h.egresos.filter(val).forEach(r => add(r, 'eg')); h.ingresos.filter(val).forEach(r => add(r, 'ing'));
   let acc = 0; return [...g.values()].sort((a, b) => a.mes < b.mes ? -1 : 1).map(x => { acc += x.ing - x.eg; return Object.assign(x, {saldo: x.ing - x.eg, acum: acc}); });
 }
+// serieProy: Serie de datos para el gráfico de un proyecto.
 function serieProy(c, h) {
   const l = porMesProy(h).filter(x => x.mes !== 'sin-fecha'); const modo = lsGet('graf-' + c.id) || 'acum';
   let ai = 0, ae = 0;
   return {modo, puntos: l.map(x => { ai += x.ing; ae += x.eg; return modo === 'acum' ? {mes: x.mes, i: ai, e: ae, s: ai - ae, n: x.n, mi: x.ing, me: x.eg} : {mes: x.mes, i: x.ing, e: x.eg, s: x.saldo, n: x.n, mi: x.ing, me: x.eg}; })};
 }
+// vResumenProy: Resumen y gráfico de un proyecto largo.
 function vResumenProy(c, R, h) {
   const {modo, puntos} = serieProy(c, h); const sel = ((S.ftab || {})[c.id + '|egreso'] || {}).mes || '';
   const verTabla = lsGet('tabla-' + c.id) === '1';
@@ -889,6 +1011,7 @@ function vResumenProy(c, R, h) {
     <div class="chart-box" data-chart="${c.id}" data-sel="${sel}"></div>`}
     ${nota}</div>`;
 }
+// curva: Curva suave (monotone cubic) para los gráficos de líneas.
 function curva(p) {
   const n = p.length; if (n < 2) return '';
   const dx = [], m = [], t = [];
@@ -900,8 +1023,11 @@ function curva(p) {
   for (let k = 0; k < n - 1; k++) { const h3 = dx[k] / 3; d += `C${(p[k][0] + h3).toFixed(1)},${(p[k][1] + t[k] * h3).toFixed(1)} ${(p[k + 1][0] - h3).toFixed(1)},${(p[k + 1][1] - t[k + 1] * h3).toFixed(1)} ${p[k + 1][0].toFixed(1)},${p[k + 1][1].toFixed(1)}`; }
   return d;
 }
+// corto: Formato corto de montos para los ejes de los gráficos (12k, 1.2M).
 const corto = v => { const a = Math.abs(v), sg = v < 0 ? '-' : ''; return a >= 1e6 ? `${sg}${(a / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M` : a >= 1e3 ? `${sg}${(a / 1e3).toFixed(a >= 1e4 ? 0 : 1)}k` : `${sg}${Math.round(a)}`; };
+// mesCorto: Mes abreviado para los ejes ("Nov 26").
 const mesCorto = m => { const [y, mm] = m.split('-'); return MES[+mm - 1].slice(0, 3).charAt(0) + MES[+mm - 1].slice(1, 3).toLowerCase() + ' ' + y.slice(2); };
+// dibujarGraficos: Dibuja los gráficos SVG después de pintar la vista.
 function dibujarGraficos() {
   document.querySelectorAll('[data-chart]').forEach(box => {
     const c = ctrlById(box.dataset.chart); if (!c) return; const {puntos: TODO, modo} = serieProy(c, hoja(c.id, 'general'));
@@ -937,6 +1063,7 @@ function dibujarGraficos() {
     svg.addEventListener('mouseleave', () => { tip.hidden = true; cross.style.display = 'none'; });
   });
 }
+// vPorMes (control): SIN USO. Quedó de una versión anterior; la función del mismo nombre en Vehículos la reemplaza.
 function vPorMes(c, h) {
   const l = porMesProy(h); if (!l.length) return '';
   const sel = ((S.ftab || {})[c.id + '|egreso'] || {}).mes || '';
@@ -949,6 +1076,7 @@ function vPorMes(c, h) {
     <tr class="tot"><td><b>Total</b></td><td class="num"><b>${L(tI)}</b></td><td class="num"><b>${L(-tE)}</b></td><td class="num ${tI - tE < 0 ? 'neg' : 'pos'}"><b>${L(tI - tE)}</b></td><td></td><td></td></tr>
     </tbody></table></div></div>`;
 }
+// vDistribucion: Tablas "Resumen de distribución" y "Distribución por persona" (con saldos anteriores opcionales).
 function vDistribucion(c, R) {
   const okMes = !!(c.porMes && R.mes && /^\d{4}-\d{2}$/.test(R.mes)); const ver = okMes && (S.verSaldos || {})[c.id];
   const G = ver ? (() => { const acc = {}; mesesDe(c.id).filter(m => /^\d{4}-\d{2}$/.test(m) && m <= R.mes).forEach(m => resumen(c, hoja(c.id, m)).per.forEach(x => { acc[x.p] = Math.round(((acc[x.p] || 0) + x.saldo) * 100) / 100; })); return acc; })() : null;
@@ -968,6 +1096,7 @@ function vDistribucion(c, R) {
     <tr class="tot"><td>Saldo total</td>${P ? `<td class="num prev">${L(R.per.reduce((s, x) => { const a = P.per.find(y => y.p === x.p); return s + (a ? a.saldo : 0); }, 0))}</td>` : ''}${G ? `<td class="num prev">${L(R.per.reduce((s, x) => s + (G[x.p] || 0), 0))}</td>` : ''}<td class="num">${L(R.per.reduce((s, x) => s + x.pagar, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.aporte, 0))}</td><td class="num">${L(R.per.reduce((s, x) => s + x.saldo, 0))}</td></tr></tbody></table></div>
     <div class="bd note">Compartido dividido entre ${R.n} ${R.n === 1 ? 'persona' : 'personas'}, más lo individual de cada quien. Saldo = total a pagar + lo abonado.${G ? ` ${P ? `El saldo de ${esc(mesLargo(P.mes).toLowerCase())} y el global` : 'El saldo global'} son solo referencia: el global suma los saldos de todos los meses hasta ${esc(mesLargo(R.mes).toLowerCase())}, incluido este.` : ''}${R.pendientes ? ` No incluye ${R.pendientes} registros por validar.` : ''}</div></div></div>`;
 }
+// origenChip: Etiqueta de estado de una fila: App, Manual, Por validar…
 function origenChip(r) {
   if (r.estado === 'pendiente') return `<span class="chip warn" title="Registró ${esc(nombreDe(r.creado_por))}">Por validar</span>`;
   if (r.estado === 'rechazado') return `<span class="chip bad" title="${esc(r.nota)}">Rechazado</span>`;
@@ -979,18 +1108,25 @@ function origenChip(r) {
   }
   return `<span class="chip">${r.origen === 'usuario' ? 'Validado' : 'Manual'}</span>`;
 }
+// subDe: Subcategoría de un movimiento (de la app).
 const subDe = r => r.sub || r.cat || '';
+// cuentaDe: Cuenta de un movimiento (de la app).
 const cuentaDe = r => { const t = r.tx_id && D.byId.get(r.tx_id); return (t && t.cuenta) || r.app_cuenta || 'Sin cuenta (manual)'; };
+// ORD_DEF: Orden por defecto de las tablas (fecha descendente).
 const ORD_DEF = {};
+// ordDe: Orden elegido para una tabla.
 function ordDe(key, def) { if (!S.orden) { try { S.orden = JSON.parse(localStorage.getItem('cg-orden') || '{}') || {}; } catch (_) { S.orden = {}; } } return S.orden[key] || def; }
+// thOrd: Encabezado de tabla que se puede tocar para ordenar.
 function thOrd(key, campo, label, def, cls) {
   const o = ordDe(key, def); const on = o.k === campo;
   return `<th class="${cls || ''}" ${on ? `aria-sort="${o.dir === 'asc' ? 'ascending' : 'descending'}"` : ''}><button class="ordb" data-act="ordenar" data-key="${esc(key)}" data-campo="${campo}" data-def="${def.k}|${def.dir}" title="Ordenar por ${esc(label.toLowerCase())}">${label}<i>${on ? (o.dir === 'asc' ? '▲' : '▼') : '▲▼'}</i></button></th>`;
 }
+// ordenarLista: Ordena una lista según la columna elegida.
 function ordenarLista(l, o, get) {
   const g = get[o.k] || get.fecha; const f = o.dir === 'asc' ? 1 : -1;
   return [...l].sort((a, b) => { const x = g(a), y = g(b); const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x ?? '').localeCompare(String(y ?? ''), 'es', {numeric: true, sensitivity: 'base'}); return c * f || String(a.fecha || '').localeCompare(String(b.fecha || '')) * f; });
 }
+// tablaFilas: TABLA DE EGRESOS O INGRESOS de un control: filtros, filas, íconos de acción y micro proyectos al fondo.
 function tablaFilas(c, h, lado) {
   const a = esAdmin(); const ro = cerrado(c);
   const todas = lado === 'egreso' ? h.egresos : h.ingresos;
@@ -1047,6 +1183,7 @@ function tablaFilas(c, h, lado) {
 }
 
 /* ================= participantes por mes ================= */
+// todasPersonas: Todos los nombres de personas usados en la plataforma.
 function todasPersonas(c) {
   const s = new Set(c.personas || []);
   Object.values(c.personasMes || {}).forEach(l => (l || []).forEach(p => s.add(p)));
@@ -1054,6 +1191,7 @@ function todasPersonas(c) {
   (S.partTmp || []).forEach(p => s.add(p));
   return [...s];
 }
+// vParticipantes: Línea "Participan en …" con el botón Cambiar.
 function vParticipantes(c, mes) {
   const a = esAdmin(); const act = personasDe(c, mes); const propio = Array.isArray((c.personasMes || {})[mes]);
   if (!(a && S.editPart === c.id + '|' + mes)) return `<div class="row small" style="gap:8px"><span class="eyebrow">Participan en ${esc(mesLargo(mes))}</span>${act.map(p => `<span class="chip">${esc(p)}</span>`).join('') || '<span class="muted">Nadie todavía</span>'}<span class="note">${propio ? 'lista propia de este mes' : 'los de siempre'}</span>${a && !cerrado(c) ? `<button class="btn sm ghost" data-act="editPart" data-c="${c.id}" data-m="${mes}">Cambiar</button>` : ''}</div>`;
@@ -1066,6 +1204,7 @@ function vParticipantes(c, mes) {
 }
 
 /* ================= vista: cambios en la app (admin) ================= */
+// vCambios: VISTA CAMBIOS (admin): registros modificados, borrados o duplicados en la app.
 function vCambios() {
   const lista = cambios();
   return `<div class="stack"><div><div class="eyebrow">Cambios en la app</div><h1>${lista.length ? `${lista.length} ${lista.length === 1 ? 'fila por revisar' : 'filas por revisar'}` : 'Sin cambios pendientes'}</h1>
@@ -1079,12 +1218,14 @@ function vCambios() {
 }
 
 /* ================= reparto de un movimiento ================= */
+// abrirReparto: Abre la ventana "Repartir movimiento" (dividir un registro en partes).
 function abrirReparto(txId, base) {
   const t = D.byId.get(txId); if (!t) return toast('Ese movimiento ya no está en lo sincronizado.');
   const ps = partes(txId).map(m => ({id: m.id, control: m.control, tipo: m.tipo, mes: m.mes, valor: m.valor, grupo: m.grupo || '', orig: m}));
   if (!ps.length) { const c = (base && ctrlById(base.control)) || sugerido(t) || familiares()[0]; ps.push({control: c.id, tipo: (base && base.tipo) || tipoSugerido(c, t), mes: c.porMes ? ((base && base.mes) || t.mes) : 'general', valor: t.monto, grupo: c.porMes ? ((base && base.grupo) || microSugerido(c, t)) : ''}); }
   S.rep = {t, partes: ps, borrar: []}; pintarReparto();
 }
+// pintarReparto: Dibuja las partes del reparto y lo que falta repartir.
 function pintarReparto() {
   const {t, partes: ps} = S.rep; const lado = t.code === 0 ? 'ingreso' : 'egreso';
   const suma = ps.reduce((s, p) => s + (+p.valor || 0), 0); const resto = Math.round((t.monto - suma) * 100) / 100;
@@ -1104,6 +1245,7 @@ function pintarReparto() {
       <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="rpGuardar" ${resto < -0.005 ? 'disabled' : ''}>Guardar reparto</button></div>
     </div></div></div>`;
 }
+// guardarReparto: Guarda las partes del reparto (control, micro proyecto, tipo, mes, monto).
 async function guardarReparto() {
   const {t, partes: ps, borrar} = S.rep; const lado = t.code === 0 ? 'ingreso' : 'egreso';
   if (ps.some(p => !(+p.valor > 0))) return toast('Cada parte necesita un monto mayor que cero.');
@@ -1125,25 +1267,41 @@ async function guardarReparto() {
 }
 
 /* ================= vehículos ================= */
+// GALON: Litros por galón.
 const GALON = 3.78541;
+// vUnidad: Unidad de volumen elegida (litros o galones).
 const vUnidad = () => lsGet('veh-unidad') === 'G' ? 'G' : 'L';
+// vVol: Convierte un volumen a la unidad elegida.
 const vVol = l => vUnidad() === 'L' ? l : l / GALON;
+// vU: Nombre de la unidad (L o gal).
 const vU = () => vUnidad() === 'L' ? 'L' : 'gal';
+// vRU: Unidad de rendimiento (km/L o km/gal).
 const vRU = () => vUnidad() === 'L' ? 'km/L' : 'km/gal';
+// vR: Convierte rendimiento a la unidad elegida.
 const vR = r => vUnidad() === 'L' ? r : r * GALON;
+// nf: Formato de número sin moneda.
 const nf = (v, d = 0) => (+v || 0).toLocaleString('es-HN', {minimumFractionDigits: d, maximumFractionDigits: d});
+// vehs: Vehículos visibles.
 const vehs = () => (S.veh || []).filter(v => v.activo !== false);
+// vehById: Busca un vehículo por id.
 const vehById = id => (S.veh || []).find(v => v.id === id);
+// regsDe: Registros (combustible, mantenimiento, recorridos) de un vehículo.
 const regsDe = (id, tipo) => (S.vreg || []).filter(r => r.vehiculo === id && (!tipo || r.tipo === tipo)).sort((a, b) => (a.fecha + String(a.odometro || 0).padStart(9, '0')) < (b.fecha + String(b.odometro || 0).padStart(9, '0')) ? -1 : 1);
+// lineasDe: Líneas de costo de un registro de mantenimiento.
 const lineasDe = r => Array.isArray(r.gastos) && r.gastos.length ? r.gastos : (r.tx_id || r.mov_id || r.costo != null ? [{concepto: '', tx_id: r.tx_id || null, mov_id: r.mov_id || null, costo: r.costo}] : []);
+// txsDeReg: Registros de la app vinculados a un registro del vehículo.
 const txsDeReg = r => lineasDe(r).map(g => g.tx_id).filter(Boolean);
+// regDeTx: Registro del vehículo al que está vinculado un gasto de la app.
 const regDeTx = id => (S.vreg || []).find(r => txsDeReg(r).includes(id));
+// costoLinea: Costo de una línea (mano de obra, repuestos…).
 function costoLinea(g) {
   if (g.tx_id) { const t = D.byId.get(g.tx_id); if (t) return t.monto; }
   if (g.mov_id) { const m = S.movs.get(g.mov_id); if (m) return +m.valor || 0; }
   return +g.costo || 0;
 }
+// costoReg: Costo total de un registro del vehículo.
 const costoReg = r => lineasDe(r).reduce((a, g) => a + costoLinea(g), 0);
+// gastoTxt: Texto corto del gasto vinculado.
 function gastoTxt(r) {
   const ls = lineasDe(r); if (ls.length > 1) { const n = ls.filter(g => g.tx_id || g.mov_id).length; return `<span class="chip ${n ? 'app' : ''}" title="${n} vinculados a gastos de la app">${ls.length} costos · ${n} de la app</span>`; }
   if (ls.length === 1 && !r.tx_id && !r.mov_id) r = Object.assign({}, r, ls[0]);
@@ -1152,6 +1310,7 @@ function gastoTxt(r) {
   return r.tipo === 'recorrido' ? '' : '<span class="chip warn">Sin vincular</span>';
 }
 /* recargas con km, consumo y rendimiento */
+// recargas: Recargas de combustible con km recorridos, consumo y rendimiento.
 function recargas(v) {
   const tq = +v.tanque_l || 0; const l = regsDe(v.id, 'combustible');
   return l.map((r, i) => {
@@ -1162,7 +1321,9 @@ function recargas(v) {
     return Object.assign({}, r, {km, consumo, rend, estimado: nv < 99 || np < 99, costoV: costoReg(r), ppl: +r.litros ? costoReg(r) / r.litros : null});
   });
 }
+// lecturas: Lecturas de kilometraje ordenadas.
 function lecturas(v) { return regsDe(v.id).filter(r => r.odometro != null).map(r => ({fecha: r.fecha, odo: +r.odometro, tipo: r.tipo, id: r.id})).sort((a, b) => a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.odo - b.odo); }
+// vStats: Indicadores de un vehículo (km, rendimiento, costo por km).
 function vStats(v) {
   const rc = recargas(v); const val = rc.filter(r => r.rend); const km = val.reduce((a, r) => a + r.km, 0), cons = val.reduce((a, r) => a + r.consumo, 0);
   const lec = lecturas(v); const odo = lec.length ? Math.max(...lec.map(x => x.odo)) : null; const odo0 = lec.length ? Math.min(...lec.map(x => x.odo)) : null;
@@ -1171,12 +1332,14 @@ function vStats(v) {
   const ult = [...rc].reverse().find(r => r.ppl);
   return {rc, prom: cons ? km / cons : null, odo, recorrido: odo != null && odo0 != null ? odo - odo0 : 0, cC, cM, cxkm: odo - odo0 > 0 ? (cC + cM) / (odo - odo0) : null, gMes, ppl: ult ? ult.ppl : null, mants};
 }
+// vPorMes: Totales por mes de un vehículo (para el gráfico). Nota: hay otra función con este nombre más arriba que quedó sin uso; esta es la que se usa.
 function vPorMes(v) {
   const m = {}; const add = (f, k, x) => { const key = f.slice(0, 7); m[key] = m[key] || {c: 0, m: 0, km: 0}; m[key][k] += x; };
   recargas(v).forEach(r => add(r.fecha, 'c', r.costoV)); regsDe(v.id, 'mantenimiento').forEach(r => add(r.fecha, 'm', costoReg(r)));
   const lec = lecturas(v); for (let i = 1; i < lec.length; i++) { const d = lec[i].odo - lec[i - 1].odo; if (d > 0) add(lec[i].fecha, 'km', d); }
   return Object.keys(m).sort().slice(-12).map(k => Object.assign({mes: k}, m[k]));
 }
+// vProximos: Próximos mantenimientos según el plan.
 function vProximos(v) {
   const odo = vStats(v).odo || 0; const hoyD = new Date(hoy() + 'T12:00:00');
   return (S.vplan || []).filter(p => p.vehiculo === v.id).map(p => {
@@ -1187,13 +1350,17 @@ function vProximos(v) {
   }).sort((a, b) => b.pct - a.pct);
 }
 /* detección de gastos de vehículos en la app */
+// NORM: Normaliza texto (sin tildes, mayúsculas) para comparar.
 const NORM = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+// parseDet: Lee del detalle de la app datos del vehículo: "FORD FOCUS 2016 | 223123 km 335 km - SHELL".
 function parseDet(det) {
   const d = String(det || ''); const nums = [...d.matchAll(/(\d{1,3}(?:[.,]\d{3})+|\d+)\s*km\b/gi)].map(m => +m[1].replace(/[.,]/g, ''));
   const prov = (d.split(/\s+-\s+/).slice(1).join(' - ') || '').trim();
   return {odo: nums.length ? Math.max(...nums) : null, kmUlt: nums.length > 1 ? Math.min(...nums) : null, prov};
 }
+// tipoDetectado: Tipo de registro de vehículo detectado en un gasto (combustible, mantenimiento…).
 function tipoDetectado(t) { const c = NORM([t.cat, t.sub, t.nota].join(' ')); if (/COMBUSTIBLE|GASOLINA|DIESEL/.test(c)) return 'combustible'; if (/MANTEN|REPARAC|TALLER|REPUESTO|LLANTA|ACEITE|LUBRIC/.test(c)) return 'mantenimiento'; return null; }
+// detectados: Gastos de la app que parecen de un vehículo y aún no están vinculados.
 function detectados() {
   if (!S.vreg || !esAdmin()) return [];
   const ligados = new Set((S.vreg || []).flatMap(txsDeReg)); const ign = new Set((S.aj.vehIgnorar || []));
@@ -1208,16 +1375,20 @@ function detectados() {
 }
 /* foto del vehículo */
 S.vfotos = S.vfotos || {};
+// cargarFotosVeh: Carga las fotos de los vehículos desde Storage.
 async function cargarFotosVeh() {
   for (const el of document.querySelectorAll('[data-vfoto]:not([data-ok])')) {
     const ruta = el.dataset.vfoto; el.dataset.ok = '1';
     try { if (!S.vfotos[ruta]) { const {data} = await sb.storage.from('comprobantes').createSignedUrl(ruta, 3600); if (data) S.vfotos[ruta] = data.signedUrl; } if (S.vfotos[ruta]) el.innerHTML = `<img src="${esc(S.vfotos[ruta])}" alt="" style="width:100%;height:100%;object-fit:cover">`; } catch (_) {}
   }
 }
+// CARRO: Ícono de carro por defecto.
 const CARRO = `<svg viewBox="0 0 320 200" aria-hidden="true" style="width:100%;height:100%;display:block"><rect width="320" height="200" fill="var(--sunk)"/><path d="M30 140 L36 112 Q60 98 98 96 L130 70 Q160 62 200 68 L240 96 Q282 100 292 118 L294 140 Z" fill="var(--line)"/><circle cx="88" cy="142" r="22" fill="var(--muted)"/><circle cx="240" cy="142" r="22" fill="var(--muted)"/></svg>`;
+// fotoVeh: Foto o ícono de un vehículo.
 const fotoVeh = v => v.foto ? `<div data-vfoto="${esc(v.foto)}" style="width:100%;height:100%">${S.vfotos[v.foto] ? `<img src="${esc(S.vfotos[v.foto])}" alt="" style="width:100%;height:100%;object-fit:cover">` : CARRO}</div>` : CARRO;
 
 /* ---------- vista ---------- */
+// vVehiculos: VISTA VEHÍCULOS: tarjetas de vehículos y ficha del seleccionado.
 function vVehiculos() {
   if (S.veh === null) return `<div class="stack"><div><div class="eyebrow">Vehículos</div><h1>Gestión de vehículos</h1></div><div class="panel"><div class="bd note">${esAdmin() ? 'Para usar este apartado, corre en Supabase el SQL de vehículos.' : 'Este apartado todavía no está disponible.'}</div></div></div>`;
   const a = esAdmin(); const lista = vehs(); const det = detectados();
@@ -1232,6 +1403,7 @@ function vVehiculos() {
     ${v ? vFicha(v) : `<div class="panel"><div class="bd note">${a ? 'Agrega tu primer vehículo con "Agregar vehículo". En "Texto en la app" escribe cómo lo nombras en el detalle de Registro Contable (por ejemplo FORD FOCUS 2016) para que la plataforma reconozca sus gastos.' : 'No tienes vehículos asignados.'}</div></div>`}
   </div>`;
 }
+// vFicha: Ficha de un vehículo: indicadores, gráficos, planes y listados.
 function vFicha(v) {
   const a = esAdmin(); const st = vStats(v); const c = v.control && ctrlById(v.control); const px = vProximos(v); const tab = ['comb', 'mant', 'rec', 'det'].includes(S.vehTab) ? S.vehTab : 'comb';
   const urg = px.filter(p => p.pct >= 0.85); const sinV = [...st.rc, ...st.mants].filter(r => !r.tx_id && !r.mov_id && r.costo == null).length;
@@ -1261,6 +1433,7 @@ function vFicha(v) {
       ${[['comb', 'Combustible'], ['mant', 'Mantenimiento'], ['rec', 'Recorridos'], ...(a ? [['det', `Detectados${detectados().filter(d => d.v.id === v.id).length ? ` <span class="count warn-bg">${detectados().filter(d => d.v.id === v.id).length}</span>` : ''}`]] : [])].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-act="vehTab" data-t="${k}">${l}</button>`).join('')}
     </div></div><div class="bd" id="vehLista">${vVehLista(v, tab)}</div></div>`;
 }
+// vencTxt: Texto de vencimiento de un mantenimiento ("Vencido por X km / meses / días").
 function vencTxt(x) {
   const partes = [];
   if (x.faltaKm != null && x.faltaKm < 0) partes.push(`${nf(-x.faltaKm)} km`);
@@ -1268,6 +1441,7 @@ function vencTxt(x) {
   if (x.porTiempo) partes.reverse();
   return partes.length ? `Vencido por ${partes.join(' y ')}` : 'Vencido';
 }
+// vPanelPlanes: Panel de planes de mantenimiento.
 function vPanelPlanes(v, px) {
   const a = esAdmin(); const odo = vStats(v).odo;
   return `<div class="panel"><div class="hd"><h2>Próximos mantenimientos</h2>${odo != null ? `<span class="note">odómetro ${nf(odo)} km</span>` : ''}</div><div class="bd">
@@ -1277,6 +1451,7 @@ function vPanelPlanes(v, px) {
     ${a ? `<div class="form" style="border-top:1px solid var(--line);padding-top:10px"><label>Servicio<input id="vpServ" list="vpServs" placeholder="Aceite y filtro"><datalist id="vpServs">${['Aceite y filtro', 'Rotación de llantas', 'Frenos', 'Batería', 'Alineación y balanceo', 'Filtro de aire', 'Servicio mayor'].map(x => `<option value="${x}">`).join('')}</datalist></label><label>Cada (km)<input id="vpKm" inputmode="numeric" placeholder="5000"></label><label>Cada (meses)<input id="vpMes" inputmode="numeric" placeholder="6"></label><label>Último servicio (si no está registrado)<input id="vpUlt" type="date"></label><label>Odómetro de ese servicio<input id="vpUltOdo" inputmode="numeric"></label><label style="justify-content:flex-end"><button class="btn sm pri" data-act="vplanNuevo" data-id="${esc(v.id)}">Agregar plan</button></label></div><div class="note">El último servicio se toma solo de los mantenimientos registrados con el mismo tipo.</div>` : ''}
   </div></div>`;
 }
+// vVehLista: Listados de combustible, mantenimiento y recorridos.
 function vVehLista(v, tab) {
   const a = esAdmin(); const st = vStats(v);
   if (tab === 'comb') {
@@ -1308,17 +1483,22 @@ function vVehLista(v, tab) {
   }
   return '';
 }
+// nivelMini: Indicador pequeño del nivel de combustible.
 const nivelMini = n => { const p = n == null ? 100 : +n; return `<span class="gmini" title="${Math.round(p)}%"><span style="width:${Math.max(0, Math.min(100, p))}%"></span></span>`; };
+// vRegAcciones: Botones de acción de un registro del vehículo.
 function vRegAcciones(r, soloBorrar) {
   return `${soloBorrar ? '' : `<button class="btn sm ghost" data-act="vregEditar" data-id="${esc(r.id)}">Editar</button>`}<button class="btn sm ghost danger" data-act="vregBorrar" data-id="${esc(r.id)}">${S.confirmVreg === r.id ? '¿Borrar? Sí' : 'Borrar'}</button>`;
 }
+// adjDeReg: Comprobantes adjuntos a un registro del vehículo.
 const adjDeReg = r => { const tx = txsDeReg(r); return (S.adj || []).filter(x => x.veh_reg === r.id || (x.tx_id && tx.includes(x.tx_id)) || (r.mov_id && x.mov_id === r.mov_id)); };
 /* candidatos de gasto para vincular */
+// gastosParaVincular: Gastos de la app que se pueden vincular a un registro del vehículo.
 function gastosParaVincular(v, tipo, actual) {
   const act = [].concat(actual || []); const usados = new Set((S.vreg || []).flatMap(txsDeReg).filter(id => !act.includes(id))); const al = NORM(v.alias || v.nombre);
   return D.txs.filter(t => t.code === 1 && !usados.has(t.id) && (act.includes(t.id) || tipoDetectado(t) === tipo || (al && NORM(t.det).includes(al))))
     .sort((a, b) => { const sa = (al && NORM(a.det).includes(al) ? 0 : 1), sb2 = (al && NORM(b.det).includes(al) ? 0 : 1); return sa - sb2 || (a.fecha < b.fecha ? 1 : -1); }).slice(0, 80);
 }
+// lineaCostoHTML: Fila de una línea de costo en el formulario de mantenimiento.
 function lineaCostoHTML(g) {
   const ops = S._vgOpts || []; const sel = g.tx_id || '';
   const extra = sel && !ops.some(t => t.id === sel) && D.byId.get(sel) ? [D.byId.get(sel)] : [];
@@ -1328,6 +1508,7 @@ function lineaCostoHTML(g) {
     <input class="in num vgCosto" inputmode="decimal" value="${g.costo != null && !g.tx_id ? g.costo : ''}" placeholder="0.00" aria-label="Costo">
     <button type="button" class="btn sm ghost danger vgQuitar" aria-label="Quitar costo">Quitar</button></div>`;
 }
+// vFormReg: Formulario de un registro del vehículo (en ventana emergente).
 function vFormReg(v, tipo, r) {
   const st = vStats(v); const ed = r || S.vehDraft || {}; const comb = tipo === 'combustible';
   const gastos = gastosParaVincular(v, tipo, comb ? ed.tx_id : txsDeReg(ed));
@@ -1357,10 +1538,15 @@ function vFormReg(v, tipo, r) {
     <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" type="button" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="vregGuardar">${ed.id ? 'Guardar cambios' : comb ? 'Guardar recarga' : 'Guardar mantenimiento'}</button></div>`;
 }
 /* medidor */
+// GA: Geometría del medidor de combustible.
 const GA = {cx: 34, cy: 150, r: 124, aF: 98, aE: 4};
+// gRad: Grados a radianes.
 const gRad = a => a * Math.PI / 180;
+// gPt: Punto sobre el arco del medidor.
 const gPt = (a, rr) => [GA.cx + rr * Math.cos(gRad(a)), GA.cy - rr * Math.sin(gRad(a))];
+// gAng: Ángulo de la aguja según el nivel.
 const gAng = p => GA.aE + (GA.aF - GA.aE) * p / 100;
+// dibujarMedidor: Dibuja el medidor de combustible con su aguja.
 function dibujarMedidor(el, p) {
   const tk = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => { const a = gAng(k * 12.5), may = k % 2 === 0; const [x1, y1] = gPt(a, GA.r - (may ? 22 : 14)), [x2, y2] = gPt(a, GA.r); return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${k === 0 ? '#E2533F' : '#E9E2C8'}" stroke-linecap="round" stroke-width="${may ? 4 : 2.5}"/>`; }).join('');
   const a = gAng(p); const [tx, ty] = gPt(a, GA.r - 8), [b1x, b1y] = gPt(a + 90, 7), [b2x, b2y] = gPt(a - 90, 7), [tlx, tly] = gPt(a + 180, 18);
@@ -1371,8 +1557,11 @@ function dibujarMedidor(el, p) {
     <g transform="translate(${(px - 9).toFixed(1)},${(py - 11).toFixed(1)})" fill="none" stroke="#E9E2C8" stroke-width="1.8" stroke-linejoin="round"><rect x="0" y="2" width="11" height="18" rx="1.5"/><rect x="2.5" y="5" width="6" height="5" fill="#E9E2C8" stroke="none"/><path d="M11 8 h3 l3 3 v8 a1.5 1.5 0 0 1 -3 0 v-5 h-3"/></g>
     <path d="M${tx.toFixed(1)},${ty.toFixed(1)} L${b1x.toFixed(1)},${b1y.toFixed(1)} L${tlx.toFixed(1)},${tly.toFixed(1)} L${b2x.toFixed(1)},${b2y.toFixed(1)} Z" fill="#5DA9F0"/><circle cx="${GA.cx}" cy="${GA.cy}" r="11" fill="#2a312d"/><circle cx="${GA.cx}" cy="${GA.cy}" r="4" fill="#5DA9F0"/></svg>`;
 }
+// FRAC: Fracciones del tanque (1/4, 1/2…).
 const FRAC = ['Vacío', '1/8', '¼', '3/8', '½', '5/8', '¾', '7/8', 'Lleno'];
+// nivTxt: Texto del nivel de combustible.
 const nivTxt = p => { if (p >= 99) return 'Lleno'; if (p <= 1) return 'Vacío'; const k = Math.round(p / 12.5); return `${Math.round(p)}% · ${Math.abs(p / 12.5 - k) < 0.12 ? '' : 'cerca de '}${FRAC[k]}`; };
+// montarFormReg: Activa la interacción del formulario (aguja arrastrable, cálculos).
 function montarFormReg() {
   const f = $('#vregForm'); if (!f || f.dataset.montado) return; f.dataset.montado = '1';
   const v = vehById(f.dataset.veh); const comb = f.dataset.tipo === 'combustible'; const r = f.dataset.id ? (S.vreg || []).find(x => x.id === f.dataset.id) : null;
@@ -1415,6 +1604,7 @@ function montarFormReg() {
     f.dataset.nivelRef = '1'; f._nivel = () => nivel; fijar(nivel);
   } else calc();
 }
+// abrirRegModal: Abre el formulario de un registro del vehículo en ventana emergente.
 function abrirRegModal(tipo, id) {
   const v = vehById(S.vehSel); if (!v) return; const r = id ? (S.vreg || []).find(x => x.id === id) : null;
   S.detAbierto = r ? {tipo: 'vreg', id: r.id, rt: tipo} : null;
@@ -1433,12 +1623,14 @@ function abrirRegModal(tipo, id) {
   montarFormReg(); montarRecorrido(v); cargarMiniaturas();
   const f1 = $('#modalRoot input:not([disabled]):not([type=file])'); if (f1 && tipo === 'recorrido') $('#vrOdo').focus();
 }
+// montarRecorrido: Activa el formulario de recorridos.
 function montarRecorrido(v) {
   const vr = $('#vrOdo'); if (!vr || vr.dataset.m) return; vr.dataset.m = '1';
   const upd = () => { const l = lecturas(v); const u = l[l.length - 1]; const odo = parseFloat((vr.value || '').replace(/,/g, '')); const rc = recargas(v).pop(); const st = vStats(v);
     $('#vrCalc').innerHTML = !isFinite(odo) ? '' : `<div><span class="note">Desde la lectura anterior${u ? ` (${fFecha(u.fecha)})` : ''}</span><b>${u ? nf(odo - u.odo) + ' km' : '—'}</b></div><div><span class="note">Desde la última recarga</span><b>${rc && rc.odometro != null ? nf(odo - rc.odometro) + ' km' : '—'}</b></div><div><span class="note">Autonomía estimada</span><b>${rc && st.prom && v.tanque_l ? nf(Math.max(0, (+v.tanque_l * (rc.nivel == null ? 100 : +rc.nivel) / 100) * st.prom - (odo - rc.odometro))) + ' km' : '—'}</b></div>` + (u && odo <= u.odo ? `<div style="grid-column:1/-1;background:var(--warn-soft);color:var(--warn)">El odómetro es menor o igual a la lectura anterior (${nf(u.odo)} km).</div>` : ''); };
   vr.addEventListener('input', upd);
 }
+// guardarReg: Guarda un registro del vehículo.
 async function guardarReg() {
   const f = $('#vregForm'); const v = vehById(f.dataset.veh); const comb = f.dataset.tipo === 'combustible'; const id = f.dataset.id;
   const num = s => { const x = parseFloat(String(s || '').replace(/,/g, '')); return isFinite(x) ? x : null; };
@@ -1458,6 +1650,7 @@ async function guardarReg() {
   S.vehTab = comb ? 'comb' : 'mant'; S.vehEdit = null; S.vehDraft = null; S.detAbierto = null; $('#modalRoot').innerHTML = ''; render();
 }
 /* gráficos */
+// vBarras: Gráfico de barras de gastos del vehículo.
 function vBarras(box, datos, series, fmt) {
   const W = Math.max(280, box.clientWidth), H = 190, ml = 44, mr = 6, mt = 18, mb = 24; const n = datos.length; if (!n) { box.innerHTML = '<div class="note">Sin datos.</div>'; return; }
   const tot = datos.map(d => series.reduce((a, s) => a + d[s.k], 0)); const mx = Math.max(1, ...tot); const raw = mx * 1.08 / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), fr = raw / e, st = (fr <= 1 ? 1 : fr <= 2 ? 2 : fr <= 5 ? 5 : 10) * e; const hi = Math.ceil(mx * 1.08 / st) * st;
@@ -1473,6 +1666,7 @@ function vBarras(box, datos, series, fmt) {
   box.querySelectorAll('rect[data-i]').forEach(el => el.addEventListener('mouseenter', () => { const i = +el.dataset.i, d = datos[i]; tip.innerHTML = `<b>${esc(mesLargo(d.mes))}</b>${series.map(s => `<div class="r"><span>${s.n}</span><span>${fmt(d[s.k])}</span></div>`).join('')}`; tip.hidden = false; let left = (ml + i * bw + bw / 2) * sc - tip.offsetWidth / 2; tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, left)) + 'px'; tip.style.top = '0px'; }));
   box.querySelector('svg').addEventListener('mouseleave', () => { tip.hidden = true; });
 }
+// vRend: Gráfico de rendimiento del vehículo.
 function vRend(box, v) {
   const st = vStats(v); const r = st.rc.filter(x => x.rend); if (r.length < 2) { box.innerHTML = '<div class="note">Hacen falta al menos dos recargas con odómetro y litros para calcular el rendimiento.</div>'; return; }
   const W = Math.max(280, box.clientWidth), H = 190, ml = 38, mr = 10, mt = 10, mb = 24; const vals = r.map(x => vR(x.rend)); const prom = vR(st.prom);
@@ -1492,6 +1686,7 @@ function vRend(box, v) {
   box.querySelectorAll('rect[data-i]').forEach(el => el.addEventListener('mouseenter', () => { const i = +el.dataset.i, x = r[i]; tip.innerHTML = `<b>${fFecha(x.fecha)} · ${esc(x.proveedor || 'Recarga')}</b><div class="r"><span>Rendimiento${x.estimado ? ' (estimado)' : ''}</span><span>${nf(vals[i], 1)} ${vRU()}</span></div><div class="r"><span>Recorrido</span><span>${nf(x.km)} km</span></div><div class="r"><span>Cargado</span><span>${nf(vVol(+x.litros), 1)} ${vU()}</span></div>`; tip.hidden = false; tip.style.left = Math.max(0, Math.min(box.clientWidth - tip.offsetWidth, pts[i][0] * sc - tip.offsetWidth / 2)) + 'px'; tip.style.top = '0px'; }));
   box.querySelector('svg').addEventListener('mouseleave', () => { tip.hidden = true; });
 }
+// dibujarVeh: Dibuja los gráficos de vehículos después de pintar la vista.
 function dibujarVeh() {
   const v = S.view === 'vehiculos' && vehById(S.vehSel); if (!v) return;
   document.querySelectorAll('[data-vchart]').forEach(box => {
@@ -1503,17 +1698,29 @@ function dibujarVeh() {
   cargarFotosVeh();
 }
 /* ===== Créditos: proyección del plan y conciliación con registros reales (solo administrador) ===== */
+// CR_CON: Conceptos de una cuota: capital, interés, seguro, comisiones.
 const CR_CON = ['cap', 'int', 'seg', 'com'];
+// CR_N: Nombres visibles de los conceptos.
 const CR_N = {cap: 'Capital', int: 'Interés', seg: 'Seguro', com: 'Comisiones'};
+// CR_TIPO: Tipos de crédito: [etiqueta corta, clase de color, nombre largo].
 const CR_TIPO = {intra: ['Intra', 'cr-intra', 'Intrafinanciamiento'], extra: ['Extra', 'cr-extra', 'Extrafinanciamiento'], prestamo: ['Préstamo', 'cr-pres', 'Préstamo']};
+// crR2: Redondeo a 2 decimales con signo (igual que el reparto).
 const crR2 = x => Math.sign(x) * Math.round(Math.abs(x) * 100 + 1e-6) / 100;
+// crUid: Genera un id único (uuid) para registros nuevos.
 const crUid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ch => { const r = Math.random() * 16 | 0; return (ch === 'x' ? r : (r & 3 | 8)).toString(16); }));
+// creditos: Créditos ordenados: activos primero, luego por nombre.
 const creditos = () => (S.cred || []).slice().sort((a, b) => (a.estado === 'cancelado') - (b.estado === 'cancelado') || (a.nombre || '').localeCompare(b.nombre || ''));
+// credById: Busca un crédito por id.
 const credById = id => (S.cred || []).find(c => c.id === id);
+// cuotasDe: Cuotas del plan de un crédito, ordenadas.
 const cuotasDe = cid => (S.ccuo || []).filter(x => x.credito === cid).sort((a, b) => a.numero - b.numero);
+// enlCuota: Enlaces (registros reales) de una cuota.
 const enlCuota = qid => (S.cenl || []).filter(e => e.cuota === qid);
+// refKey: Clave de un registro enlazado: "t:id" si es de la app, "m:id" si es manual.
 const refKey = e => e.tx_id ? 't:' + e.tx_id : 'm:' + e.mov_id;
+// crAddM: Suma meses a una fecha respetando fin de mes.
 function crAddM(iso, k) { const [y, m, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, m - 1 + k, 1)); const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(); dt.setUTCDate(Math.min(d, last)); return dt.toISOString().slice(0, 10); }
+// proyectar: PROYECCIÓN DEL PLAN con cuota fija (sistema francés): capital, interés, seguro (fijo o % del saldo), comisiones y saldo de cada cuota.
 function proyectar(c) {
   const i = c.tasa_tipo === 'mensual' ? (+c.tasa || 0) / 100 : (+c.tasa || 0) / 1200; const n = Math.max(1, Math.round(+c.plazo || 1)); const P = +c.capital || 0;
   const base = i ? P * i / (1 - Math.pow(1 + i, -n)) : P / n; let saldo = P; const out = [];
@@ -1526,9 +1733,13 @@ function proyectar(c) {
   }
   return out;
 }
+// qVal: Montos proyectados de una cuota por concepto.
 const qVal = q => ({cap: +q.capital || 0, int: +q.interes || 0, seg: +q.seguro || 0, com: +q.comisiones || 0});
+// realCuota: Montos reales de una cuota por concepto (suma de enlaces).
 function realCuota(qid) { const o = {cap: 0, int: 0, seg: 0, com: 0}; enlCuota(qid).forEach(e => { o[e.concepto] = crR2(o[e.concepto] + (+e.monto || 0)); }); return o; }
+// crTot: Suma de los cuatro conceptos.
 const crTot = o => crR2(o.cap + o.int + o.seg + o.com);
+// estadoCuota: Estado de una cuota: Conciliada (marcada a mano), Parcial, Cuadra, Con diferencia, Sin registros, Próxima o Pendiente.
 function estadoCuota(q) {
   if (q.conciliada) return ['Conciliada', 'app'];
   const re = crTot(realCuota(q.id)), pr = +q.cuota || 0;
@@ -1538,6 +1749,7 @@ function estadoCuota(q) {
   if (dias <= 5) return ['Próxima', 'warn'];
   return ['Pendiente', ''];
 }
+// resumenCred: Indicadores de un crédito: saldo de capital real, interés pagado, conciliadas, próxima cuota.
 function resumenCred(c) {
   const cs = cuotasDe(c.id); const enl = (S.cenl || []).filter(e => e.credito === c.id);
   const capReal = enl.filter(e => e.concepto === 'cap').reduce((s, e) => s + (+e.monto || 0), 0);
@@ -1548,11 +1760,14 @@ function resumenCred(c) {
   const costo = cs.reduce((s, q) => s + (+q.interes || 0) + (+q.seguro || 0) + (+q.comisiones || 0), 0);
   return {cs, conc, prox, sinReg, capReal, intReal, saldo: crR2((+c.capital || 0) - capReal), costo, fin: cs.length ? cs[cs.length - 1].fecha : null};
 }
+// crRefInfo: Datos visibles de un registro enlazado (descripción, fecha, cuenta, monto).
 function crRefInfo(e) {
   if (e.tx_id) { const t = D.byId.get(e.tx_id); return t ? {desc: [t.nota, t.det].filter(Boolean).join(' | ') || t.cat || 'Registro de la app', fecha: t.fecha, cuenta: t.cuenta, monto: t.monto, origen: 'App'} : {desc: 'Registro de la app ya no disponible', fecha: '', cuenta: '', monto: 0, origen: 'App', falta: true}; }
   const m = S.movs.get(e.mov_id); return m ? {desc: m.descripcion || 'Registro manual', fecha: m.fecha || '', cuenta: (ctrlById(m.control) || {}).nombre || '', monto: +m.valor || 0, origen: 'Manual'} : {desc: 'Registro manual borrado', fecha: '', cuenta: '', monto: 0, origen: 'Manual', falta: true};
 }
+// crUsadas: Registros que ya están enlazados a alguna cuota (para no sugerirlos de nuevo).
 function crUsadas() { const s = new Set(); (S.cenl || []).forEach(e => s.add(refKey(e))); return s; }
+// crSugeridos: Registros sugeridos para una cuota: con el texto del crédito o de la misma cuenta ±25 días; o resultados de búsqueda.
 function crSugeridos(c, q) {
   const usadas = crUsadas(); const pat = (c.patron || '').trim().toUpperCase(); const f0 = new Date(q.fecha + 'T12:00');
   const bus = (S.credBus || '').trim().toUpperCase(); const n = parseFloat(bus.replace(/[^0-9.]/g, ''));
@@ -1568,6 +1783,7 @@ function crSugeridos(c, q) {
   if (bus) for (const m of S.movs.values()) { if (m.tx_id || m.estado === 'rechazado' || usadas.has('m:' + m.id)) continue; if ((m.descripcion || '').toUpperCase().includes(bus) || (isFinite(n) && Math.abs((+m.valor || 0) - n) < 0.01)) out.push({mov_id: m.id, m, d: Math.abs((new Date((m.fecha || hoy()) + 'T12:00') - f0) / 864e5)}); }
   return out.sort((a, b) => (a.p || 0) - (b.p || 0) || a.d - b.d).slice(0, 15);
 }
+// vCreditos: VISTA CRÉDITOS (admin): indicadores, lista de créditos y ficha del seleccionado.
 function vCreditos() {
   const head = `<div><div class="eyebrow">Créditos</div><h1>Intra, extrafinanciamientos y préstamos</h1><div class="note">Proyecta el plan de pago y relaciónalo con los registros reales. No crea gastos ni cambia el reparto de los controles.</div></div>`;
   if (S.cred === null) return `<div class="stack">${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de créditos (creditos.sql).</div></div></div>`;
@@ -1595,6 +1811,7 @@ function vCreditos() {
     ${c ? vCredFicha(c) : ''}
   </div>`;
 }
+// vCredFicha: Ficha de un crédito: datos del contrato, resumen y plan de pago.
 function vCredFicha(c) {
   const R = resumenCred(c); const cs = R.cs; const T = CR_TIPO[c.tipo] || CR_TIPO.prestamo;
   if (!cs.length) return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">${esc(c.nombre)}</h2><button class="btn" data-act="credRecalc" data-id="${c.id}">Proyectar plan</button></div><div class="bd note">Este crédito no tiene plan todavía.</div></div>`;
@@ -1622,6 +1839,7 @@ function vCredFicha(c) {
   </div>
   ${vConciliar(c, q)}`;
 }
+// vConciliar: Panel para conciliar una cuota: proyectado vs real, registros vinculados con su desglose y sugeridos.
 function vConciliar(c, q) {
   const pr = qVal(q), re = realCuota(q.id), e = estadoCuota(q);
   const fila = (k) => { const d = crR2(re[k] - pr[k]); return `<tr><td><i class="cr-dot cr-${k}"></i>${CR_N[k]}</td><td class="num">${L(pr[k])}</td><td class="num">${re[k] ? L(re[k]) : '<span class="muted">—</span>'}</td><td class="num ${Math.abs(d) > 0.004 && (re[k] || pr[k]) ? 'neg' : 'muted'}">${re[k] || pr[k] ? (d > 0 ? '+' : '') + L(d) : '—'}</td></tr>`; };
@@ -1650,6 +1868,7 @@ function vConciliar(c, q) {
     </div></div>`;
 }
 /* --- guardar --- */
+// crSetPartes: Guarda el desglose de un registro en una cuota (borra los enlaces anteriores e inserta los nuevos).
 async function crSetPartes(qid, ref, partes) {
   const q0 = (S.ccuo || []).find(x => x.id === qid); if (!q0) return;
   const [tipo, id] = [ref.slice(0, 1), ref.slice(2)]; const col = tipo === 't' ? 'tx_id' : 'mov_id';
@@ -1662,7 +1881,9 @@ async function crSetPartes(qid, ref, partes) {
   } catch (e) {}
   render();
 }
+// crMontoRef: Monto de un registro enlazado.
 function crMontoRef(ref) { const id = ref.slice(2); if (ref[0] === 't') { const t = D.byId.get(id); return t ? t.monto : 0; } const m = S.movs.get(id); return m ? +m.valor || 0 : 0; }
+// crDesgloseProy: Propone el desglose de un registro: por palabra clave (seguro, comisión, interés) o según lo que falta de lo proyectado.
 function crDesgloseProy(qid, ref, adivinar) {
   const q0 = S.ccuo.find(x => x.id === qid); const monto = crMontoRef(ref);
   if (adivinar) { let txt = ''; if (ref[0] === 't') { const t = D.byId.get(ref.slice(2)); txt = t ? [t.nota, t.det, t.cat, t.sub].join(' ').toLowerCase() : ''; } else { const m = S.movs.get(ref.slice(2)); txt = m ? (m.descripcion || '').toLowerCase() : ''; }
@@ -1672,6 +1893,7 @@ function crDesgloseProy(qid, ref, adivinar) {
   for (const k of CR_CON) { const v = crR2(Math.min(Math.max(0, pr[k] - ya[k]), rest)); if (v > 0) { out[k] = v; rest = crR2(rest - v); } }
   return out;
 }
+// crGuardarPlan: Guarda el plan: actualiza cuotas existentes, agrega las nuevas y borra las sobrantes sin registros.
 async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = false} = {}) {
   const ex = cuotasDe(c.id); const porN = new Map(ex.map(x => [x.numero, x]));
   const upd = [], ins = []; const maxN = Math.max(...filas.map(f => f.numero));
@@ -1688,6 +1910,7 @@ async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = 
   } catch (e) {}
 }
 /* --- ventanas --- */
+// abrirCredForm: Ventana para crear o editar un crédito.
 function abrirCredForm(id) {
   const c = id ? credById(id) : null; const v = (k, d = '') => esc(c && c[k] != null ? String(c[k]) : d);
   const cuentas = [...new Set(D.txs.map(t => t.cuenta).filter(Boolean))].sort();
@@ -1719,6 +1942,7 @@ function abrirCredForm(id) {
     </div></div></div>`;
   $('#crNombre').focus();
 }
+// guardarCred: Guarda el crédito y proyecta (o recalcula) su plan.
 async function guardarCred() {
   const F = $('#credF'); const id = F.dataset.id; const n = s => parseFloat(String($(s).value).replace(/[^0-9.\-]/g, ''));
   const row = {tipo: (document.querySelector('input[name=crTipo]:checked') || {}).value || 'prestamo', nombre: $('#crNombre').value.trim(), entidad: $('#crEnt').value.trim() || null, cuenta: $('#crCuenta').value.trim() || null,
@@ -1734,6 +1958,7 @@ async function guardarCred() {
   } catch (e) {}
   render();
 }
+// abrirCuoForm: Ventana para corregir una cuota a mano.
 function abrirCuoForm(qid) {
   const x = S.ccuo.find(y => y.id === qid); if (!x) return;
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="cqT" style="max-width:560px">
@@ -1746,6 +1971,7 @@ function abrirCuoForm(qid) {
       <div class="note">La cuota queda marcada como editada y no se recalcula al cambiar el contrato.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="cuoGuardar">Guardar cuota</button></div></div></div></div>`;
 }
+// guardarCuo: Guarda la cuota corregida (queda marcada como editada).
 async function guardarCuo() {
   const x = S.ccuo.find(y => y.id === $('#cuoF').dataset.id); const n = s => crR2(parseFloat(String($(s).value).replace(/[^0-9.\-]/g, '')) || 0);
   const row = {fecha: $('#cqFecha').value || x.fecha, capital: n('#cq_cap'), interes: n('#cq_int'), seguro: n('#cq_seg'), comisiones: n('#cq_com'), saldo: n('#cqSaldo'), nota: $('#cqNota').value.trim() || null, editada: true};
@@ -1753,8 +1979,11 @@ async function guardarCuo() {
   try { const d = await q(sb.from('credito_cuotas').update(row).eq('id', x.id).select(), 'Cuota corregida'); Object.assign(x, d && d[0] ? d[0] : row); } catch (e) {}
   $('#modalRoot').innerHTML = ''; render();
 }
+// crNum: Lee un número pegado del banco (1,234.56 o 1.234,56).
 function crNum(s) { s = String(s || '').trim(); if (!s) return 0; const neg = /^\(.*\)$/.test(s) || /^-/.test(s); s = s.replace(/[^0-9.,]/g, ''); if (/,\d{2}$/.test(s) && !/\.\d{2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/,/g, ''); const v = parseFloat(s) || 0; return neg ? -v : v; }
+// crFechaTxt: Lee una fecha pegada (dd/mm/aaaa o aaaa-mm-dd).
 function crFechaTxt(s) { s = String(s || '').trim(); let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`; m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; } return null; }
+// crParsePlan: Convierte el texto pegado del banco en filas de cuotas.
 function crParsePlan(txt) {
   const out = [];
   for (const ln of String(txt || '').split(/\r?\n/)) { const cols = ln.split(/\t|;|\s{2,}/).map(x => x.trim()).filter(x => x !== ''); if (cols.length < 4) continue;
@@ -1763,6 +1992,7 @@ function crParsePlan(txt) {
     out.push({numero: num, fecha, capital: crR2(capital), interes: crR2(interes), seguro: crR2(seguro), comisiones: crR2(comisiones)}); }
   out.sort((a, b) => a.numero - b.numero); return out;
 }
+// abrirPegar: Ventana "Pegar plan del banco".
 function abrirPegar(cid) {
   const c = credById(cid);
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="cpT" style="max-width:760px">
@@ -1774,11 +2004,13 @@ function abrirPegar(cid) {
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="pegGuardar" disabled>Reemplazar plan</button></div></div></div></div>`;
   $('#pegTxt').focus();
 }
+// prevPegar: Vista previa de las cuotas reconocidas al pegar.
 function prevPegar() {
   const filas = crParsePlan($('#pegTxt').value); const b = document.querySelector('[data-act=pegGuardar]');
   b.disabled = !filas.length;
   $('#pegPrev').innerHTML = filas.length ? `<b>${filas.length} cuotas reconocidas</b> · de la ${filas[0].numero} (${fFecha(filas[0].fecha)}) a la ${filas[filas.length - 1].numero} (${fFecha(filas[filas.length - 1].fecha)}) · capital ${L(filas.reduce((s, f) => s + f.capital, 0))} · interés ${L(filas.reduce((s, f) => s + f.interes, 0))}` : 'No se reconoce ninguna fila. Revisa que la primera columna sea el número de cuota y la segunda la fecha.';
 }
+// guardarPegar: Reemplaza el plan con el pegado del banco.
 async function guardarPegar() {
   const c = credById($('#pegF').dataset.id); const filas = crParsePlan($('#pegTxt').value); if (!filas.length) return;
   let saldo = +c.capital || 0; for (const f of filas) { saldo = crR2(saldo - f.capital); f.saldo = Math.max(0, saldo); f.cuota = crR2(f.capital + f.interes + f.seguro + f.comisiones); }
@@ -1789,6 +2021,7 @@ async function guardarPegar() {
 }
 
 /* ===== iconos de acción ===== */
+// ICO: Dibujos (SVG) de los íconos de acción: editar, borrar, quitar, dividir, asociar, validar.
 const ICO = {
   editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   borrar: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
@@ -1797,12 +2030,14 @@ const ICO = {
   asociar: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   validar: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'
 };
+// icoBtn: Crea un botón de ícono con su nombre al pasar el mouse.
 function icoBtn(k, titulo, act, href, extra) {
   const svg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
   return href ? `<a class="btn sm ghost ico ${extra || ''}" href="${href}" title="${esc(titulo)}" aria-label="${esc(titulo)}">${svg}</a>`
     : `<button class="btn sm ghost ico ${extra || ''}" data-act="${act}" title="${esc(titulo)}" aria-label="${esc(titulo)}">${svg}</button>`;
 }
 /* ===== registro manual: nuevo / editar en ventana emergente ===== */
+// abrirRegistro: Ventana "+ Nuevo registro" / "Editar registro" (egreso o ingreso).
 function abrirRegistro(cid, mes, movId) {
   const c = ctrlById(cid); if (!c) return; const a = esAdmin();
   const m = movId ? S.movs.get(movId) : null; const nuevo = !m;
@@ -1830,6 +2065,7 @@ function abrirRegistro(cid, mes, movId) {
     </div></div></div>`;
   const f = $('#nrValor'); f && (nuevo ? $('#nrDesc').focus() : f.focus());
 }
+// guardarRegistro: Guarda el registro: si es nuevo lo inserta (válido si es admin, por validar si es usuario); si existe lo actualiza.
 async function guardarRegistro() {
   const F = $('#regForm'); if (!F) return; const c = ctrlById(F.dataset.c); if (!c || cerrado(c)) return;
   const id = F.dataset.id; const m = id ? S.movs.get(id) : null;
@@ -1850,6 +2086,7 @@ async function guardarRegistro() {
   return insertarMovs([row], esAdmin() ? 'Registro agregado' : 'Registrado. Queda por validar.').catch(() => {});
 }
 /* formulario de vehículo */
+// abrirVehForm: Ventana para crear o editar un vehículo.
 function abrirVehForm(id) {
   const v = id ? vehById(id) : {}; const ctrls = S.ctrls.filter(c => !cerrado(c));
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="vfT" style="max-width:720px">
@@ -1866,6 +2103,7 @@ function abrirVehForm(id) {
     </div><div class="note">"Texto en la app" es como escribes el vehículo en el detalle de Registro Contable; con él se detectan sus gastos. "Control" define quién lo ve: las personas con acceso a ese control.</div>
     <div class="row" style="justify-content:space-between">${id ? `<button class="btn ghost danger" data-act="vehBorrar" data-id="${esc(id)}">${S.confirmVeh === id ? (regsDe(id).length ? '¿Archivar? Sí' : '¿Eliminar? Sí') : regsDe(id).length ? 'Archivar vehículo' : 'Eliminar vehículo'}</button>` : '<span></span>'}<button class="btn pri" data-act="vehGuardar">${id ? 'Guardar cambios' : 'Agregar vehículo'}</button></div></div></div></div>`;
 }
+// guardarVeh: Guarda el vehículo.
 async function guardarVeh() {
   const f = $('#vehForm'); const id = f.dataset.id; const g = s => $(s).value.trim(); const num = s => { const x = parseFloat(g(s).replace(/,/g, '')); return isFinite(x) ? x : null; };
   const row = {nombre: g('#vNombre'), alias: g('#vAlias').toUpperCase(), marca: g('#vMarca'), modelo: g('#vModelo'), anio: num('#vAnio'), placa: g('#vPlaca').toUpperCase(), vin: g('#vVin').toUpperCase(), tanque_l: num('#vTanque'), combustible: g('#vComb'), control: $('#vCtrl').value || null};
@@ -1883,10 +2121,15 @@ async function guardarVeh() {
 }
 
 /* ================= micro proyectos ================= */
+// microsDe: Micro proyectos de un control.
 const microsDe = (cid, soloAbiertos) => (S.micro || []).filter(x => x.control === cid && (!soloAbiertos || x.estado === 'abierto'));
+// microById: Busca un micro proyecto por id.
 const microById = id => (S.micro || []).find(x => x.id === id);
+// microSugerido: Micro proyecto sugerido según la clave en el texto del registro.
 function microSugerido(c, t) { if (!c || !t) return ''; const d = (t.det + ' ' + t.nota).toUpperCase(); const x = microsDe(c.id, true).find(x => x.clave && d.includes(x.clave.toUpperCase())); return x ? x.id : ''; }
+// microOptions: Opciones de micro proyecto para listas desplegables.
 const microOptions = (cid, sel, vacio) => `<option value="">${vacio || 'Sin micro proyecto'}</option>` + microsDe(cid).filter(x => x.estado === 'abierto' || x.id === sel).map(x => `<option value="${esc(x.id)}" ${x.id === sel ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
+// resumenMicro: Totales y meses de un micro proyecto.
 function resumenMicro(id) {
   const rows = [...S.movs.values()].filter(m => m.grupo === id && m.estado === 'valido');
   const eg = rows.filter(m => m.lado === 'egreso'), ing = rows.filter(m => m.lado === 'ingreso');
@@ -1896,6 +2139,7 @@ function resumenMicro(id) {
   const meses = [...new Set(rows.map(m => m.mes))].sort();
   return {rows, eg, ing, porTipo, porPersona, egreso: e, ingreso: i, saldo: i - e, meses, pendientes: [...S.movs.values()].filter(m => m.grupo === id && m.estado === 'pendiente').length};
 }
+// vMicros: Panel de micro proyectos al fondo del control (abiertos y con movimientos; cerrados ocultos).
 function vMicros(c, mes) {
   if (S.micro === null) return esAdmin() ? '<div class="panel"><div class="hd"><h2>Micro proyectos</h2></div><div class="bd note">Para usar micro proyectos, corre en Supabase el SQL de micro proyectos.</div></div>' : '';
   const l = microsDe(c.id); const a = esAdmin();
@@ -1912,6 +2156,7 @@ function vMicros(c, mes) {
       ${ocu.length ? `<div class="bd" style="border-top:1px solid var(--line);padding-top:10px;padding-bottom:10px"><button class="linkish small" data-act="microVerTodos" data-c="${c.id}">${ver ? '▾ Ocultar cerrados' : `▸ Ver ${ocu.length} ${ocu.length === 1 ? 'cerrado' : 'cerrados'}`}</button></div>` : ''}`; })()}
     ${a ? `<div class="bd row" style="border-top:1px solid var(--line)"><input class="in" id="mpNombre-${c.id}" placeholder="Nombre (ej.: Viaje a Santa Rosa)" style="max-width:280px"><input class="in" id="mpClave-${c.id}" placeholder="Clave opcional (ej.: SROSA)" style="max-width:200px" title="Si el detalle de un registro de la app contiene esta palabra, la bandeja lo sugiere"><button class="btn sm pri" data-act="microNuevo" data-c="${c.id}">Crear micro proyecto</button></div>` : ''}</div>`;
 }
+// abrirMicro: Ventana para crear o editar un micro proyecto.
 function abrirMicro(id) {
   const x = microById(id); if (!x) return; const c = ctrlById(x.control); const R = resumenMicro(id); S.detAbierto = null;
   const porMes = {}; R.rows.forEach(m => (porMes[m.mes] = porMes[m.mes] || []).push(m));
@@ -1928,11 +2173,17 @@ function abrirMicro(id) {
 }
 
 /* ================= comprobantes adjuntos ================= */
+// CLIP: Ícono de clip.
 const CLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.1l-8.5 8.5a5.5 5.5 0 01-7.8-7.8l8.5-8.5a3.7 3.7 0 015.2 5.2l-8.5 8.5a1.8 1.8 0 01-2.6-2.6l7.8-7.8"/></svg>';
+// adjDeFila: Comprobantes de un movimiento.
 const adjDeFila = m => (S.adj || []).filter(x => (m.tx_id && x.tx_id === m.tx_id) || x.mov_id === m.id);
+// adjDeTx: Comprobantes de un registro de la app.
 const adjDeTx = id => (S.adj || []).filter(x => x.tx_id === id || (!x.tx_id && partes(id).some(p => p.id === x.mov_id)));
+// clipN: Indicador de cantidad de comprobantes.
 const clipN = l => l.length ? `<span class="clip" title="${l.length} ${l.length === 1 ? 'comprobante' : 'comprobantes'}">${CLIP}${l.length}</span>` : '';
+// tam: Tamaño de archivo legible (KB, MB).
 const tam = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+// vAdjuntos: Sección de comprobantes dentro de una ficha.
 function vAdjuntos(lista, destino, puedeSubir) {
   if (S.adj === null) return esAdmin() ? '<div class="eyebrow">Comprobantes</div><div class="note">Para adjuntar comprobantes, corre en Supabase el SQL de adjuntos.</div>' : '';
   const cuando = d => d ? new Date(d).toLocaleDateString('es-HN', {dateStyle: 'medium'}) : '';
@@ -1945,12 +2196,15 @@ function vAdjuntos(lista, destino, puedeSubir) {
     ${puedeSubir ? `<label class="btn sm" style="align-self:flex-start">Adjuntar comprobante<input type="file" hidden multiple accept="image/*,application/pdf" data-adj-up data-tx="${esc(destino.tx || '')}" data-mov="${esc(destino.mov || '')}" data-veh="${esc(destino.veh || '')}" data-vehiculo="${esc(destino.vehiculo || '')}"></label>
       <div class="note">Foto o PDF de la factura, depósito o transferencia (máx. 10 MB). ${destino.tx ? 'Queda ligado al registro de la app: aparece en todas sus partes.' : ''}</div>` : ''}`;
 }
+// cargarMiniaturas: Carga las miniaturas de imágenes desde Storage.
 async function cargarMiniaturas() {
   for (const el of document.querySelectorAll('#modalRoot [data-thumb]')) {
     try { const {data} = await sb.storage.from('comprobantes').createSignedUrl(el.dataset.thumb, 600); if (data && data.signedUrl) el.innerHTML = `<img src="${esc(data.signedUrl)}" alt="">`; } catch (_) {}
   }
 }
+// reabrirDetalle: Vuelve a abrir la ficha después de subir o quitar archivos.
 function reabrirDetalle() { const d = S.detAbierto; if (!d) return; if (d.tipo === 'vreg') return abrirRegModal(d.rt, d.id); if (d.tipo === 'tx') abrirDetalleTx(d.id); else abrirDetalle(d.id); }
+// subirAdjuntos: Sube archivos al Storage "comprobantes" y los registra.
 async function subirAdjuntos(files, tx, mov, vreg, vehiculo) {
   const ok = []; for (const f of files) {
     if (f.size > 10485760) { toast(`${f.name}: pesa más de 10 MB`); continue; }
@@ -1967,12 +2221,14 @@ async function subirAdjuntos(files, tx, mov, vreg, vehiculo) {
   if (ok.length) toast(ok.length === 1 ? 'Comprobante adjuntado' : `${ok.length} comprobantes adjuntados`);
   render(); reabrirDetalle();
 }
+// quitarAdjunto: Borra un comprobante.
 async function quitarAdjunto(id, silencio) {
   const x = (S.adj || []).find(z => z.id === id); if (!x) return;
   await sb.storage.from('comprobantes').remove([x.ruta]);
   await q(sb.from('adjuntos').delete().eq('id', id), silencio ? undefined : 'Comprobante quitado');
   S.adj = S.adj.filter(z => z.id !== id);
 }
+// ligarAdjuntos: Vincula comprobantes al registro de la app cuando se asocia una fila manual.
 async function ligarAdjuntos(movId, txId) {
   const l = (S.adj || []).filter(x => x.mov_id === movId && !x.tx_id); if (!l.length) return;
   const d = await q(sb.from('adjuntos').update({tx_id: txId}).eq('mov_id', movId).is('tx_id', null).select());
@@ -1980,10 +2236,12 @@ async function ligarAdjuntos(movId, txId) {
 }
 
 /* ================= asociar fila manual a un registro de la app ================= */
+// abrirAsociar: Ventana para asociar una fila manual a un registro de la app.
 function abrirAsociar(id) {
   const m = S.movs.get(id); if (!m) return;
   S.asoc = {id, q: '', tx: null, usar: {fecha: true, valor: true, desc: true, cat: true}, moverMes: false}; pintarAsoc();
 }
+// candidatosAsoc: Registros de la app candidatos para asociar.
 function candidatosAsoc(m, qq) {
   const v = Math.abs(+m.valor || 0); const code = m.lado === 'ingreso' ? 0 : 1; const Q = (qq || '').trim().toUpperCase();
   const num = parseFloat(Q.replace(/[^0-9.]/g, ''));
@@ -1992,6 +2250,7 @@ function candidatosAsoc(m, qq) {
   const pts = t => (cents(restante(t)) === cents(v) ? 0 : Math.min(9, Math.abs(restante(t) - v) / Math.max(v, 1) * 20)) + (m.fecha ? Math.min(30, dias(t.fecha, m.fecha)) / 3 : 5);
   return l.sort((a, b) => pts(a) - pts(b)).slice(0, 25);
 }
+// pintarAsoc: Dibuja los candidatos con buscador.
 function pintarAsoc() {
   const A = S.asoc; const m = S.movs.get(A.id); const c = ctrlById(m.control); const t = A.tx && D.byId.get(A.tx);
   const lista = candidatosAsoc(m, A.q);
@@ -2026,6 +2285,7 @@ function pintarAsoc() {
     </div></div></div>`;
   if (!t && S._focusAsoc) { const i = $('#asocQ'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } S._focusAsoc = false; }
 }
+// guardarAsoc: Guarda la asociación.
 async function guardarAsoc() {
   const A = S.asoc; const m = S.movs.get(A.id); const t = D.byId.get(A.tx); if (!m || !t) return;
   const c = ctrlById(m.control); const rest = restante(t);
@@ -2039,6 +2299,7 @@ async function guardarAsoc() {
 }
 
 /* ================= detalle de una fila ================= */
+// abrirDetalle: Ficha completa de una fila: datos, datos de la app, historial y comprobantes.
 function abrirDetalle(id) {
   const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin(); S.detAbierto = {tipo: 'fila', id};
   const t = m.tx_id ? D.byId.get(m.tx_id) : null; const cb = cambioDe(m);
@@ -2075,9 +2336,13 @@ function abrirDetalle(id) {
 }
 
 /* ================= reporte PDF ================= */
+// JSPDF_URL: Biblioteca para generar PDF (se carga solo cuando se usa).
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+// AUTOTABLE_URL: Complemento de tablas para PDF.
 const AUTOTABLE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+// cargarScript: Carga un script externo una sola vez.
 function cargarScript(src) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de PDF. Revisa tu internet.')); document.head.appendChild(s); }); }
+// exportarPDF: Genera el reporte PDF de un control y mes (completo o por persona).
 async function exportarPDF(c, mes, persona) {
   toast('Preparando PDF…');
   try {
@@ -2127,6 +2392,7 @@ async function exportarPDF(c, mes, persona) {
     descargar(`${base}${c.porMes ? '_' + mes : ''}.pdf`, doc.output('blob'));
   } catch (e) { toast('No se pudo generar el PDF: ' + (e && e.message || e)); }
 }
+// pdfPersona: Partes del PDF para una sola persona (sus gastos y los compartidos).
 function pdfPersona(doc, o) {
   const {c, mes, h, R, persona, val, titulo, tabla, der, W, H, M, gris} = o;
   const mio = r => r.tipo === persona || r.tipo === 'COMPARTIDO';
@@ -2156,18 +2422,21 @@ function pdfPersona(doc, o) {
   const limpio = t => t.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_');
   descargar(`${limpio(c.nombre)}${c.porMes ? '_' + mes : ''}_${limpio(persona)}.pdf`, doc.output('blob'));
 }
+// rellenarDatosApp: Completa datos de la app en filas que no los tienen.
 async function rellenarDatosApp() {
   const l = [...S.movs.values()].filter(m => m.tx_id && m.app_monto == null && D.byId.has(m.tx_id));
   for (const m of l) { const {data} = await sb.from('movimientos').update(snapApp(D.byId.get(m.tx_id))).eq('id', m.id).select(); if (data && data[0]) S.movs.set(m.id, normMov(data[0])); }
 }
 
 /* ================= vista: proyectos ================= */
+// totProy: Totales de un proyecto.
 function totProy(c) {
   const h = hoja(c.id, 'general'); const R = resumen(c, h);
   const fechas = h.egresos.concat(h.ingresos).map(r => r.fecha).filter(Boolean).sort();
   const pend = bandeja().filter(t => { const s = sugerido(t); return s && s.id === c.id; }).length;
   return {R, desde: fechas[0], hasta: fechas[fechas.length - 1], pend, filas: R.filas};
 }
+// vProyectos: VISTA PROYECTOS: lista de proyectos con totales.
 function vProyectos() {
   const a = esAdmin();
   const ab = proyectos().filter(c => !cerrado(c)), ce = proyectos().filter(cerrado);
@@ -2190,6 +2459,7 @@ function vProyectos() {
     <div class="panel"><div class="hd"><h2>Cerrados</h2><span class="muted small">${ce.length}</span></div>${tabla(ce, 'No hay proyectos cerrados.')}</div>
   </div>`;
 }
+// vConfigProy: Configuración de un proyecto.
 function vConfigProy(c) {
   const vacio = !totProy(c).filas;
   const conAcceso = S.accesos.filter(x => x.control === c.id).map(x => nombreDe(x.usuario));
@@ -2205,7 +2475,9 @@ function vConfigProy(c) {
 }
 
 /* ================= vista: movimientos (admin) ================= */
+// EST: Nombres de estados para filtros.
 const EST = {asignado: ['Asignado', 'app'], pendiente: ['Pendiente', 'warn'], noaplica: ['No aplica', ''], traslado: ['Traslado', ''], futuro: ['Programado', ''], anterior: ['Antes del inicio', ''], otro: ['Sin control', '']};
+// vMovimientos: VISTA MOVIMIENTOS (admin): todos los registros de la app con filtros y estados.
 function vMovimientos() {
   const f = S.filtros; const qq = f.q.toUpperCase();
   const all = D.txs; const cnt = {}; all.forEach(t => { const e = estadoTx(t); cnt[e] = (cnt[e] || 0) + 1; });
@@ -2241,6 +2513,7 @@ function vMovimientos() {
 }
 
 /* ================= vista: usuarios (admin) ================= */
+// vUsuarios: VISTA USUARIOS (admin): activar cuentas, rol, persona y accesos.
 function vUsuarios() {
   const personas = [...new Set(S.ctrls.flatMap(c => c.personas || []))];
   const ordenados = [...S.perfiles].sort((a, b) => (a.activo === b.activo ? 0 : a.activo ? 1 : -1) || (a.creado_el < b.creado_el ? -1 : 1));
@@ -2270,6 +2543,7 @@ function vUsuarios() {
 }
 
 /* ================= vista: ajustes (admin) ================= */
+// nombresPersonas: Nombres de personas usados (movimientos, participantes, perfiles) y aviso de nombres parecidos.
 function nombresPersonas() {
   const m = new Map(); const add = (n, k) => { n = String(n || '').trim(); if (!n || n === 'COMPARTIDO') return; if (!m.has(n)) m.set(n, {n, filas: 0, ctrls: new Set(), perfiles: 0}); const x = m.get(n); if (k === 'f') x.filas++; else if (k === 'p') x.perfiles++; else x.ctrls.add(k); };
   for (const mv of S.movs.values()) add(mv.tipo, 'f');
@@ -2280,6 +2554,7 @@ function nombresPersonas() {
   lista.forEach(x => { x.parecido = lista.filter(y => y !== x && dist(clave(x.n), clave(y.n)) <= 2).map(y => y.n); });
   return lista.sort((a, b) => a.n.localeCompare(b.n, 'es'));
 }
+// vNombres: Panel "Nombres de personas" para unificar nombres mal escritos.
 function vNombres() {
   if (!esAdmin()) return '';
   const l = nombresPersonas(); if (!l.length) return '';
@@ -2293,6 +2568,7 @@ function vNombres() {
     </tbody></table></div><datalist id="unifNombres">${l.map(x => `<option value="${esc(x.n)}">`).join('')}</datalist>
     <div class="bd note">Unificar cambia el nombre en todas las filas (TIPO de egresos y persona de ingresos), en los participantes de cada control y mes, y en el perfil del usuario.</div></div>`;
 }
+// unificarNombre: Reemplaza un nombre por otro en movimientos, participantes y perfiles.
 async function unificarNombre(de, a) {
   a = a.trim().toUpperCase(); if (!a || a === de) return toast('Escribe el nombre correcto, distinto al actual.');
   try {
@@ -2309,6 +2585,7 @@ async function unificarNombre(de, a) {
   } catch (e) {}
   derive(); render();
 }
+// vAjustes: VISTA AJUSTES (admin): fecha de inicio, controles, reglas, monedas, nombres.
 function vAjustes() {
   return `<div class="stack">
     <div><div class="eyebrow">Ajustes</div><h1>Controles y sincronización</h1></div>
@@ -2337,7 +2614,9 @@ function vAjustes() {
 }
 
 /* ================= sincronización (admin) ================= */
+// BM: Código del marcador (bookmarklet) que lee el portal de Registro Contable.
 const BM = `javascript:(async()=>{if(window.__cgRun)return;window.__cgRun=1;var y=new Date().getFullYear(),s=(y-1)+'-01-01',e=y+'-12-31';var fs=[].slice.call(document.querySelectorAll('input')).map(function(i){return(i.value||'').trim()}).filter(function(v){return/^\\d{4}-\\d{2}-\\d{2}$/.test(v)});if(fs.length>=2){fs.sort();s=fs[0];e=fs[fs.length-1]}var o=document.createElement('div');o.style.cssText='position:fixed;inset:0;z-index:999999;background:rgba(10,16,13,.6);display:flex;align-items:center;justify-content:center;font:15px -apple-system,Helvetica,sans-serif';o.innerHTML='<div style="background:#fff;color:#18211D;padding:26px;border-radius:12px;max-width:440px;text-align:center"><div id="cg-h" style="font-size:19px;font-weight:700">Leyendo…</div><p style="color:#5D6B64;margin:8px 0">Periodo: <input id="cg-d" type="date" style="font-size:14px"> a <input id="cg-e" type="date" style="font-size:14px"> <button id="cg-r" style="font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer">Leer</button></p><p style="color:#5D6B64;margin:6px 0">Cópialos y pégalos en Control de Gastos.</p><button id="cg-c" style="font-size:16px;padding:11px 20px;background:#1E6A50;color:#fff;border:0;border-radius:8px;cursor:pointer;font-weight:700">Copiar datos</button> <button id="cg-f" style="font-size:14px;padding:10px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer">Descargar archivo</button><p id="cg-m" style="color:#1E6A50;font-weight:600;min-height:20px"></p><button id="cg-x" style="font-size:13px;border:0;background:none;color:#5D6B64;cursor:pointer">Cerrar</button><textarea id="cg-t" style="position:fixed;left:-9999px;top:0"></textarea></div>';document.body.appendChild(o);var Q=function(x){return o.querySelector(x)},p='',ta=Q('#cg-t');Q('#cg-d').value=s;Q('#cg-e').value=e;var leer=async function(){var a=Q('#cg-d').value,b=Q('#cg-e').value;if(!a||!b||a>b){Q('#cg-m').textContent='Revisa las fechas.';return}Q('#cg-h').textContent='Leyendo…';Q('#cg-m').textContent='';p='';try{var t=await(await fetch('/moneyBook/getDataByPeriod?startDate='+a+'&endDate='+b+'&mbid=1&assetId=')).text();var d=new DOMParser().parseFromString(t,'text/xml');var g=function(r,n){var x=r.getElementsByTagName(n)[0];return x?x.textContent:''};var rows=[].slice.call(d.getElementsByTagName('row')).map(function(r){return[g(r,'id'),g(r,'mbDate'),+g(r,'inOutCode'),g(r,'payType'),g(r,'inOutType'),g(r,'mbCategory'),g(r,'subCategory'),g(r,'mbContent'),g(r,'mbDetailContent'),+g(r,'mbCash')]});p=JSON.stringify({v:1,src:'registro-contable',at:new Date().toISOString(),desde:a,hasta:b,rows:rows});ta.value=p;Q('#cg-h').textContent=rows.length+' movimientos listos'}catch(err){Q('#cg-h').textContent='No se pudo leer';Q('#cg-m').textContent='Abre esto en el portal de la app con el servicio Wi-Fi activo. '+err}};Q('#cg-r').onclick=leer;Q('#cg-x').onclick=function(){o.remove();window.__cgRun=0};Q('#cg-c').onclick=function(){if(!p)return;ta.focus();ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(_){}Q('#cg-m').textContent=ok?'Copiado. Vuelve a Control de Gastos y pega (Cmd+V).':'No se pudo copiar. Usa Descargar archivo.'};Q('#cg-f').onclick=function(){if(!p)return;var l=document.createElement('a');l.href=URL.createObjectURL(new Blob([p],{type:'application/json'}));l.download='registro-contable-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(l);l.click();l.remove();Q('#cg-m').textContent='Archivo descargado. Súbelo en Control de Gastos.'};leer()})();`;
+// vBookmarklet: Instrucciones y botón del marcador.
 function vBookmarklet() {
   return `<p class="small" style="margin:0">Se configura una sola vez. Arrastra este botón a tu barra de favoritos de Safari o Chrome:</p>
     <div><a class="bm" href="${esc(BM)}" draggable="true" onclick="return false">Enviar a Control de Gastos</a></div>
@@ -2345,14 +2624,20 @@ function vBookmarklet() {
     <div class="row"><button class="btn sm" data-act="copiarBM">Copiar código</button></div>
     <code class="blk" id="bmCode">${esc(BM)}</code>`;
 }
+// normPortal: Normaliza la dirección del portal (http://IP:puerto).
 function normPortal(v) { v = (v || '').trim(); if (!v) return ''; if (!/^https?:\/\//i.test(v)) v = 'http://' + v; try { const u = new URL(v); return u.protocol + '//' + u.host; } catch (_) { return ''; } }
+// portalActual: Dirección del portal guardada.
 function portalActual() { return normPortal(S.aj.portal || lsGet('portal') || ''); }
+// urlDatos: Dirección del XML del portal para un período.
 function urlDatos(base) { const y = new Date().getFullYear(); return `${base}/moneyBook/getDataByPeriod?startDate=${y - 1}-01-01&endDate=${y}-12-31&mbid=1&assetId=`; }
+// pintarEnlaces: Actualiza los enlaces del portal en la ventana de sincronización.
 function pintarEnlaces() {
   const base = portalActual();
   [['#lnkPortal', base], ['#lnkDatos', base && urlDatos(base)]].forEach(([s, u]) => { const a = $(s); if (a) { a.href = u || '#'; a.style.opacity = u ? 1 : .45; a.style.pointerEvents = u ? '' : 'none'; } });
 }
+// HELPER: Servidor auxiliar local (si existe) para leer el portal directo.
 let HELPER = null;
+// detectarServidor: Revisa si el servidor auxiliar está disponible.
 async function detectarServidor() {
   const probar = async base => { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 1500);
     try { const r = await fetch(base + '/api/ping', {signal: ac.signal, cache: 'no-store'}); if (!r.ok) return false; const j = await r.json(); return !!j.ok; } catch (_) { return false; } finally { clearTimeout(t); } };
@@ -2360,6 +2645,7 @@ async function detectarServidor() {
   else if (location.protocol === 'https:' && await probar('http://localhost:8765')) HELPER = 'http://localhost:8765';
   if (S.view === 'ajustes') render();
 }
+// abrirSync: Ventana de sincronización (pegar datos del portal).
 function abrirSync(auto) {
   const base = portalActual();
   const directo = HELPER !== null;
@@ -2385,6 +2671,7 @@ function abrirSync(auto) {
   pintarEnlaces();
   if (directo && auto && base) syncDirecto(); else setTimeout(() => { const i = directo || !base ? $('#portalIn') : $('#pasteBox'); i && i.focus(); }, 50);
 }
+// xmlAPayload: Convierte el XML del portal en el paquete de datos de la plataforma.
 function xmlAPayload(txt) {
   const i = txt.search(/<\?xml|<dataset/i); if (i < 0) return null;
   const d = new DOMParser().parseFromString(txt.slice(i), 'text/xml');
@@ -2395,6 +2682,7 @@ function xmlAPayload(txt) {
   const f = rows.map(r => r[1]).sort();
   return {v: 1, src: 'registro-contable', at: new Date().toISOString(), desde: f[0], hasta: f[f.length - 1], rows};
 }
+// syncDirecto: Sincroniza leyendo el portal directamente (con el servidor auxiliar).
 async function syncDirecto() {
   const msg = $('#syncMsg'); const base = portalActual(); const btn = $('#btnSyncDirecto');
   if (!base) { msg.innerHTML = '<span class="neg">Pega primero la dirección que muestra la app.</span>'; $('#portalIn').focus(); return; }
@@ -2409,6 +2697,7 @@ async function syncDirecto() {
   } catch (e) { msg.innerHTML = '<span class="neg">No pude comunicarme con el servidor local. ¿Sigue abierta la ventana de "Control de Gastos" en tu Mac?</span>'; }
   finally { if (btn) btn.disabled = false; }
 }
+// procesarPayload: Recibe los datos pegados y calcula nuevos, modificados y eliminados (vista previa).
 async function procesarPayload(txt) {
   const msg = $('#syncMsg');
   let p = null; try { p = JSON.parse(txt); } catch (_) { p = xmlAPayload(txt); }
@@ -2434,7 +2723,9 @@ async function procesarPayload(txt) {
   if (!mods.length && !dels.length) return aplicarSync(ctx);
   S.syncPend = ctx; pintarPrevia();
 }
+// asigTxt: Texto de cómo está asignado un registro.
 function asigTxt(id) { const pp = partes(id); return pp.length ? pp.map(m => { const c = ctrlById(m.control); return `${c ? (c.corto || c.nombre) : m.control} · ${m.mes === 'general' ? 'proyecto' : mesLargo(m.mes)} · ${L(m.valor)}`; }).join(' / ') : ''; }
+// pintarPrevia: Dibuja la vista previa de la sincronización con las decisiones.
 function pintarPrevia() {
   const X = S.syncPend; if (!X) return; const msg = $('#syncMsg'); if (!msg) return;
   const radio = (id, v, txt) => `<label class="small row" style="gap:5px"><input type="radio" name="dec-${esc(id)}" data-dec="${esc(id)}" value="${v}" ${X.dec[id] === v ? 'checked' : ''}>${txt}</label>`;
@@ -2456,6 +2747,7 @@ function pintarPrevia() {
     </div>
     <div class="bd row" style="justify-content:flex-end;border-top:1px solid var(--line)"><button class="btn" data-act="prevCancelar">Cancelar</button><button class="btn pri" data-act="prevGuardar">Guardar sincronización</button></div></div>`;
 }
+// aplicarSync: Aplica la sincronización: guarda los meses, decisiones e historial.
 async function aplicarSync(X) {
   const msg = $('#syncMsg'); const {p, desde, hasta, prevRaw, inMap} = X; const at = p.at || new Date().toISOString();
   const cambiosAntes = cambios().length; const prevTx = new Map(D.byId);
@@ -2492,6 +2784,7 @@ async function aplicarSync(X) {
   const nc = cambios().length;
   msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${prevRaw.size ? `${X.nuevos} nuevos${X.mods.length ? `; modificados: ${nApp} con la versión de la app${nWeb ? `, ${nWeb} con la versión web` : ''}` : ''}${X.dels.length ? `; borrados en la app: ${nBor} aplicados${nMan ? `, ${nMan} mantenidos` : ''}` : ''}.` : ''} ${mesesCamb.length} ${mesesCamb.length === 1 ? 'mes actualizado' : 'meses actualizados'}.${filasAct ? ` ${filasAct} ${filasAct === 1 ? 'fila asignada se actualizó' : 'filas asignadas se actualizaron'}.` : ''}${nc > cambiosAntes ? ` <b class="neg">${nc - cambiosAntes} filas asignadas por revisar.</b> <a href="#cambios" data-act="cerrarModal">Revisar cambios</a> ·` : ''} <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
 }
+// eliminarTx: Elimina un registro que se borró en la app y se había conservado.
 async function eliminarTx(id) {
   const t = D.byId.get(id); if (!t) return; const at = new Date().toISOString();
   try {
@@ -2505,10 +2798,15 @@ async function eliminarTx(id) {
 }
 
 /* ================= historial de sincronización ================= */
+// fmtTasa: Formato de tasa de cambio (4 decimales).
 const fmtTasa = v => (+v).toLocaleString('es-HN', {minimumFractionDigits: 2, maximumFractionDigits: 4});
+// fmtOrig: Formato del monto original en moneda extranjera.
 const fmtOrig = (m, v) => `${m === 'USD' ? '$' : m + ' '}${(+v).toLocaleString('es-HN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+// fxTxt: Indicador de moneda extranjera en una fila.
 const fxTxt = t => t && t.moneda ? `<span class="fx" title="Monto original ${fmtOrig(t.moneda, t.original)} a una tasa de ${fmtTasa(t.tasa)}"><span class="chip fxc">${esc(t.moneda)}</span> ${fmtOrig(t.moneda, t.original)} × ${fmtTasa(t.tasa)}</span>` : t && t.sinTasa && S.mon ? '<span class="fx" title="Cuenta en dólares sin datos de moneda. Sube el Excel de Registro Contable en Sincronizar.">$ sin tasa</span>' : '';
+// fxFilas: Filas de detalle de moneda extranjera.
 const fxFilas = (t, fila) => t && t.moneda ? fila('Moneda', `<span class="chip fxc" style="margin:0">${esc(t.moneda)}</span>`) + fila('Monto original', `<span class="num">${fmtOrig(t.moneda, t.original)}</span>`) + fila('Tasa de cambio', `<span class="num">${fmtTasa(t.tasa)}</span>`) + fila('Valor en lempiras', `<b class="num">${L(t.monto)}</b>`) + (cents(t.montoApp) !== cents(t.monto) && cents(t.montoApp) !== cents(t.original) ? fila('Importe en el portal', `<span class="num">${t.montoApp.toFixed(2)}</span>`) : '') : t && t.sinTasa ? fila('Moneda', S.mon ? 'Cuenta en dólares: falta subir el Excel de Registro Contable para conocer el monto original y la tasa' : 'Cuenta en dólares') : '';
+// importarMonedas: Importa el Excel exportado de la app para obtener la moneda y el valor en lempiras.
 async function importarMonedas(file, msg) {
   if (!S.mon) { msg.innerHTML = '<span class="neg">Primero corre en Supabase el SQL de monedas (tabla tx_moneda).</span>'; return; }
   msg.textContent = 'Leyendo Excel…';
@@ -2538,8 +2836,11 @@ async function importarMonedas(file, msg) {
   const nc = cambios().length;
   msg.innerHTML = `<b class="pos">Listo.</b> ${leidas} filas leídas del Excel, ${extranjeras} en otra moneda. ${filas.length} quedaron con su monto original y su tasa${sinPar ? `; ${sinPar} no se encontraron entre lo sincronizado (sincroniza ese periodo primero)` : ''}.${nc ? ` <a href="#cambios" data-act="cerrarModal">Revisar ${nc} en Cambios</a>` : ''}`;
 }
+// CAMPOS_TX: Campos que se comparan para detectar cambios en un registro.
 const CAMPOS_TX = [['monto', 'Monto', v => L(v)], ['fecha', 'Fecha', v => fFecha(v)], ['det', 'Detalle'], ['cuenta', 'Cuenta'], ['cat', 'Categoría'], ['sub', 'Subcategoría'], ['nota', 'Contenido'], ['tipoMov', 'Tipo en la app']];
+// difTx: Diferencias entre dos versiones de un registro.
 function difTx(o, t) { return CAMPOS_TX.filter(([k]) => k === 'monto' ? cents(o.monto) !== cents(t.monto) : (o[k] || '') !== (t[k] || '')).map(([k, n, f]) => [n, f ? f(o[k]) : (o[k] || ''), f ? f(t[k]) : (t[k] || '')]); }
+// registrarHistorial: Guarda en el historial la versión inicial y los cambios de cada registro.
 async function registrarHistorial(prevTx, at, desde, hasta, msg, extra) {
   if (!S.hist) return;
   const cambiar = []; const ahora = new Date().toISOString(); const vacio = S.hist.size === 0;
@@ -2552,11 +2853,13 @@ async function registrarHistorial(prevTx, at, desde, hasta, msg, extra) {
   for (const [id, ents] of Object.entries(extra || {})) { const k = cambiar.findIndex(x => x.tx_id === id); const base = k >= 0 ? cambiar[k] : S.hist.get(id); if (!base) continue; const nh = Object.assign({}, base, {cambios: [...(base.cambios || []), ...ents]}); if (k >= 0) cambiar[k] = nh; else cambiar.push(nh); }
   for (let i = 0; i < cambiar.length; i += 500) { const lote = cambiar.slice(i, i + 500); if (msg && cambiar.length > 500) msg.textContent = `Guardando historial… ${Math.min(i + 500, cambiar.length)} de ${cambiar.length}`; await q(sb.from('tx_hist').upsert(lote)); lote.forEach(x => S.hist.set(x.tx_id, x)); }
 }
+// iniciarHistorial: Crea el historial inicial de los registros que no lo tienen.
 async function iniciarHistorial() {
   if (!S.hist || S.hist.size || !D.txs.length) return;
   const ahora = new Date().toISOString(); const filas = D.txs.map(t => ({tx_id: t.id, primera: null, visto: ahora, cambios: []}));
   for (let i = 0; i < filas.length; i += 500) { const lote = filas.slice(i, i + 500); await q(sb.from('tx_hist').upsert(lote)); lote.forEach(x => S.hist.set(x.tx_id, x)); }
 }
+// abrirDetalleTx: Ficha completa de un registro de la app con su historial.
 function abrirDetalleTx(id) {
   const t = D.byId.get(id); if (!t) return; S.detAbierto = {tipo: 'tx', id};
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
@@ -2592,6 +2895,7 @@ function abrirDetalleTx(id) {
 }
 
 /* ================= acciones ================= */
+// asignar: Asigna registros de la app a un control (crea movimientos válidos).
 async function asignar(ids, ctrlId, tipo, mesFijo, grupo) {
   const c = ctrlById(ctrlId); if (!c) return toast('Elige un control o proyecto.'); if (cerrado(c)) return toast('Ese proyecto está cerrado.');
   S.enCurso = S.enCurso || new Set();
@@ -2603,11 +2907,13 @@ async function asignar(ids, ctrlId, tipo, mesFijo, grupo) {
   ids.forEach(id => { S.sel.delete(id); S.enCurso.add(id); });
   try { await insertarMovs(rows, `${rows.length === 1 ? 'Asignado' : rows.length + ' asignados'} a ${c.corto || c.nombre}`); } catch (e) {} finally { ids.forEach(id => S.enCurso.delete(id)); }
 }
+// ignorar: Marca registros como "no aplica".
 async function ignorar(ids) {
   const rows = ids.map(id => ({tx_id: id, motivo: 'Marcado como no aplica'}));
   await q(sb.from('ignorados').upsert(rows), ids.length === 1 ? 'Marcado como no aplica' : `${ids.length} marcados como no aplica`).catch(() => null);
   rows.forEach(r => S.ign.set(r.tx_id, r)); ids.forEach(id => S.sel.delete(id)); derive(); render();
 }
+// exportar: Exporta a Excel el control y mes.
 async function exportar(c) {
   toast('Preparando Excel…');
   try {
@@ -2619,10 +2925,15 @@ async function exportar(c) {
     descargar(c.nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_') + '.xlsx', new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   } catch (e) { toast('No se pudo exportar: ' + (e && e.message || e)); }
 }
+// descargar: Descarga un archivo generado.
 function descargar(nombre, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
+// MONEYF: Formato de moneda para Excel.
 const MONEYF = '_-"L"* #,##0.00_-;\\-"L"* #,##0.00_-;_-"L"* "-"??_-;_-@_-';
+// estiloHdr: Estilo de encabezados en Excel.
 function estiloHdr(cell) { cell.font = {bold: true, name: 'Calibri', size: 12}; cell.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFE2EFDA'}}; cell.border = {bottom: {style: 'thin'}}; }
+// fechaX: Fecha para Excel.
 function fechaX(s) { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+// hojaFamiliar: Hoja de Excel de un control mensual (con fórmulas y reparto).
 function hojaFamiliar(wb, c, h0) {
   const h = {egresos: h0.egresos.filter(r => r.estado === 'valido'), ingresos: h0.ingresos.filter(r => r.estado === 'valido')};
   const ws = wb.addWorksheet(mesHoja(h0.mes));
@@ -2661,6 +2972,7 @@ function hojaFamiliar(wb, c, h0) {
   [ws.getCell(B + 2, 2), ws.getCell(sg, 6), ws.getCell(st, 10)].forEach(x => x.font = {bold: true});
   ws.views = [{state: 'frozen', ySplit: 3}];
 }
+// hojaProyecto: Hoja de Excel de un proyecto.
 function hojaProyecto(wb, c, h0) {
   const h = {egresos: h0.egresos.filter(r => r.estado === 'valido'), ingresos: h0.ingresos.filter(r => r.estado === 'valido')};
   const ws = wb.addWorksheet((c.corto || c.nombre).replace(/[\\/?*[\]:]/g, '').slice(0, 28) || 'Proyecto');
@@ -2679,10 +2991,14 @@ function hojaProyecto(wb, c, h0) {
   [T, T + 2].forEach(r => { ws.getCell(r, 4).font = {bold: true}; ws.getCell(r, 5).numFmt = MONEYF; ws.getCell(r, 9).numFmt = MONEYF; });
   ws.views = [{state: 'frozen', ySplit: 2}];
 }
+// movDe: Movimiento de la fila donde se tocó un botón.
 const movDe = el => { const tr = el.closest('[data-mov]'); return tr && S.movs.get(tr.dataset.mov); };
 
 document.addEventListener('submit', e => { if (e.target.id === 'authForm') { e.preventDefault(); enviarAuth(e.target); } });
 document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; }); }, true);
+/* ================= acciones de la interfaz =================
+   Un solo escuchador para todos los botones: busca el elemento con data-act
+   más cercano al clic y ejecuta la acción con ese nombre. */
 document.addEventListener('click', async e => {
   const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -2877,6 +3193,7 @@ document.addEventListener('click', async e => {
     return guardarControl(c).then(() => { S.ctrls.push(c); render(); toast('Control creado. Ajusta sus reglas abajo.'); }).catch(() => {});
   }
 });
+/* Cambios en listas, casillas y campos (se disparan al salir del campo o elegir una opción). */
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
@@ -2941,6 +3258,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'fileIn' && t.files[0]) { const f = t.files[0]; if (/\.xlsx$/i.test(f.name)) { const msg = $('#syncMsg'); try { await importarMonedas(f, msg); } catch (e) { msg.innerHTML = `<span class="neg">No se pudo leer el Excel: ${esc(errMsg(e))}</span>`; } t.value = ''; return; } procesarPayload(await f.text()); }
 });
 let qT;
+/* Escritura en buscadores y campos que se actualizan mientras escribes. */
 document.addEventListener('input', e => {
   if (e.target.id === 'credBus') { S.credBus = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => { S._focusCB = true; render(); }, 250); return; }
   if (e.target.id === 'pegTxt') return prevPegar();
@@ -2955,6 +3273,7 @@ document.addEventListener('paste', e => {
   const txt = (e.clipboardData || window.clipboardData).getData('text'); e.target.value = txt.slice(0, 200) + (txt.length > 200 ? '…' : '');
   procesarPayload(txt);
 });
+/* Atajos de teclado: Enter para guardar en formularios y abrir filas, Escape para cerrar ventanas. */
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr.cr-row[data-act]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
