@@ -241,7 +241,7 @@ code.blk{display:block;white-space:pre-wrap;word-break:break-all;font-family:var
 tr.cr-row{cursor:pointer}tr.cr-sel td{background:var(--accent-soft)!important}
 .cr-bar{display:inline-block;width:70px;height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;vertical-align:middle}.cr-bar i{display:block;height:100%;background:var(--accent)}
 .cr-split{display:flex;height:10px;border-radius:99px;overflow:hidden;margin:12px 14px 8px}.cr-split i{display:block;height:100%}
-.cr-cap{background:var(--accent)!important}.cr-int{background:var(--bad)!important}.cr-seg{background:#3a6ea5!important}.cr-com{background:var(--warn)!important}
+.cr-cap{background:var(--accent)!important}.cr-int{background:var(--bad)!important}.cr-seg{background:#3a6ea5!important}.cr-com{background:var(--warn)!important}.cr-mor{background:#8a4fa3!important}
 .cr-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px}
 .cr-plan td,.cr-plan th{padding:6px 8px;font-size:12.5px}
 .cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:18px;align-items:start}
@@ -250,7 +250,7 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 .cr-rec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;background:var(--panel)}
 .cr-sug{background:var(--sunk);border-style:dashed}
 .cr-rh{display:flex;gap:10px;align-items:center}.cr-rh b{font-size:13px;font-weight:600}
-.cr-parts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cr-parts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 .cr-parts label{display:grid;gap:3px;font-size:11px;font-weight:600;color:var(--muted)}
 .cr-parts input{height:32px;border:1px solid var(--line);border-radius:7px;padding:0 8px;background:var(--panel);color:var(--fg);text-align:right;width:100%;min-width:0;font-size:12.5px}
 @media (max-width:520px){.cr-parts{grid-template-columns:1fr 1fr}}
@@ -1698,10 +1698,10 @@ function dibujarVeh() {
   cargarFotosVeh();
 }
 /* ===== Créditos: proyección del plan y conciliación con registros reales (solo administrador) ===== */
-// CR_CON: Conceptos de una cuota: capital, interés, seguro, comisiones.
-const CR_CON = ['cap', 'int', 'seg', 'com'];
+// CR_CON: Conceptos de una cuota: capital, interés, seguro, comisiones y mora (recargo por pago atrasado).
+const CR_CON = ['cap', 'int', 'seg', 'com', 'mor'];
 // CR_N: Nombres visibles de los conceptos.
-const CR_N = {cap: 'Capital', int: 'Interés', seg: 'Seguro', com: 'Comisiones'};
+const CR_N = {cap: 'Capital', int: 'Interés', seg: 'Seguro', com: 'Comisiones', mor: 'Mora'};
 // CR_TIPO: Tipos de crédito: [etiqueta corta, clase de color, nombre largo].
 const CR_TIPO = {intra: ['Intra', 'cr-intra', 'Intrafinanciamiento'], extra: ['Extra', 'cr-extra', 'Extrafinanciamiento'], prestamo: ['Préstamo', 'cr-pres', 'Préstamo']};
 // crR2: Redondeo a 2 decimales con signo (igual que el reparto).
@@ -1734,11 +1734,11 @@ function proyectar(c) {
   return out;
 }
 // qVal: Montos proyectados de una cuota por concepto.
-const qVal = q => ({cap: +q.capital || 0, int: +q.interes || 0, seg: +q.seguro || 0, com: +q.comisiones || 0});
+const qVal = q => ({cap: +q.capital || 0, int: +q.interes || 0, seg: +q.seguro || 0, com: +q.comisiones || 0, mor: +q.mora || 0});
 // realCuota: Montos reales de una cuota por concepto (suma de enlaces).
-function realCuota(qid) { const o = {cap: 0, int: 0, seg: 0, com: 0}; enlCuota(qid).forEach(e => { o[e.concepto] = crR2(o[e.concepto] + (+e.monto || 0)); }); return o; }
+function realCuota(qid) { const o = {cap: 0, int: 0, seg: 0, com: 0, mor: 0}; enlCuota(qid).forEach(e => { o[e.concepto] = crR2(o[e.concepto] + (+e.monto || 0)); }); return o; }
 // crTot: Suma de los cuatro conceptos.
-const crTot = o => crR2(o.cap + o.int + o.seg + o.com);
+const crTot = o => crR2(o.cap + o.int + o.seg + o.com + (o.mor || 0));
 // estadoCuota: Estado de una cuota: Conciliada (marcada a mano), Parcial, Cuadra, Con diferencia, Sin registros, Próxima o Pendiente.
 function estadoCuota(q) {
   if (q.conciliada) return ['Conciliada', 'app'];
@@ -1754,11 +1754,12 @@ function resumenCred(c) {
   const cs = cuotasDe(c.id); const enl = (S.cenl || []).filter(e => e.credito === c.id);
   const capReal = enl.filter(e => e.concepto === 'cap').reduce((s, e) => s + (+e.monto || 0), 0);
   const intReal = enl.filter(e => e.concepto === 'int').reduce((s, e) => s + (+e.monto || 0), 0);
+  const moraReal = enl.filter(e => e.concepto === 'mor').reduce((s, e) => s + (+e.monto || 0), 0);
   const conc = cs.filter(q => q.conciliada).length;
   const prox = cs.find(q => !q.conciliada && !crTot(realCuota(q.id)) && q.fecha >= hoy()) || null;
   const sinReg = cs.filter(q => estadoCuota(q)[0] === 'Sin registros').length;
-  const costo = cs.reduce((s, q) => s + (+q.interes || 0) + (+q.seguro || 0) + (+q.comisiones || 0), 0);
-  return {cs, conc, prox, sinReg, capReal, intReal, saldo: crR2((+c.capital || 0) - capReal), costo, fin: cs.length ? cs[cs.length - 1].fecha : null};
+  const costo = cs.reduce((s, q) => s + (+q.interes || 0) + (+q.seguro || 0) + (+q.comisiones || 0) + (+q.mora || 0), 0);
+  return {cs, conc, prox, sinReg, capReal, intReal, moraReal, saldo: crR2((+c.capital || 0) - capReal), costo, fin: cs.length ? cs[cs.length - 1].fecha : null};
 }
 // crRefInfo: Datos visibles de un registro enlazado (descripción, fecha, cuenta, monto).
 function crRefInfo(e) {
@@ -1789,9 +1790,9 @@ function vCreditos() {
   if (S.cred === null) return `<div class="stack">${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de créditos (creditos.sql).</div></div></div>`;
   const lista = creditos();
   if (!S.credSel || !credById(S.credSel)) S.credSel = lista[0] ? lista[0].id : null;
-  let kCuota = 0, kSaldo = 0, kInt = 0, kSin = 0;
+  let kCuota = 0, kSaldo = 0, kInt = 0, kSin = 0, kMora = 0;
   const filas = lista.map(c => { const R = resumenCred(c); const act = c.estado !== 'cancelado';
-    if (act) { kCuota += R.prox ? +R.prox.cuota : 0; kSaldo += R.saldo; kSin += R.sinReg; } kInt += R.intReal;
+    if (act) { kCuota += R.prox ? +R.prox.cuota : 0; kSaldo += R.saldo; kSin += R.sinReg; } kInt += R.intReal; kMora += R.moraReal;
     const e = R.prox ? estadoCuota(R.prox) : null; const T = CR_TIPO[c.tipo] || CR_TIPO.prestamo;
     return `<tr class="cr-row ${c.id === S.credSel ? 'cr-sel' : ''}" data-act="credSel" data-id="${c.id}" tabindex="0"><td><b>${esc(c.nombre)}</b><div class="cat">${R.cs.length} cuotas${R.fin ? ' · termina ' + mesLargo(R.fin.slice(0, 7)).toLowerCase() : ''}${act ? '' : ' · cancelado'}</div></td>
       <td><span class="cr-pill ${T[1]}">${T[0]}</span></td><td class="small muted">${esc([c.entidad, c.cuenta].filter(Boolean).join(' · '))}</td>
@@ -1805,6 +1806,7 @@ function vCreditos() {
     <div class="kpis"><div class="kpi"><div class="eyebrow">Próximas cuotas</div><div class="v">${L(kCuota)}</div><div class="note">proyectado de los créditos activos</div></div>
       <div class="kpi"><div class="eyebrow">Saldo de capital</div><div class="v">${L(kSaldo)}</div><div class="note">capital menos lo pagado en registros</div></div>
       <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v neg">${L(kInt)}</div><div class="note">según registros vinculados</div></div>
+      <div class="kpi"><div class="eyebrow">Moras pagadas</div><div class="v ${kMora ? 'neg' : ''}">${L(kMora)}</div><div class="note">recargos por pagos atrasados</div></div>
       <div class="kpi"><div class="eyebrow">Cuotas sin registros</div><div class="v">${kSin}</div><div class="note">${kSin ? 'vencidas sin pago vinculado' : 'todo relacionado'}</div></div></div>
     <div class="panel"><div class="hd"><h2 style="margin-right:auto">Créditos</h2></div>
       ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Crédito</th><th>Tipo</th><th>Entidad · cuenta</th><th class="num">Próxima cuota</th><th class="num">Saldo capital</th><th>Conciliadas</th><th>Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`
@@ -1819,7 +1821,9 @@ function vCredFicha(c) {
   S.cuoSel = S.cuoSel || {};
   if (!S.cuoSel[c.id] || !cs.find(q => q.numero === S.cuoSel[c.id])) { const lim = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10); const pasadas = cs.filter(q => q.fecha <= lim); S.cuoSel[c.id] = (pasadas.find(q => !q.conciliada) || pasadas[pasadas.length - 1] || cs[0]).numero; }
   const ks = S.cuoSel[c.id]; const q = cs.find(x => x.numero === ks);
-  const tot = cs.reduce((a, x) => ({cap: a.cap + (+x.capital || 0), int: a.int + (+x.interes || 0), seg: a.seg + (+x.seguro || 0), com: a.com + (+x.comisiones || 0)}), {cap: 0, int: 0, seg: 0, com: 0}); const TT = crTot(tot) || 1;
+  const tot = cs.reduce((a, x) => ({cap: a.cap + (+x.capital || 0), int: a.int + (+x.interes || 0), seg: a.seg + (+x.seguro || 0), com: a.com + (+x.comisiones || 0), mor: a.mor + (+x.mora || 0)}), {cap: 0, int: 0, seg: 0, com: 0, mor: 0}); const TT = crTot(tot) || 1;
+  // conMora: la columna y el concepto Mora solo se muestran si el crédito tiene alguna mora proyectada o pagada.
+  const conMora = cs.some(x => +x.mora) || (S.cenl || []).some(e => e.credito === c.id && e.concepto === 'mor'); const CONV = conMora ? CR_CON : CR_CON.filter(k => k !== 'mor');
   let rows = cs; if (!S.credTodo) { const a = Math.max(0, Math.min(ks - 3, cs.length - 8)); rows = cs.slice(a, a + 8); }
   const tasa = `${(+c.tasa || 0).toLocaleString('en-US', {maximumFractionDigits: 4})} % ${c.tasa_tipo === 'mensual' ? 'mensual' : 'anual'}`;
   const seg = +c.seguro ? (c.seguro_tipo === 'saldo' ? `${+c.seguro} % del saldo` : L(+c.seguro) + ' al mes') : 'sin seguro';
@@ -1828,13 +1832,13 @@ function vCredFicha(c) {
       <div class="row" style="gap:6px">${icoBtn('editar', 'Editar contrato', 'credForm')}${S.confirmCredL === c.id ? `<button class="btn sm danger" data-act="credBorrarL" data-id="${c.id}">¿Eliminar crédito? Sí</button><button class="btn sm ghost" data-act="credBorrarNo">No</button>` : icoBtn('borrar', 'Eliminar crédito', 'credBorrarL', '', 'danger')}<button class="btn sm" data-act="credPegar" data-id="${c.id}">Pegar plan del banco</button><button class="btn sm" data-act="credRecalc" data-id="${c.id}">Recalcular plan</button></div></div>
     <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Cuota proyectada</div><div class="v">${L(+q.cuota || 0)}</div></div>
-      <div class="kpi"><div class="eyebrow">Costo proyectado</div><div class="v neg">${L(tot.int + tot.seg + tot.com)}</div><div class="note">interés + seguro + comisiones</div></div>
-      <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v">${L(R.intReal)}</div><div class="note">según registros</div></div>
+      <div class="kpi"><div class="eyebrow">Costo proyectado</div><div class="v neg">${L(tot.int + tot.seg + tot.com + tot.mor)}</div><div class="note">interés + seguro + comisiones${conMora ? ' + moras' : ''}</div></div>
+      <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v">${L(R.intReal)}</div><div class="note">según registros${R.moraReal ? ` · moras <span class="neg">${L(R.moraReal)}</span>` : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Termina</div><div class="v">${R.fin ? mesLargo(R.fin.slice(0, 7)) : '—'}</div><div class="note">${R.conc} de ${cs.length} conciliadas</div></div></div>
-    <div class="cr-split" aria-hidden="true">${CR_CON.map(k => `<i class="cr-${k}" style="width:${(tot[k] / TT * 100).toFixed(2)}%"></i>`).join('')}</div>
-    <div class="leg" style="padding:0 14px 10px">${CR_CON.map(k => `<span><i class="cr-${k}"></i>${CR_N[k]} ${L(tot[k])}</span>`).join('')}</div>
-    <div class="tbl-wrap"><table class="cr-plan"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th><th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
-      ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num">${x.numero}</td><td class="num">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td><td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td><span class="chip ${e[1]}">${e[0]}</span>${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
+    <div class="cr-split" aria-hidden="true">${CONV.map(k => `<i class="cr-${k}" style="width:${(tot[k] / TT * 100).toFixed(2)}%"></i>`).join('')}</div>
+    <div class="leg" style="padding:0 14px 10px">${CONV.map(k => `<span><i class="cr-${k}"></i>${CR_N[k]} ${L(tot[k])}</span>`).join('')}</div>
+    <div class="tbl-wrap"><table class="cr-plan"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th>${conMora ? '<th class="num">Mora</th>' : ''}<th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num">${x.numero}</td><td class="num">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td>${conMora ? `<td class="num ${+x.mora ? 'neg' : 'muted'}">${+x.mora ? L(+x.mora) : '—'}</td>` : ''}<td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td><span class="chip ${e[1]}">${e[0]}</span>${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}${+x.mora || realCuota(x.id).mor ? ' <span class="chip bad" title="Esta cuota tiene mora">mora</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
     </tbody></table></div>
     <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line)"><span class="note">${S.credTodo ? cs.length + ' cuotas' : `Cuotas ${rows[0].numero}–${rows[rows.length - 1].numero} de ${cs.length}`} · toca una cuota para relacionarla</span><button class="btn sm" data-act="credTodo">${S.credTodo ? 'Ver menos' : 'Ver plan completo'}</button></div>
   </div>
@@ -1888,8 +1892,8 @@ function crMontoRef(ref) { const id = ref.slice(2); if (ref[0] === 't') { const 
 function crDesgloseProy(qid, ref, adivinar) {
   const q0 = S.ccuo.find(x => x.id === qid); const monto = crMontoRef(ref);
   if (adivinar) { let txt = ''; if (ref[0] === 't') { const t = D.byId.get(ref.slice(2)); txt = t ? [t.nota, t.det, t.cat, t.sub].join(' ').toLowerCase() : ''; } else { const m = S.movs.get(ref.slice(2)); txt = m ? (m.descripcion || '').toLowerCase() : ''; }
-    const g = /seguro/.test(txt) ? 'seg' : /comisi|cargo admin|administraci/.test(txt) ? 'com' : /inter[eé]s/.test(txt) ? 'int' : null; if (g) return {[g]: monto}; }
-  const ya = {cap: 0, int: 0, seg: 0, com: 0}; (S.cenl || []).filter(e => e.cuota === qid && refKey(e) !== ref).forEach(e => { ya[e.concepto] += +e.monto || 0; });
+    const g = /mora|moratori|recargo|atraso|penalidad|penalizaci/.test(txt) ? 'mor' : /seguro/.test(txt) ? 'seg' : /comisi|cargo admin|administraci/.test(txt) ? 'com' : /inter[eé]s/.test(txt) ? 'int' : null; if (g) return {[g]: monto}; }
+  const ya = {cap: 0, int: 0, seg: 0, com: 0, mor: 0}; (S.cenl || []).filter(e => e.cuota === qid && refKey(e) !== ref).forEach(e => { ya[e.concepto] += +e.monto || 0; });
   const pr = qVal(q0); const out = {}; let rest = monto;
   for (const k of CR_CON) { const v = crR2(Math.min(Math.max(0, pr[k] - ya[k]), rest)); if (v > 0) { out[k] = v; rest = crR2(rest - v); } }
   return out;
@@ -1901,6 +1905,7 @@ async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = 
   for (const f of filas) { const o = porN.get(f.numero);
     const row = {fecha: f.fecha, capital: f.capital, interes: f.interes, seguro: f.seguro, comisiones: f.comisiones, cuota: f.cuota, saldo: f.saldo};
     if (marcarEditada) row.editada = true;
+    if (f.mora != null) row.mora = f.mora; else if (o && +o.mora) row.cuota = crR2(f.cuota + (+o.mora));  // la mora registrada se conserva al recalcular
     if (o) { if (soloNoEditadas && o.editada) continue; upd.push([o, row]); } else ins.push(Object.assign({id: crUid(), credito: c.id, numero: f.numero, editada: !!marcarEditada, conciliada: false}, row)); }
   const sobran = ex.filter(x => x.numero > maxN); const conEnl = sobran.filter(x => enlCuota(x.id).length || x.conciliada);
   try {
@@ -1974,14 +1979,14 @@ function abrirCuoForm(qid) {
       ${CR_CON.map(k => `<label>${CR_N[k]}<input class="num" inputmode="decimal" id="cq_${k}" value="${(+qVal(x)[k]).toFixed(2)}"></label>`).join('')}
       <label>Saldo después<input class="num" inputmode="decimal" id="cqSaldo" value="${(+x.saldo || 0).toFixed(2)}"></label>
       <label style="grid-column:1/-1">Nota<input id="cqNota" value="${esc(x.nota || '')}" placeholder="Ej.: el banco cobró seguro distinto"></label></div>
-      <div class="note">La cuota queda marcada como editada y no se recalcula al cambiar el contrato.</div>
+      <div class="note">Mora: recargo o interés moratorio cobrado por pagar tarde esta cuota. La cuota queda marcada como editada y no se recalcula al cambiar el contrato.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="cuoGuardar">Guardar cuota</button></div></div></div></div>`;
 }
 // guardarCuo: Guarda la cuota corregida (queda marcada como editada).
 async function guardarCuo() {
   const x = S.ccuo.find(y => y.id === $('#cuoF').dataset.id); const n = s => crR2(parseFloat(String($(s).value).replace(/[^0-9.\-]/g, '')) || 0);
-  const row = {fecha: $('#cqFecha').value || x.fecha, capital: n('#cq_cap'), interes: n('#cq_int'), seguro: n('#cq_seg'), comisiones: n('#cq_com'), saldo: n('#cqSaldo'), nota: $('#cqNota').value.trim() || null, editada: true};
-  row.cuota = crR2(row.capital + row.interes + row.seguro + row.comisiones);
+  const row = {fecha: $('#cqFecha').value || x.fecha, capital: n('#cq_cap'), interes: n('#cq_int'), seguro: n('#cq_seg'), comisiones: n('#cq_com'), mora: n('#cq_mor'), saldo: n('#cqSaldo'), nota: $('#cqNota').value.trim() || null, editada: true};
+  row.cuota = crR2(row.capital + row.interes + row.seguro + row.comisiones + row.mora);
   try { const d = await q(sb.from('credito_cuotas').update(row).eq('id', x.id).select(), 'Cuota corregida'); Object.assign(x, d && d[0] ? d[0] : row); } catch (e) {}
   $('#modalRoot').innerHTML = ''; render();
 }
@@ -1994,8 +1999,8 @@ function crParsePlan(txt) {
   const out = [];
   for (const ln of String(txt || '').split(/\r?\n/)) { const cols = ln.split(/\t|;|\s{2,}/).map(x => x.trim()).filter(x => x !== ''); if (cols.length < 4) continue;
     const num = parseInt(cols[0], 10); const fecha = crFechaTxt(cols[1]); if (!isFinite(num) || !fecha) continue;
-    const v = cols.slice(2).map(crNum); const [capital, interes, seguro = 0, comisiones = 0] = v;
-    out.push({numero: num, fecha, capital: crR2(capital), interes: crR2(interes), seguro: crR2(seguro), comisiones: crR2(comisiones)}); }
+    const v = cols.slice(2).map(crNum); const [capital, interes, seguro = 0, comisiones = 0, mora = 0] = v;
+    out.push({numero: num, fecha, capital: crR2(capital), interes: crR2(interes), seguro: crR2(seguro), comisiones: crR2(comisiones), mora: crR2(mora)}); }
   out.sort((a, b) => a.numero - b.numero); return out;
 }
 // abrirPegar: Ventana "Pegar plan del banco".
@@ -2004,7 +2009,7 @@ function abrirPegar(cid) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="cpT" style="max-width:760px">
     <div class="hd"><h2 id="cpT" style="margin-right:auto">Pegar plan del banco · ${esc(c.nombre)}</h2><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="bd stack" id="pegF" data-id="${cid}">
-      <div class="note">Copia la tabla de amortización desde Excel o el PDF del banco. Columnas en este orden: <b>número, fecha, capital, interés, seguro, comisiones</b> (seguro y comisiones son opcionales). El saldo se calcula desde el capital del contrato.</div>
+      <div class="note">Copia la tabla de amortización desde Excel o el PDF del banco. Columnas en este orden: <b>número, fecha, capital, interés, seguro, comisiones, mora</b> (seguro, comisiones y mora son opcionales). El saldo se calcula desde el capital del contrato.</div>
       <textarea id="pegTxt" rows="10" style="width:100%;font-family:var(--f-num);font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel);color:var(--fg)" placeholder="1	15/07/2025	655.10	11479.17	652.50	0.00"></textarea>
       <div id="pegPrev" class="note">Pega las filas para ver la vista previa.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="pegGuardar" disabled>Reemplazar plan</button></div></div></div></div>`;
@@ -2019,7 +2024,7 @@ function prevPegar() {
 // guardarPegar: Reemplaza el plan con el pegado del banco.
 async function guardarPegar() {
   const c = credById($('#pegF').dataset.id); const filas = crParsePlan($('#pegTxt').value); if (!filas.length) return;
-  let saldo = +c.capital || 0; for (const f of filas) { saldo = crR2(saldo - f.capital); f.saldo = Math.max(0, saldo); f.cuota = crR2(f.capital + f.interes + f.seguro + f.comisiones); }
+  let saldo = +c.capital || 0; for (const f of filas) { saldo = crR2(saldo - f.capital); f.saldo = Math.max(0, saldo); f.cuota = crR2(f.capital + f.interes + f.seguro + f.comisiones + (f.mora || 0)); }
   $('#modalRoot').innerHTML = '';
   await crGuardarPlan(c, filas, {marcarEditada: true});
   if (filas.length !== +c.plazo) { try { const d = await q(sb.from('creditos').update({plazo: filas.length}).eq('id', c.id).select()); Object.assign(c, d && d[0] ? d[0] : {plazo: filas.length}); } catch (e) {} }
