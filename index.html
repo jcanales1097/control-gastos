@@ -256,9 +256,27 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 @media (max-width:520px){.cr-parts{grid-template-columns:1fr 1fr}}
 .cr-warn{color:var(--warn);font-weight:600}
 .cr-sum .kpi{border-radius:0}
+.modal.cr-modal{max-width:1180px;width:min(1180px,calc(100vw - 24px))}
+.cr-modal .bd.cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
+.cr-modal .cr-conc>div{overflow:auto;max-height:calc(100vh - 200px);padding-right:4px}
+.cr-cf{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.cr-cf #credBus{flex:1 1 200px;max-width:none;height:32px}
+.cr-ck{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg)}
+.cr-ck select.in{height:28px}
+.cr-cands{display:grid;gap:6px}
+.cr-cand{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 10px;cursor:pointer;background:var(--panel)}
+.cr-cand:hover{border-color:var(--accent)}.cr-cand.on{background:var(--accent-soft);border-color:var(--accent)}
+.cr-cand input{width:16px;height:16px;flex:none;accent-color:var(--accent)}
+.cr-cand b{font-size:13px;font-weight:600}
+@media (max-width:900px){.cr-modal .bd.cr-conc{grid-template-columns:minmax(0,1fr)}.cr-modal .cr-conc>div{max-height:none}}
 .cr-filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;align-items:end}
 .cr-filtros label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:var(--muted)}
 .cr-filtros .in{max-width:none;width:100%;height:32px}
+.crf-f{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:var(--muted);min-width:0}
+.msel{display:block;width:100%}.msel-s{display:flex!important;align-items:center;justify-content:space-between;gap:6px;line-height:22px;font-weight:500;color:var(--fg);overflow:hidden}.msel-s span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msel-pop{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;max-width:300px;max-height:300px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 10px 26px rgba(0,0,0,.14);padding:6px;display:grid;gap:2px}
+.msel-s{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:4px 8px;height:32px;box-sizing:border-box;font-size:12.5px}
+.msel-o{padding:6px 8px;border-radius:6px;white-space:normal;display:flex!important;flex-direction:row!important;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--fg);cursor:pointer}.msel-o input{accent-color:var(--accent);width:15px;height:15px;flex:none}.msel-o:hover{background:var(--sunk)}
 .cr-tog{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--fg);cursor:pointer}
 .cr-tog i{width:9px;height:9px;border-radius:3px;display:inline-block}
 .cr-tog[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
@@ -762,7 +780,6 @@ function render() {
   window.scrollTo(0, keep);
   dibujarGraficos(); dibujarVeh();
   if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
-  if (S._focusCB) { const el = $('#credBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusCB = false; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
 // renderEspera: Pantalla para cuentas creadas que el administrador aún no activa.
@@ -1789,21 +1806,32 @@ function crRefInfo(e) {
 }
 // crUsadas: Registros que ya están enlazados a alguna cuota (para no sugerirlos de nuevo).
 function crUsadas() { const s = new Set(); (S.cenl || []).forEach(e => s.add(refKey(e))); return s; }
-// crSugeridos: Registros sugeridos para una cuota: con el texto del crédito o de la misma cuenta ±25 días; o resultados de búsqueda.
-function crSugeridos(c, q) {
-  const usadas = crUsadas(); const pat = (c.patron || '').trim().toUpperCase(); const f0 = new Date(q.fecha + 'T12:00');
-  const bus = (S.credBus || '').trim().toUpperCase(); const n = parseFloat(bus.replace(/[^0-9.]/g, ''));
-  const out = [];
+// crCandidatos: registros que se pueden vincular a una cuota. Por defecto: sin vincular, de la fecha de la cuota (± días elegidos)
+// y del crédito (misma cuenta o con su texto). "Cualquier fecha" quita el filtro de fecha; con "solo del crédito" apagado muestra todos; el buscador filtra por texto o monto.
+function crCandidatos(c, q) {
+  const o = S.concOpt || {}; const usadas = crUsadas(); const pat = (c.patron || '').trim().toUpperCase(); const f0 = new Date(q.fecha + 'T12:00');
+  const bus = (o.q || '').trim().toUpperCase(); const n = parseFloat(bus.replace(/[^0-9.]/g, '')); const rango = o.dias == null ? 10 : o.dias;
+  const out = []; const dd = f => Math.abs((new Date((f || hoy()) + 'T12:00') - f0) / 864e5);
   for (const t of D.txs) {
     if (usadas.has('t:' + t.id)) continue;
-    const txt = [t.nota, t.det, t.cat, t.sub, t.cuenta].join(' ').toUpperCase();
-    let ok;
-    if (bus) ok = txt.includes(bus) || (isFinite(n) && Math.abs(t.monto - n) < 0.01);
-    else { if (t.code === 0) continue; const dd = Math.abs((new Date(t.fecha + 'T12:00') - f0) / 864e5); ok = (pat && txt.includes(pat)) || (c.cuenta && t.cuenta === c.cuenta && dd <= 25); }
-    if (ok) out.push({tx_id: t.id, t, d: Math.abs((new Date(t.fecha + 'T12:00') - f0) / 864e5), p: pat && txt.includes(pat) ? 0 : 1});
+    const txt = [t.nota, t.det, t.cat, t.sub, t.cuenta].join(' ').toUpperCase(); const d = dd(t.fecha);
+    if (!o.todas && d > rango) continue;
+    const delCred = (pat && txt.includes(pat)) || (c.cuenta && t.cuenta === c.cuenta);
+    if (o.soloCred !== false && !delCred && !bus) continue;
+    if (bus && !(txt.includes(bus) || (isFinite(n) && Math.abs(t.monto - n) < 0.01))) continue;
+    if (!bus && t.code === 0 && !(pat && txt.includes(pat))) continue;   // ingresos solo si se buscan o traen el texto del crédito
+    out.push({ref: 't:' + t.id, desc: [t.nota, t.det].filter(Boolean).join(' | ') || t.cat, sub: t.sub || t.cat, fecha: t.fecha, cuenta: t.cuenta, monto: t.monto, origen: 'App', d, p: pat && txt.includes(pat) ? 0 : delCred ? 1 : 2});
   }
-  if (bus) for (const m of S.movs.values()) { if (m.tx_id || m.estado === 'rechazado' || usadas.has('m:' + m.id)) continue; if ((m.descripcion || '').toUpperCase().includes(bus) || (isFinite(n) && Math.abs((+m.valor || 0) - n) < 0.01)) out.push({mov_id: m.id, m, d: Math.abs((new Date((m.fecha || hoy()) + 'T12:00') - f0) / 864e5)}); }
-  return out.sort((a, b) => (a.p || 0) - (b.p || 0) || a.d - b.d).slice(0, 15);
+  for (const m of S.movs.values()) {
+    if (m.tx_id || m.estado === 'rechazado' || usadas.has('m:' + m.id)) continue;
+    const txt = (m.descripcion || '').toUpperCase(); const d = dd(m.fecha);
+    if (!o.todas && d > rango) continue;
+    const delCred = !!(pat && txt.includes(pat));
+    if (o.soloCred !== false && !delCred && !bus) continue;
+    if (bus && !(txt.includes(bus) || (isFinite(n) && Math.abs((+m.valor || 0) - n) < 0.01))) continue;
+    out.push({ref: 'm:' + m.id, desc: m.descripcion || 'Registro manual', sub: '', fecha: m.fecha || '', cuenta: (ctrlById(m.control) || {}).nombre || '', monto: +m.valor || 0, origen: 'Manual', d, p: delCred ? 0 : 2});
+  }
+  return out.sort((a, b) => a.p - b.p || a.d - b.d).slice(0, 80);
 }
 // vCreditos: VISTA CRÉDITOS (admin): indicadores, lista de créditos y ficha del seleccionado.
 function vCreditos() {
@@ -1865,13 +1893,13 @@ function vCredFicha(c) {
     <div class="tbl-wrap"><table class="cr-plan"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th>${conMora ? '<th class="num">Mora</th>' : ''}<th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
       ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num">${x.numero}</td><td class="num">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td>${conMora ? `<td class="num ${+x.mora ? 'neg' : 'muted'}">${+x.mora ? L(+x.mora) : '—'}</td>` : ''}<td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td><span class="chip ${e[1]}">${e[0]}</span>${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}${+x.mora || realCuota(x.id).mor ? ' <span class="chip bad" title="Esta cuota tiene mora">mora</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
     </tbody></table></div>
-    <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line)"><span class="note">${S.credTodo ? cs.length + ' cuotas' : `Cuotas ${rows[0].numero}–${rows[rows.length - 1].numero} de ${cs.length}`} · toca una cuota para relacionarla</span><button class="btn sm" data-act="credTodo">${S.credTodo ? 'Ver menos' : 'Ver plan completo'}</button></div>
+    <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line)"><span class="note">${S.credTodo ? cs.length + ' cuotas' : `Cuotas ${rows[0].numero}–${rows[rows.length - 1].numero} de ${cs.length}`} · toca una cuota para vincular sus registros</span><button class="btn sm" data-act="credTodo">${S.credTodo ? 'Ver menos' : 'Ver plan completo'}</button></div>
   </div>
-  ${vConciliar(c, q)}`;
+`;
 }
-// vConciliar: Panel para conciliar una cuota: proyectado vs real, registros vinculados con su desglose y sugeridos.
+// vConciliar: contenido de la ventana para conciliar una cuota: proyectado vs real, registros vinculados con su desglose y registros para vincular (filtros y selección múltiple).
 function vConciliar(c, q) {
-  const pr = qVal(q), re = realCuota(q.id), e = estadoCuota(q);
+  const pr = qVal(q), re = realCuota(q.id), e = estadoCuota(q); const o = S.concOpt || {}; S.concSel = S.concSel || new Set();
   const fila = (k) => { const d = crR2(re[k] - pr[k]); return `<tr><td><i class="cr-dot cr-${k}"></i>${CR_N[k]}</td><td class="num">${L(pr[k])}</td><td class="num">${re[k] ? L(re[k]) : '<span class="muted">—</span>'}</td><td class="num ${Math.abs(d) > 0.004 && (re[k] || pr[k]) ? 'neg' : 'muted'}">${re[k] || pr[k] ? (d > 0 ? '+' : '') + L(d) : '—'}</td></tr>`; };
   const tr = crTot(re), dt = crR2(tr - (+q.cuota || 0));
   const enl = enlCuota(q.id); const grupos = new Map(); enl.forEach(x => { const k = refKey(x); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(x); });
@@ -1880,26 +1908,57 @@ function vConciliar(c, q) {
       <div class="cr-parts" data-ref="${esc(k)}" data-q="${q.id}">${CR_CON.map(cn => { const v = (partes.find(x => x.concepto === cn) || {}).monto; return `<label><span><i class="cr-dot cr-${cn}"></i>${CR_N[cn]}</span><input class="num" inputmode="decimal" data-cpart="${cn}" value="${v ? (+v).toFixed(2) : ''}" placeholder="0.00"></label>`; }).join('')}</div>
       <div class="row" style="justify-content:space-between;gap:8px"><span class="small ${Math.abs(libre) > 0.004 ? 'cr-warn' : 'muted'}">${Math.abs(libre) > 0.004 ? (libre > 0 ? 'Sin asignar ' + L(libre) : 'Asignado de más ' + L(-libre)) : partes.length > 1 ? 'Desglosado en ' + partes.length + ' conceptos' : 'Todo en ' + CR_N[partes[0].concepto]}</span>
         <span class="row" style="gap:6px"><button class="btn sm" data-act="cenlProy" data-ref="${esc(k)}" data-q="${q.id}">Desglosar como lo proyectado</button><select class="in" data-ctodo="${esc(k)}" data-q="${q.id}" aria-label="Asignar todo a un concepto"><option value="">Todo a…</option>${CR_CON.map(cn => `<option value="${cn}">${CR_N[cn]}</option>`).join('')}</select></span></div></div>`; }).join('');
-  const sug = crSugeridos(c, q);
-  return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">Cuota ${q.numero} de ${cuotasDe(c.id).length} · ${fFecha(q.fecha)}</h2><span class="chip ${e[1]}">${e[0]}</span>
-      <button class="btn sm ${q.conciliada ? '' : 'pri'}" data-act="cuoConc" data-id="${q.id}">${q.conciliada ? 'Quitar conciliación' : 'Marcar conciliada'}</button></div>
+  const cand = crCandidatos(c, q); const vis = new Set(cand.map(x => x.ref)); [...S.concSel].forEach(r => { if (!vis.has(r)) S.concSel.delete(r); });
+  const selTot = cand.filter(x => S.concSel.has(x.ref)).reduce((s, x) => s + x.monto, 0);
+  const rango = o.dias == null ? 10 : o.dias; const cs = cuotasDe(c.id); const iq = cs.findIndex(x => x.id === q.id);
+  return `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal" role="dialog" aria-modal="true" aria-labelledby="ccT">
+    <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="ccT">${esc(c.nombre)} · cuota ${q.numero} de ${cs.length}</h2><div class="note">Vence el ${fFecha(q.fecha)} · proyectado ${L(+q.cuota || 0)}</div></div>
+      <span class="chip ${e[1]}">${e[0]}</span>
+      <button class="btn sm ghost" data-act="concNav" data-d="-1" ${iq <= 0 ? 'disabled' : ''} title="Cuota anterior" aria-label="Cuota anterior">‹</button><button class="btn sm ghost" data-act="concNav" data-d="1" ${iq >= cs.length - 1 ? 'disabled' : ''} title="Cuota siguiente" aria-label="Cuota siguiente">›</button>
+      <button class="btn sm ${q.conciliada ? '' : 'pri'}" data-act="cuoConc" data-id="${q.id}">${q.conciliada ? 'Quitar conciliación' : 'Marcar conciliada'}</button><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="bd cr-conc">
-      <div><div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th class="num">Proyectado</th><th class="num">Real</th><th class="num">Diferencia</th></tr></thead><tbody>${CR_CON.map(fila).join('')}
-        <tr class="cr-tt"><td><b>Cuota</b></td><td class="num"><b>${L(+q.cuota || 0)}</b></td><td class="num"><b>${tr ? L(tr) : '—'}</b></td><td class="num ${tr && Math.abs(dt) > 0.004 ? 'neg' : ''}"><b>${tr ? (dt > 0 ? '+' : '') + L(dt) : '—'}</b></td></tr></tbody></table></div>
-        ${q.nota ? `<div class="note" style="margin-top:8px">${esc(q.nota)}</div>` : ''}</div>
-      <div class="stack" style="gap:8px;min-width:0">
+      <div class="stack" style="gap:10px;min-width:0">
+        <div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th class="num">Proyectado</th><th class="num">Real</th><th class="num">Diferencia</th></tr></thead><tbody>${CR_CON.map(fila).join('')}
+          <tr class="cr-tt"><td><b>Cuota</b></td><td class="num"><b>${L(+q.cuota || 0)}</b></td><td class="num"><b>${tr ? L(tr) : '—'}</b></td><td class="num ${tr && Math.abs(dt) > 0.004 ? 'neg' : ''}"><b>${tr ? (dt > 0 ? '+' : '') + L(dt) : '—'}</b></td></tr></tbody></table></div>
+        ${q.nota ? `<div class="note">${esc(q.nota)}</div>` : ''}
         <div class="eyebrow">Registros vinculados</div>
-        ${recs || '<div class="note">Ningún registro vinculado a esta cuota todavía.</div>'}
-        <div class="row" style="justify-content:space-between;margin-top:6px"><div class="eyebrow">${S.credBus ? 'Resultados de búsqueda' : 'Sugeridos · misma cuenta (±25 días) o texto del crédito'}</div><input class="in" id="credBus" placeholder="Buscar texto o monto" value="${esc(S.credBus || '')}" style="max-width:220px"></div>
-        ${sug.length ? sug.map(s => { const info = s.t ? {desc: [s.t.nota, s.t.det].filter(Boolean).join(' | ') || s.t.cat, fecha: s.t.fecha, cuenta: s.t.cuenta, monto: s.t.monto, o: 'App'} : {desc: s.m.descripcion || 'Registro manual', fecha: s.m.fecha || '', cuenta: (ctrlById(s.m.control) || {}).nombre || '', monto: +s.m.valor || 0, o: 'Manual'};
-          return `<div class="cr-rec cr-sug"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${esc(info.desc)}</b><div class="note">${info.fecha ? fFecha(info.fecha) + ' · ' : ''}${esc(info.cuenta)} · ${info.o}</div></div><span class="num" style="font-weight:600">${L(info.monto)}</span><button class="btn sm pri" data-act="cenlAdd" data-ref="${s.tx_id ? 't:' + esc(s.tx_id) : 'm:' + esc(s.mov_id)}" data-q="${q.id}">Vincular</button></div></div>`; }).join('')
-          : `<div class="note">${S.credBus ? 'Nada coincide con la búsqueda.' : 'No hay registros sugeridos. Usa la búsqueda por texto o monto.'}</div>`}
+        ${recs || '<div class="note">Ningún registro vinculado todavía. Marca registros a la derecha y toca “Vincular seleccionados”.</div>'}
       </div>
-    </div></div>`;
+      <div class="stack" style="gap:8px;min-width:0">
+        <div class="eyebrow">Registros para vincular</div>
+        <div class="cr-cf">
+          <input class="in" id="credBus" placeholder="Buscar texto o monto" value="${esc(o.q || '')}">
+          <label class="cr-ck"><input type="checkbox" data-copt="todas" ${o.todas ? 'checked' : ''}> Cualquier fecha</label>
+          ${o.todas ? '' : `<label class="cr-ck">± <select class="in" data-copt="dias">${[0, 3, 5, 10, 15, 31].map(n => `<option value="${n}" ${rango === n ? 'selected' : ''}>${n ? n + ' días' : 'mismo día'}</option>`).join('')}</select> de ${fFecha(q.fecha)}</label>`}
+          <label class="cr-ck"><input type="checkbox" data-copt="soloCred" ${o.soloCred === false ? '' : 'checked'}> Solo de la cuenta o texto del crédito</label>
+        </div>
+        <div class="row" style="justify-content:space-between"><span class="note">${cand.length} ${cand.length === 1 ? 'registro' : 'registros'}${cand.length >= 80 ? ' (primeros 80; afina la búsqueda)' : ''}${S.concSel.size ? ` · <b>${S.concSel.size} marcados = ${L(selTot)}</b>` : ''}</span>
+          <button class="btn sm pri" data-act="cenlVarios" data-q="${q.id}" ${S.concSel.size ? '' : 'disabled'}>Vincular seleccionados${S.concSel.size ? ' (' + S.concSel.size + ')' : ''}</button></div>
+        <div class="cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${S.concSel.has(x.ref) ? 'on' : ''}"><input type="checkbox" data-csel="${esc(x.ref)}" ${S.concSel.has(x.ref) ? 'checked' : ''}>
+            <span style="min-width:0;flex:1"><b>${esc(x.desc)}</b><span class="note" style="display:block">${x.fecha ? fFecha(x.fecha) : 'sin fecha'}${x.fecha && Math.round(x.d) ? ` (${x.fecha < q.fecha ? '−' : '+'}${Math.round(x.d)} d)` : ''} · ${esc(x.cuenta)}${x.sub ? ' · ' + esc(x.sub) : ''} · ${x.origen}</span></span>
+            <span class="num" style="font-weight:600">${L(x.monto)}</span></label>`).join('')
+          : `<div class="note" style="padding:8px 0">${o.todas ? 'Nada coincide.' : `No hay registros sin vincular en ± ${rango} días. Marca “Cualquier fecha” o busca por texto o monto.`}</div>`}</div>
+      </div>
+    </div></div></div>`;
+}
+// abrirConc: abre la ventana de conciliación de una cuota (al tocar una cuota del plan o "Conciliar" en el análisis).
+function abrirConc(cid, n) { const qq = cuotasDe(cid).find(x => x.numero === n); if (!qq) return; S.cuoSel = S.cuoSel || {}; S.cuoSel[cid] = n; S.concQ = qq.id; S.concSel = new Set(); pintarConc(); }
+// pintarConc: vuelve a dibujar la ventana abierta conservando el scroll y el foco del buscador.
+function pintarConc(foco) {
+  const qq = S.concQ && (S.ccuo || []).find(x => x.id === S.concQ); if (!qq) { S.concQ = null; return; } const c = credById(qq.credito); if (!c) return;
+  const cols = [...document.querySelectorAll('.cr-modal .cr-conc > div')].map(d => d.scrollTop);
+  $('#modalRoot').innerHTML = vConciliar(c, qq);
+  document.querySelectorAll('.cr-modal .cr-conc > div').forEach((d, i) => { d.scrollTop = cols[i] || 0; });
+  if (foco) { const el = $('#credBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+}
+// crVincularVarios: vincula todos los registros marcados a la cuota, cada uno con su desglose sugerido.
+async function crVincularVarios(qid, refs) {
+  for (const ref of refs) await crSetPartes(qid, ref, crDesgloseProy(qid, ref, true), true);
+  S.concSel = new Set(); toast(refs.length === 1 ? 'Registro vinculado' : refs.length + ' registros vinculados'); render(); pintarConc();
 }
 /* --- guardar --- */
 // crSetPartes: Guarda el desglose de un registro en una cuota (borra los enlaces anteriores e inserta los nuevos).
-async function crSetPartes(qid, ref, partes) {
+async function crSetPartes(qid, ref, partes, sinPintar) {
   const q0 = (S.ccuo || []).find(x => x.id === qid); if (!q0) return;
   const [tipo, id] = [ref.slice(0, 1), ref.slice(2)]; const col = tipo === 't' ? 'tx_id' : 'mov_id';
   const viejos = (S.cenl || []).filter(e => e.cuota === qid && refKey(e) === ref);
@@ -1909,7 +1968,7 @@ async function crSetPartes(qid, ref, partes) {
     const nuevos = Object.entries(partes).filter(([, v]) => crR2(v) > 0).map(([k, v]) => ({id: crUid(), cuota: qid, credito: q0.credito, [col]: id, concepto: k, monto: crR2(v)}));
     if (nuevos.length) { const d = await q(sb.from('credito_enlaces').insert(nuevos).select()); S.cenl.push(...(d && d.length ? d : nuevos)); }
   } catch (e) {}
-  render();
+  if (sinPintar) return; render(); pintarConc();
 }
 // crMontoRef: Monto de un registro enlazado.
 function crMontoRef(ref) { const id = ref.slice(2); if (ref[0] === 't') { const t = D.byId.get(id); return t ? t.monto : 0; } const m = S.movs.get(id); return m ? +m.valor || 0 : 0; }
@@ -1943,7 +2002,7 @@ async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = 
 /* ===== Créditos · Análisis: filtros, gráficos interactivos y tabla resumen ===== */
 // crCfDef: filtros por defecto del análisis (12 meses atrás y 12 adelante).
 function crCfDef() { const d = new Date(); const ym = k => { const x = new Date(d.getFullYear(), d.getMonth() + k, 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`; };
-  return {tipo: '', entidad: '', estado: 'activo', cred: '', desde: ym(-11), hasta: ym(12), agr: 'mes', ver: {cap: true, int: true, seg: true, com: true, mor: true}, periodo: null}; }
+  return {tipo: [], entidad: [], estado: ['activo'], cred: [], desde: ym(-11), hasta: ym(12), agr: 'mes', ver: {cap: true, int: true, seg: true, com: true, mor: true}, periodo: null}; }
 const crCf = () => (S.cf = S.cf || crCfDef());
 // crPerKey: período de una fecha según la agrupación (mes, trimestre o año).
 function crPerKey(fecha, agr) { const y = fecha.slice(0, 4), m = +fecha.slice(5, 7); return agr === 'anio' ? y : agr === 'trim' ? `${y}-T${Math.ceil(m / 3)}` : fecha.slice(0, 7); }
@@ -1953,7 +2012,7 @@ function crPerLargo(k) { if (/^\d{4}$/.test(k)) return 'Año ' + k; if (/T\d$/.t
 function crPeriodos(f) { const out = []; let [y, m] = f.desde.split('-').map(Number); const [y2, m2] = f.hasta.split('-').map(Number); let n = 0;
   while ((y < y2 || (y === y2 && m <= m2)) && n < 400) { const k = crPerKey(`${y}-${String(m).padStart(2, '0')}-01`, f.agr); if (out[out.length - 1] !== k) out.push(k); m++; if (m > 12) { m = 1; y++; } n++; } return out; }
 // crFiltrados: créditos que cumplen los filtros de tipo, entidad, estado y crédito.
-function crFiltrados(f) { return creditos().filter(c => (!f.tipo || c.tipo === f.tipo) && (!f.entidad || (c.entidad || '') === f.entidad) && (!f.estado || (c.estado || 'activo') === f.estado) && (!f.cred || c.id === f.cred)); }
+function crFiltrados(f) { const en = (a, v) => !a.length || a.includes(v); return creditos().filter(c => en(f.tipo, c.tipo) && en(f.entidad, c.entidad || '') && en(f.estado, c.estado || 'activo') && en(f.cred, c.id)); }
 // crDatosAnalisis: suma por período lo proyectado y lo real (por concepto), saldos y el resumen por crédito.
 function crDatosAnalisis(f) {
   const lista = crFiltrados(f); const pers = crPeriodos(f); const set = new Set(pers);
@@ -2020,6 +2079,14 @@ function crGrafCosto(Dd, f) {
   return `<div class="crc">${filas.map(r => { const bar = (t) => { const tot = ver.reduce((s, k) => s + r[t][k], 0); return `<div class="crc-bar ${t === 'proy' ? 'p' : ''}" title="${t === 'proy' ? 'Proyectado' : 'Real'} ${L(tot)}\n${ver.map(k => CR_N[k] + ': ' + L(r[t][k])).join('\n')}">${ver.map(k => r[t][k] > 0 ? `<i style="width:${(r[t][k] / max * 100).toFixed(2)}%;background:${CR_FILL[k]}"></i>` : '').join('')}<span class="num">${L(tot)}</span></div>`; };
     return `<div class="crc-row"><button class="crc-n" data-act="cfCred" data-id="${r.c.id}" title="Filtrar por este crédito">${esc(r.c.nombre)}</button><div class="crc-bars">${bar('proy')}${bar('real')}</div></div>`; }).join('')}</div>`;
 }
+// crMsel: lista desplegable con casillas (selección múltiple). Sin nada marcado = todos.
+function crMsel(f, k, opts) {
+  const sel = f[k] || []; const nom = v => (opts.find(o => o[0] === v) || [v, v])[1];
+  const txt = !sel.length ? 'Todos' : sel.length === 1 ? nom(sel[0]) : `${sel.length} seleccionados`;
+  return `<details class="menu msel" data-k="${k}" ${S.cfOpen === k ? 'open' : ''}><summary class="in msel-s" title="${esc(sel.map(nom).join(', '))}"><span>${esc(txt)}</span><span aria-hidden="true">▾</span></summary>
+    <div class="msel-pop"><div class="row" style="justify-content:space-between;gap:6px;padding:2px 2px 6px;border-bottom:1px solid var(--line)"><button class="linkish small" data-act="crfTodos" data-k="${k}">Todos</button>${opts.length > 1 ? `<button class="linkish small" data-act="crfSolo" data-k="${k}">Invertir</button>` : ''}</div>
+    ${opts.length ? opts.map(([v, t]) => `<label class="cr-ck msel-o"><input type="checkbox" data-crfm="${k}" value="${esc(v)}" ${sel.includes(v) ? 'checked' : ''}> ${esc(t)}</label>`).join('') : '<div class="note" style="padding:6px">Sin opciones</div>'}</div></details>`;
+}
 function vCredAnalisis() {
   const f = crCf(); const Dd = crDatosAnalisis(f); const ents = [...new Set(creditos().map(c => c.entidad).filter(Boolean))].sort();
   // Los totales respetan los conceptos visibles (botones de Conceptos).
@@ -2027,12 +2094,12 @@ function vCredAnalisis() {
   const nCuo = Dd.porCred.reduce((s, r) => s + r.cuotas, 0), nConc = Dd.porCred.reduce((s, r) => s + r.conc, 0), nSin = Dd.porCred.reduce((s, r) => s + r.sin, 0);
   const CF = ['int', 'seg', 'com', 'mor'].filter(k => f.ver[k]); const costoP = CF.reduce((s, k) => s + sum('proy', k), 0), costoR = CF.reduce((s, k) => s + sum('real', k), 0);
   const filtros = `<div class="panel"><div class="bd cr-filtros">
-    <label>Tipo<select class="in" data-cf="tipo"><option value="">Todos</option>${Object.entries(CR_TIPO).map(([k, t]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${t[2]}</option>`).join('')}</select></label>
-    <label>Entidad<select class="in" data-cf="entidad"><option value="">Todas</option>${ents.map(e => `<option ${f.entidad === e ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></label>
-    <label>Estado<select class="in" data-cf="estado"><option value="">Todos</option><option value="activo" ${f.estado === 'activo' ? 'selected' : ''}>Activos</option><option value="cancelado" ${f.estado === 'cancelado' ? 'selected' : ''}>Cancelados</option></select></label>
-    <label>Crédito<select class="in" data-cf="cred"><option value="">Todos</option>${creditos().map(c => `<option value="${c.id}" ${f.cred === c.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></label>
-    <label>Desde<input class="in" type="month" data-cf="desde" value="${f.desde}"></label>
-    <label>Hasta<input class="in" type="month" data-cf="hasta" value="${f.hasta}"></label>
+    <div class="crf-f"><span>Tipo</span>${crMsel(f, 'tipo', Object.entries(CR_TIPO).map(([k, t]) => [k, t[2]]))}</div>
+    <div class="crf-f"><span>Entidad</span>${crMsel(f, 'entidad', ents.map(e => [e, e]))}</div>
+    <div class="crf-f"><span>Estado</span>${crMsel(f, 'estado', [['activo', 'Activos'], ['cancelado', 'Cancelados']])}</div>
+    <div class="crf-f"><span>Crédito</span>${crMsel(f, 'cred', creditos().map(c => [c.id, c.nombre]))}</div>
+    <label>Desde<input class="in" type="month" data-crf="desde" value="${f.desde}"></label>
+    <label>Hasta<input class="in" type="month" data-crf="hasta" value="${f.hasta}"></label>
     <label>Agrupar por<span class="seg" role="group" aria-label="Agrupar por">${[['mes', 'Mes'], ['trim', 'Trimestre'], ['anio', 'Año']].map(([k, t]) => `<button data-act="cfAgr" data-k="${k}" aria-pressed="${f.agr === k}">${t}</button>`).join('')}</span></label>
     <button class="btn sm ghost" data-act="cfReset" style="align-self:end">Quitar filtros</button></div>
     <div class="bd row" style="border-top:1px solid var(--line);gap:6px;padding-top:10px;padding-bottom:10px"><span class="note">Conceptos:</span>${CR_CON.map(k => `<button class="cr-tog" data-act="cfCon" data-k="${k}" aria-pressed="${!!f.ver[k]}"><i style="background:${CR_FILL[k]}"></i>${CR_N[k]}</button>`).join('')}</div></div>`;
@@ -3156,7 +3223,8 @@ function hojaProyecto(wb, c, h0) {
 const movDe = el => { const tr = el.closest('[data-mov]'); return tr && S.movs.get(tr.dataset.mov); };
 
 document.addEventListener('submit', e => { if (e.target.id === 'authForm') { e.preventDefault(); enviarAuth(e.target); } });
-document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; }); }, true);
+document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) { d.open = false; if (d.classList.contains('msel')) S.cfOpen = null; } }); }, true);
+document.addEventListener('toggle', e => { const d = e.target; if (d.classList && d.classList.contains('msel')) { if (d.open) { S.cfOpen = d.dataset.k; document.querySelectorAll('details.msel[open]').forEach(x => { if (x !== d) x.open = false; }); } else if (S.cfOpen === d.dataset.k) S.cfOpen = null; } }, true);
 /* ================= acciones de la interfaz =================
    Un solo escuchador para todos los botones: busca el elemento con data-act
    más cercano al clic y ejecuta la acción con ese nombre. */
@@ -3164,7 +3232,7 @@ document.addEventListener('click', async e => {
   const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
-  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') $('#modalRoot').innerHTML = ''; return; }
+  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') { $('#modalRoot').innerHTML = ''; S.concQ = null; } return; }
   if (act === 'recargar') return location.reload();
   if (act === 'salir') { await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
   if (act === 'guardarSetup') { const u = $('#sbUrl').value.trim().replace(/\/$/, ''), k = $('#sbKey').value.trim(); if (!/^https:\/\/.+/.test(u) || k.length < 20) return toast('Revisa la URL y la clave.'); lsSet('cg-sb-url', u); lsSet('cg-sb-key', k); return location.reload(); }
@@ -3208,10 +3276,14 @@ document.addEventListener('click', async e => {
   if (act === 'cfCon') { const f = crCf(); f.ver[b.dataset.k] = !f.ver[b.dataset.k]; if (!CR_CON.some(k => f.ver[k])) f.ver[b.dataset.k] = true; return render(); }
   if (act === 'cfReset') { S.cf = crCfDef(); return render(); }
   if (act === 'cfPer') { const f = crCf(); f.periodo = f.periodo === b.dataset.k ? null : b.dataset.k; render(); if (f.periodo) { const h = [...document.querySelectorAll('.panel h2')].find(x => x.textContent.startsWith('Cuotas de')); if (h) h.scrollIntoView({behavior: 'smooth', block: 'center'}); } return; }
-  if (act === 'cfCred') { const f = crCf(); f.cred = f.cred === b.dataset.id ? '' : b.dataset.id; f.periodo = null; return render(); }
-  if (act === 'cfIr') { S.credTab = 'lista'; S.credSel = b.dataset.c; if (b.dataset.n) { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; } S.credTodo = false; render(); const h = [...document.querySelectorAll('.panel h2')].find(x => x.textContent.startsWith('Cuota ')); if (h) h.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
-  if (act === 'credSel') { S.credSel = b.dataset.id; S.credTodo = false; S.credBus = ''; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
-  if (act === 'cuoSel') { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; S.credBus = ''; return render(); }
+  if (act === 'cfCred') { const f = crCf(); f.cred = f.cred.length === 1 && f.cred[0] === b.dataset.id ? [] : [b.dataset.id]; f.periodo = null; return render(); }
+  if (act === 'crfTodos') { e.preventDefault(); const f = crCf(); f[b.dataset.k] = []; f.periodo = null; S.cfOpen = b.dataset.k; return render(); }
+  if (act === 'crfSolo') { e.preventDefault(); const f = crCf(); const k = b.dataset.k; const todas = [...b.closest('.msel').querySelectorAll('[data-crfm]')].map(i => i.value); const sel = new Set(f[k] || []); f[k] = todas.filter(v => !sel.has(v)); f.periodo = null; S.cfOpen = k; return render(); }
+  if (act === 'cfIr') { S.credTab = 'lista'; S.credSel = b.dataset.c; S.credTodo = false; render(); if (b.dataset.n) abrirConc(b.dataset.c, +b.dataset.n); else { const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); } return; }
+  if (act === 'credSel') { S.credSel = b.dataset.id; S.credTodo = false; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'cuoSel') { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; render(); return abrirConc(b.dataset.c, +b.dataset.n); }
+  if (act === 'concNav') { const qq = S.ccuo.find(x => x.id === S.concQ); if (!qq) return; const cs = cuotasDe(qq.credito); const i = cs.findIndex(x => x.id === qq.id) + (+b.dataset.d); if (cs[i]) { abrirConc(qq.credito, cs[i].numero); render(); } return; }
+  if (act === 'cenlVarios') { const refs = [...(S.concSel || [])]; if (!refs.length) return; b.disabled = true; return crVincularVarios(b.dataset.q, refs); }
   if (act === 'credNuevo') { S.confirmCred = null; return abrirCredForm(null); }
   if (act === 'credForm') { S.confirmCred = null; return abrirCredForm(S.credSel); }
   if (act === 'credGuardar') return guardarCred();
@@ -3225,8 +3297,7 @@ document.addEventListener('click', async e => {
   if (act === 'credTodo') { S.credTodo = !S.credTodo; return render(); }
   if (act === 'cuoForm') { const tr = b.closest('tr'); const x = cuotasDe(tr.dataset.c).find(y => y.numero === +tr.dataset.n); return x && abrirCuoForm(x.id); }
   if (act === 'cuoGuardar') return guardarCuo();
-  if (act === 'cuoConc') { const x = S.ccuo.find(y => y.id === b.dataset.id); if (!x) return; try { const d = await q(sb.from('credito_cuotas').update({conciliada: !x.conciliada}).eq('id', x.id).select(), x.conciliada ? 'Conciliación quitada' : 'Cuota conciliada'); Object.assign(x, d && d[0] ? d[0] : {conciliada: !x.conciliada}); } catch (e) {} return render(); }
-  if (act === 'cenlAdd') { S.credBus = ''; return crSetPartes(b.dataset.q, b.dataset.ref, crDesgloseProy(b.dataset.q, b.dataset.ref, true)); }
+  if (act === 'cuoConc') { const x = S.ccuo.find(y => y.id === b.dataset.id); if (!x) return; try { const d = await q(sb.from('credito_cuotas').update({conciliada: !x.conciliada}).eq('id', x.id).select(), x.conciliada ? 'Conciliación quitada' : 'Cuota conciliada'); Object.assign(x, d && d[0] ? d[0] : {conciliada: !x.conciliada}); } catch (e) {} render(); return pintarConc(); }
   if (act === 'cenlProy') return crSetPartes(b.dataset.q, b.dataset.ref, crDesgloseProy(b.dataset.q, b.dataset.ref, false));
   if (act === 'cenlQuitar') { const pp = b.closest('.cr-rec').querySelector('.cr-parts'); return crSetPartes(pp.dataset.q, pp.dataset.ref, {}); }
   if (act === 'nuevoReg') return abrirRegistro(b.dataset.c, b.dataset.m);
@@ -3395,7 +3466,10 @@ document.addEventListener('change', async e => {
     else p[f] = t.value;
     return pintarReparto();
   }
-  if (t.dataset.cf) { const f = crCf(); const k = t.dataset.cf; if ((k === 'desde' || k === 'hasta') && !t.value) return render(); f[k] = t.value; if (f.desde > f.hasta) { if (k === 'desde') f.hasta = f.desde; else f.desde = f.hasta; } f.periodo = null; return render(); }
+  if (t.dataset.csel) { S.concSel = S.concSel || new Set(); t.checked ? S.concSel.add(t.dataset.csel) : S.concSel.delete(t.dataset.csel); return pintarConc(); }
+  if (t.dataset.copt) { S.concOpt = S.concOpt || {}; const k = t.dataset.copt; S.concOpt[k] = t.type === 'checkbox' ? t.checked : +t.value; return pintarConc(); }
+  if (t.dataset.crfm) { const f = crCf(); const k = t.dataset.crfm; const a = new Set(f[k] || []); t.checked ? a.add(t.value) : a.delete(t.value); f[k] = [...a]; f.periodo = null; S.cfOpen = k; return render(); }
+  if (t.dataset.crf) { const f = crCf(); const k = t.dataset.crf; if ((k === 'desde' || k === 'hasta') && !t.value) return render(); f[k] = t.value; if (f.desde > f.hasta) { if (k === 'desde') f.hasta = f.desde; else f.desde = f.hasta; } f.periodo = null; return render(); }
   if (t.dataset.cpart) { const pp = t.closest('.cr-parts'); const o = {}; pp.querySelectorAll('[data-cpart]').forEach(i => { o[i.dataset.cpart] = crR2(parseFloat(String(i.value).replace(/[^0-9.\-]/g, '')) || 0); }); return crSetPartes(pp.dataset.q, pp.dataset.ref, o); }
   if (t.dataset.ctodo !== undefined && t.dataset.ctodo) { if (!t.value) return; return crSetPartes(t.dataset.q, t.dataset.ctodo, {[t.value]: crMontoRef(t.dataset.ctodo)}); }
   if (t.name === 'nrLado') { const F = $('#regForm'); const c = ctrlById(F.dataset.c); const eg = t.value === 'egreso'; S.regLado = t.value;
@@ -3431,7 +3505,7 @@ document.addEventListener('change', async e => {
 let qT;
 /* Escritura en buscadores y campos que se actualizan mientras escribes. */
 document.addEventListener('input', e => {
-  if (e.target.id === 'credBus') { S.credBus = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => { S._focusCB = true; render(); }, 250); return; }
+  if (e.target.id === 'credBus') { S.concOpt = S.concOpt || {}; S.concOpt.q = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => pintarConc(true), 250); return; }
   if (e.target.id === 'pegTxt') return prevPegar();
   if (e.target.id === 'asocQ' && S.asoc) { S.asoc.q = e.target.value; clearTimeout(S._asocT); S._asocT = setTimeout(() => { S._focusAsoc = true; pintarAsoc(); }, 200); return; }
   if (e.target.dataset.ftab === 'q') { const k = e.target.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {q: e.target.value}); clearTimeout(qT); qT = setTimeout(() => { S._focusF = k; render(); }, 250); return; }
