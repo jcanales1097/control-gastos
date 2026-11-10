@@ -58,6 +58,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;color:var(--fg
 a.btn.pri{color:var(--accent-ink)}
 .btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.sm{padding:4px 9px;font-size:12px}
+.btn.ico{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
+.btn.ico:hover{background:var(--sunk);color:var(--fg);border-color:transparent}.btn.ico.danger:hover{color:var(--bad)}
+td.acc{width:1%;white-space:nowrap}.acc-row{display:flex;gap:2px;justify-content:flex-end;align-items:center}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
 .btn.danger{color:var(--bad)}
 .btn:disabled{opacity:.5;cursor:default}
@@ -998,8 +1001,8 @@ function tablaFilas(c, h, lado) {
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
     <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
     <td class="num" style="white-space:nowrap">${L(+r.valor || 0)}${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
-    <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? ' <button class="btn sm ghost" data-act="asociar" title="Asociar esta fila a un registro de la app">Asociar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
-    <td style="white-space:nowrap">${puedeEditar(r) ? '<button class="btn sm ghost" data-act="editarMov">Editar</button>' : ''}${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`;
+    <td style="white-space:nowrap">${origenChip(r)}</td>
+    <td class="acc"><div class="acc-row">${a && r.estado === 'pendiente' ? icoBtn('validar', 'Validar', '', '#validar') : ''}${puedeEditar(r) ? icoBtn('editar', 'Editar', 'editarMov') : ''}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? icoBtn('dividir', 'Dividir en partes', 'dividirMov') : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? icoBtn('asociar', 'Asociar a un registro de la app', 'asociar') : ''}${puedeBorrar(r) ? (S.confirmK === r.id ? `<button class="btn sm danger" data-act="quitar">${r.tx_id ? '¿Quitar?' : '¿Borrar?'} Sí</button>` : icoBtn(r.tx_id ? 'quitar' : 'borrar', r.tx_id ? 'Quitar (vuelve a la bandeja)' : 'Borrar', 'quitar', '', 'danger')) : ''}</div></td></tr>`;
     const hechos = new Set(); const nc = cols; const ivalor = 3 + (eg && fam ? 1 : 0);
     const sueltas = rowsO.filter(r => !(r.grupo && microById(r.grupo)));
     const grupos = [...new Set(rowsO.filter(r => r.grupo && microById(r.grupo)).map(r => r.grupo))].sort((x, y) => microById(x).nombre.localeCompare(microById(y).nombre, 'es'));
@@ -1474,6 +1477,20 @@ function dibujarVeh() {
     else vBarras(box, pm, [{k: 'km', n: 'Kilómetros', c: 'var(--azul)'}], x => nf(x) + ' km');
   });
   cargarFotosVeh();
+}
+/* ===== iconos de acción ===== */
+const ICO = {
+  editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  borrar: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+  quitar: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  dividir: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.2-2.9L3 3"/><path d="m15 9 6-6"/>',
+  asociar: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  validar: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'
+};
+function icoBtn(k, titulo, act, href, extra) {
+  const svg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]}</svg>`;
+  return href ? `<a class="btn sm ghost ico ${extra || ''}" href="${href}" title="${esc(titulo)}" aria-label="${esc(titulo)}">${svg}</a>`
+    : `<button class="btn sm ghost ico ${extra || ''}" data-act="${act}" title="${esc(titulo)}" aria-label="${esc(titulo)}">${svg}</button>`;
 }
 /* ===== registro manual: nuevo / editar en ventana emergente ===== */
 function abrirRegistro(cid, mes, movId) {
