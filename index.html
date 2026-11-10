@@ -256,6 +256,27 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 @media (max-width:520px){.cr-parts{grid-template-columns:1fr 1fr}}
 .cr-warn{color:var(--warn);font-weight:600}
 .cr-sum .kpi{border-radius:0}
+.cr-filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;align-items:end}
+.cr-filtros label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.cr-filtros .in{max-width:none;width:100%;height:32px}
+.cr-tog{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--fg);cursor:pointer}
+.cr-tog i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.cr-tog[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+svg.crg{width:100%;height:auto;display:block;overflow:visible}
+.crg-grid{stroke:var(--line);stroke-width:1}
+.crg-ax{fill:var(--muted);font-size:11px;font-family:var(--f-num)}
+.crg-hit{fill:transparent}
+.crg-col{cursor:pointer;outline:none}.crg-col:hover .crg-hit,.crg-col:focus .crg-hit{fill:var(--sunk)}.crg-col.on .crg-hit{fill:var(--accent-soft)}
+.crg-p{opacity:.38}
+.crg-hoy{stroke:var(--fg);stroke-dasharray:3 3;opacity:.5}
+.crg-area{fill:var(--accent);opacity:.1}.crg-lp{fill:none;stroke:var(--accent);stroke-width:2}.crg-lr{fill:none;stroke:var(--fg);stroke-width:2}.crg-dr{fill:var(--fg)}
+.leg .crg-swp{background:var(--accent);opacity:.38;height:10px!important;width:10px!important}.leg .crg-swr{background:var(--accent);height:10px!important;width:10px!important}
+.crc{display:grid;gap:10px}
+.crc-row{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr);gap:10px;align-items:center}
+.crc-n{border:0;background:none;text-align:left;font-weight:600;font-size:12.5px;color:var(--fg);cursor:pointer;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.crc-n:hover{color:var(--accent);text-decoration:underline}
+.crc-bars{display:grid;gap:3px}
+.crc-bar{display:flex;align-items:center;height:14px;gap:0}.crc-bar i{display:block;height:100%}.crc-bar.p i{opacity:.38}
+.crc-bar span{font-size:11px;margin-left:6px;color:var(--muted);white-space:nowrap}
 .tipo-txt{font-weight:600;letter-spacing:.01em}
 #regForm .fld input,#regForm .fld select{height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);font:inherit;font-size:15px;width:100%;box-sizing:border-box;max-width:none}
 #regForm .fld input:disabled{opacity:.6}
@@ -1801,8 +1822,12 @@ function vCreditos() {
       <td style="white-space:nowrap">${R.prox ? `<span class="chip ${e[1]}">${e[0]}</span> <span class="num small">${fFecha(R.prox.fecha)}</span>` : '—'}${R.sinReg ? ` <span class="chip bad">${R.sinReg} sin registros</span>` : ''}</td>
       <td class="acc"><div class="acc-row">${S.confirmCredL === c.id ? `<button class="btn sm danger" data-act="credBorrarL" title="Elimina el crédito con su plan y enlaces">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="credBorrarNo">No</button>` : icoBtn('borrar', 'Eliminar crédito', 'credBorrarL', '', 'danger')}</div></td></tr>`; }).join('');
   const c = credById(S.credSel);
+  const tabs = `<div class="subtabs" role="tablist">${[['lista', 'Créditos y conciliación'], ['ana', 'Análisis']].map(([k, t]) => `<button role="tab" data-act="credTab" data-t="${k}" aria-selected="${(S.credTab || 'lista') === k}">${t}</button>`).join('')}</div>`;
+  // Pestaña Análisis: filtros y gráficos interactivos (ver vCredAnalisis).
+  if (S.credTab === 'ana') return `<div class="stack"><div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="credNuevo">+ Nuevo crédito</button></div>${tabs}${lista.length ? vCredAnalisis() : '<div class="panel"><div class="bd note">Agrega un crédito para ver el análisis.</div></div>'}</div>`;
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="credNuevo">+ Nuevo crédito</button></div>
+    ${tabs}
     <div class="kpis"><div class="kpi"><div class="eyebrow">Próximas cuotas</div><div class="v">${L(kCuota)}</div><div class="note">proyectado de los créditos activos</div></div>
       <div class="kpi"><div class="eyebrow">Saldo de capital</div><div class="v">${L(kSaldo)}</div><div class="note">capital menos lo pagado en registros</div></div>
       <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v neg">${L(kInt)}</div><div class="note">según registros vinculados</div></div>
@@ -1915,6 +1940,131 @@ async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = 
     toast(`Plan guardado: ${filas.length} cuotas${conEnl.length ? ` · ${conEnl.length} cuotas sobrantes se conservaron porque tienen registros` : ''}`);
   } catch (e) {}
 }
+/* ===== Créditos · Análisis: filtros, gráficos interactivos y tabla resumen ===== */
+// crCfDef: filtros por defecto del análisis (12 meses atrás y 12 adelante).
+function crCfDef() { const d = new Date(); const ym = k => { const x = new Date(d.getFullYear(), d.getMonth() + k, 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`; };
+  return {tipo: '', entidad: '', estado: 'activo', cred: '', desde: ym(-11), hasta: ym(12), agr: 'mes', ver: {cap: true, int: true, seg: true, com: true, mor: true}, periodo: null}; }
+const crCf = () => (S.cf = S.cf || crCfDef());
+// crPerKey: período de una fecha según la agrupación (mes, trimestre o año).
+function crPerKey(fecha, agr) { const y = fecha.slice(0, 4), m = +fecha.slice(5, 7); return agr === 'anio' ? y : agr === 'trim' ? `${y}-T${Math.ceil(m / 3)}` : fecha.slice(0, 7); }
+function crPerLbl(k) { if (/^\d{4}$/.test(k)) return k; if (/T\d$/.test(k)) return `T${k.slice(-1)} ${k.slice(2, 4)}`; return MES[+k.slice(5, 7) - 1].slice(0, 3).toLowerCase() + ' ' + k.slice(2, 4); }
+function crPerLargo(k) { if (/^\d{4}$/.test(k)) return 'Año ' + k; if (/T\d$/.test(k)) return `Trimestre ${k.slice(-1)} de ${k.slice(0, 4)}`; return mesLargo(k); }
+// crPeriodos: lista ordenada de períodos entre "desde" y "hasta".
+function crPeriodos(f) { const out = []; let [y, m] = f.desde.split('-').map(Number); const [y2, m2] = f.hasta.split('-').map(Number); let n = 0;
+  while ((y < y2 || (y === y2 && m <= m2)) && n < 400) { const k = crPerKey(`${y}-${String(m).padStart(2, '0')}-01`, f.agr); if (out[out.length - 1] !== k) out.push(k); m++; if (m > 12) { m = 1; y++; } n++; } return out; }
+// crFiltrados: créditos que cumplen los filtros de tipo, entidad, estado y crédito.
+function crFiltrados(f) { return creditos().filter(c => (!f.tipo || c.tipo === f.tipo) && (!f.entidad || (c.entidad || '') === f.entidad) && (!f.estado || (c.estado || 'activo') === f.estado) && (!f.cred || c.id === f.cred)); }
+// crDatosAnalisis: suma por período lo proyectado y lo real (por concepto), saldos y el resumen por crédito.
+function crDatosAnalisis(f) {
+  const lista = crFiltrados(f); const pers = crPeriodos(f); const set = new Set(pers);
+  const base = () => ({cap: 0, int: 0, seg: 0, com: 0, mor: 0});
+  const P = new Map(pers.map(k => [k, {proy: base(), real: base(), n: 0, conc: 0, sin: 0, saldoP: 0, saldoR: 0}]));
+  const porCred = []; const hoyK = crPerKey(hoy(), f.agr);
+  for (const c of lista) {
+    const cs = cuotasDe(c.id); let capR = 0; const capRPer = new Map();
+    const fila = {c, proy: base(), real: base(), cuotas: 0, conc: 0, sin: 0, mora: 0};
+    for (const qq of cs) {
+      const pv = qVal(qq), rv = realCuota(qq.id); const k = crPerKey(qq.fecha, f.agr);
+      capRPer.set(k, (capRPer.get(k) || 0) + rv.cap);
+      if (!set.has(k)) continue;
+      const B = P.get(k); B.n++; const e = estadoCuota(qq)[0]; if (qq.conciliada) { B.conc++; fila.conc++; } if (e === 'Sin registros') { B.sin++; fila.sin++; }
+      for (const cn of CR_CON) { B.proy[cn] += pv[cn]; B.real[cn] += rv[cn]; fila.proy[cn] += pv[cn]; fila.real[cn] += rv[cn]; }
+      fila.cuotas++;
+    }
+    // saldo proyectado al cierre de cada período y saldo real (capital − capital pagado acumulado)
+    let ultSaldo = +c.capital || 0; const porPer = new Map(); for (const qq of cs) porPer.set(crPerKey(qq.fecha, f.agr), +qq.saldo);
+    const antes = cs.filter(qq => crPerKey(qq.fecha, f.agr) < pers[0]); if (antes.length) ultSaldo = +antes[antes.length - 1].saldo;
+    capR = cs.filter(qq => crPerKey(qq.fecha, f.agr) < pers[0]).reduce((s, qq) => s + realCuota(qq.id).cap, 0);
+    for (const k of pers) { if (porPer.has(k)) ultSaldo = porPer.get(k); capR += capRPer.get(k) || 0; const B = P.get(k); B.saldoP += ultSaldo; if (k <= hoyK) B.saldoR += Math.max(0, (+c.capital || 0) - capR); else B.saldoR = null; }
+    porCred.push(fila);
+  }
+  return {lista, pers, P, porCred, hoyK};
+}
+const CR_FILL = {cap: 'var(--accent)', int: 'var(--bad)', seg: '#3a6ea5', com: 'var(--warn)', mor: '#8a4fa3'};
+function crNice(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); const n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; }
+const crK = v => Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + 'M' : Math.abs(v) >= 1e3 ? Math.round(v / 1e3) + 'k' : String(Math.round(v));
+// crGrafPagos: barras por período, a la izquierda lo proyectado (claro) y a la derecha lo real (sólido), apiladas por concepto. Tocar una barra abre el detalle del período.
+function crGrafPagos(Dd, f) {
+  const ver = CR_CON.filter(k => f.ver[k]); const W = 960, H = 300, ml = 52, mr = 12, mt = 14, mb = 34; const n = Dd.pers.length || 1;
+  const tot = (o) => ver.reduce((s, k) => s + o[k], 0);
+  const max = crNice(Math.max(1, ...Dd.pers.map(k => Math.max(tot(Dd.P.get(k).proy), tot(Dd.P.get(k).real)))));
+  const bw = (W - ml - mr) / n; const b = Math.max(2, Math.min(18, bw * 0.36)); const y = v => mt + (H - mt - mb) * (1 - v / max);
+  let g = ''; for (let i = 0; i <= 4; i++) { const v = max * i / 4; g += `<line x1="${ml}" x2="${W - mr}" y1="${y(v)}" y2="${y(v)}" class="crg-grid"/><text x="${ml - 6}" y="${y(v) + 4}" class="crg-ax" text-anchor="end">${crK(v)}</text>`; }
+  const paso = Math.ceil(n / 12);
+  Dd.pers.forEach((k, i) => { const B = Dd.P.get(k); const x0 = ml + bw * i + bw / 2; const sel = f.periodo === k;
+    const pila = (o, x, cls) => { let acc = 0; return ver.map(cn => { const v = o[cn]; if (v <= 0) return ''; const r = `<rect x="${x}" y="${y(acc + v)}" width="${b}" height="${Math.max(0.5, y(acc) - y(acc + v))}" fill="${CR_FILL[cn]}" class="${cls}"/>`; acc += v; return r; }).join(''); };
+    const tip = `${crPerLargo(k)}\nProyectado ${L(tot(B.proy))}\nReal ${L(tot(B.real))}\n` + ver.map(cn => `${CR_N[cn]}: ${L(B.proy[cn])} / ${L(B.real[cn])}`).join('\n') + (B.sin ? `\n${B.sin} cuotas sin registros` : '');
+    g += `<g class="crg-col ${sel ? 'on' : ''}" data-act="cfPer" data-k="${k}" tabindex="0" role="button" aria-label="${esc(crPerLargo(k))}"><title>${esc(tip)}</title><rect x="${ml + bw * i}" y="${mt}" width="${bw}" height="${H - mt - mb}" class="crg-hit"/>${pila(B.proy, x0 - b - 1, 'crg-p')}${pila(B.real, x0 + 1, '')}${B.sin ? `<circle cx="${x0}" cy="${H - mb + 6}" r="3" fill="var(--bad)"/>` : ''}</g>`;
+    if (i % paso === 0) g += `<text x="${x0}" y="${H - 8}" class="crg-ax" text-anchor="middle">${crPerLbl(k)}</text>`; });
+  const hx = Dd.pers.indexOf(Dd.hoyK); if (hx >= 0) { const x = ml + bw * hx + bw / 2; g += `<line x1="${x}" x2="${x}" y1="${mt}" y2="${H - mb}" class="crg-hoy"/><text x="${x + 4}" y="${mt + 10}" class="crg-ax">hoy</text>`; }
+  return `<svg viewBox="0 0 ${W} ${H}" class="crg" role="img" aria-label="Pagos por período: proyectado y real">${g}</svg>`;
+}
+// crGrafSaldo: línea del saldo de capital proyectado y del saldo real (hasta hoy).
+function crGrafSaldo(Dd) {
+  const W = 560, H = 260, ml = 50, mr = 10, mt = 14, mb = 30; const n = Dd.pers.length; if (!n) return '';
+  const vals = Dd.pers.map(k => Dd.P.get(k)); const max = crNice(Math.max(1, ...vals.map(v => Math.max(v.saldoP, v.saldoR || 0))));
+  const x = i => ml + (W - ml - mr) * (n === 1 ? 0.5 : i / (n - 1)); const y = v => mt + (H - mt - mb) * (1 - v / max);
+  let g = ''; for (let i = 0; i <= 4; i++) { const v = max * i / 4; g += `<line x1="${ml}" x2="${W - mr}" y1="${y(v)}" y2="${y(v)}" class="crg-grid"/><text x="${ml - 6}" y="${y(v) + 4}" class="crg-ax" text-anchor="end">${crK(v)}</text>`; }
+  const pP = vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v.saldoP).toFixed(1)}`).join(' ');
+  const rr = vals.map((v, i) => v.saldoR == null ? null : [x(i), y(v.saldoR)]).filter(Boolean); const pR = rr.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  g += `<path d="${pP} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z" class="crg-area"/><path d="${pP}" class="crg-lp"/>${pR ? `<path d="${pR}" class="crg-lr"/>` : ''}`;
+  const paso = Math.ceil(n / 7);
+  vals.forEach((v, i) => { g += `<g><title>${esc(crPerLargo(Dd.pers[i]))}\nSaldo proyectado ${L(v.saldoP)}${v.saldoR != null ? '\nSaldo real ' + L(v.saldoR) : ''}</title><rect x="${x(i) - (W - ml - mr) / n / 2}" y="${mt}" width="${(W - ml - mr) / n}" height="${H - mt - mb}" class="crg-hit"/>${v.saldoR != null ? `<circle cx="${x(i)}" cy="${y(v.saldoR)}" r="2.5" class="crg-dr"/>` : ''}</g>`;
+    if (i % paso === 0) g += `<text x="${x(i)}" y="${H - 8}" class="crg-ax" text-anchor="middle">${crPerLbl(Dd.pers[i])}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" class="crg" role="img" aria-label="Saldo de capital">${g}</svg>`;
+}
+// crGrafCosto: costo por crédito (interés, seguro, comisiones y mora) proyectado contra real, en barras horizontales.
+function crGrafCosto(Dd, f) {
+  const ver = ['int', 'seg', 'com', 'mor'].filter(k => f.ver[k]); const filas = Dd.porCred.filter(r => ver.some(k => r.proy[k] || r.real[k])); if (!filas.length) return '<div class="note">Sin costos en el período elegido.</div>';
+  const max = crNice(Math.max(1, ...filas.map(r => Math.max(...['proy', 'real'].map(t => ver.reduce((s, k) => s + r[t][k], 0))))));
+  return `<div class="crc">${filas.map(r => { const bar = (t) => { const tot = ver.reduce((s, k) => s + r[t][k], 0); return `<div class="crc-bar ${t === 'proy' ? 'p' : ''}" title="${t === 'proy' ? 'Proyectado' : 'Real'} ${L(tot)}\n${ver.map(k => CR_N[k] + ': ' + L(r[t][k])).join('\n')}">${ver.map(k => r[t][k] > 0 ? `<i style="width:${(r[t][k] / max * 100).toFixed(2)}%;background:${CR_FILL[k]}"></i>` : '').join('')}<span class="num">${L(tot)}</span></div>`; };
+    return `<div class="crc-row"><button class="crc-n" data-act="cfCred" data-id="${r.c.id}" title="Filtrar por este crédito">${esc(r.c.nombre)}</button><div class="crc-bars">${bar('proy')}${bar('real')}</div></div>`; }).join('')}</div>`;
+}
+function vCredAnalisis() {
+  const f = crCf(); const Dd = crDatosAnalisis(f); const ents = [...new Set(creditos().map(c => c.entidad).filter(Boolean))].sort();
+  // Los totales respetan los conceptos visibles (botones de Conceptos).
+  const VIS = CR_CON.filter(k => f.ver[k]); const sum = (t, k) => Dd.porCred.reduce((s, r) => s + r[t][k], 0); const totT = t => VIS.reduce((s, k) => s + sum(t, k), 0);
+  const nCuo = Dd.porCred.reduce((s, r) => s + r.cuotas, 0), nConc = Dd.porCred.reduce((s, r) => s + r.conc, 0), nSin = Dd.porCred.reduce((s, r) => s + r.sin, 0);
+  const CF = ['int', 'seg', 'com', 'mor'].filter(k => f.ver[k]); const costoP = CF.reduce((s, k) => s + sum('proy', k), 0), costoR = CF.reduce((s, k) => s + sum('real', k), 0);
+  const filtros = `<div class="panel"><div class="bd cr-filtros">
+    <label>Tipo<select class="in" data-cf="tipo"><option value="">Todos</option>${Object.entries(CR_TIPO).map(([k, t]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${t[2]}</option>`).join('')}</select></label>
+    <label>Entidad<select class="in" data-cf="entidad"><option value="">Todas</option>${ents.map(e => `<option ${f.entidad === e ? 'selected' : ''}>${esc(e)}</option>`).join('')}</select></label>
+    <label>Estado<select class="in" data-cf="estado"><option value="">Todos</option><option value="activo" ${f.estado === 'activo' ? 'selected' : ''}>Activos</option><option value="cancelado" ${f.estado === 'cancelado' ? 'selected' : ''}>Cancelados</option></select></label>
+    <label>Crédito<select class="in" data-cf="cred"><option value="">Todos</option>${creditos().map(c => `<option value="${c.id}" ${f.cred === c.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></label>
+    <label>Desde<input class="in" type="month" data-cf="desde" value="${f.desde}"></label>
+    <label>Hasta<input class="in" type="month" data-cf="hasta" value="${f.hasta}"></label>
+    <label>Agrupar por<span class="seg" role="group" aria-label="Agrupar por">${[['mes', 'Mes'], ['trim', 'Trimestre'], ['anio', 'Año']].map(([k, t]) => `<button data-act="cfAgr" data-k="${k}" aria-pressed="${f.agr === k}">${t}</button>`).join('')}</span></label>
+    <button class="btn sm ghost" data-act="cfReset" style="align-self:end">Quitar filtros</button></div>
+    <div class="bd row" style="border-top:1px solid var(--line);gap:6px;padding-top:10px;padding-bottom:10px"><span class="note">Conceptos:</span>${CR_CON.map(k => `<button class="cr-tog" data-act="cfCon" data-k="${k}" aria-pressed="${!!f.ver[k]}"><i style="background:${CR_FILL[k]}"></i>${CR_N[k]}</button>`).join('')}</div></div>`;
+  let det = '';
+  if (f.periodo && Dd.P.has(f.periodo)) {
+    const filas = []; for (const c of Dd.lista) for (const qq of cuotasDe(c.id)) if (crPerKey(qq.fecha, f.agr) === f.periodo) filas.push([c, qq]);
+    det = `<div class="panel"><div class="hd"><h2 style="margin-right:auto">Cuotas de ${esc(crPerLargo(f.periodo))}</h2><button class="btn sm ghost" data-act="cfPer" data-k="${f.periodo}">Cerrar detalle</button></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Crédito</th><th>#</th><th>Fecha</th><th class="num">Proyectado</th><th class="num">Real</th><th class="num">Diferencia</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${filas.map(([c, qq]) => { const re = crTot(realCuota(qq.id)); const e = estadoCuota(qq); const d = crR2(re - (+qq.cuota || 0)); return `<tr><td><b>${esc(c.nombre)}</b></td><td class="num">${qq.numero}</td><td class="num">${fFecha(qq.fecha)}</td><td class="num">${L(+qq.cuota)}</td><td class="num">${re ? L(re) : '—'}</td><td class="num ${re && Math.abs(d) > 0.004 ? 'neg' : 'muted'}">${re ? (d > 0 ? '+' : '') + L(d) : '—'}</td><td><span class="chip ${e[1]}">${e[0]}</span></td><td><button class="btn sm" data-act="cfIr" data-c="${c.id}" data-n="${qq.numero}">Conciliar</button></td></tr>`; }).join('') || '<tr><td colspan="8" class="note">Sin cuotas en este período.</td></tr>'}
+      </tbody></table></div></div>`;
+  }
+  return `${filtros}
+    <div class="kpis">
+      <div class="kpi"><div class="eyebrow">Proyectado en el período</div><div class="v">${L(totT('proy'))}</div><div class="note">${nCuo} cuotas de ${Dd.lista.length} créditos</div></div>
+      <div class="kpi"><div class="eyebrow">Real vinculado</div><div class="v">${L(totT('real'))}</div><div class="note">${totT('proy') ? Math.round(totT('real') / totT('proy') * 100) + ' % de lo proyectado' : '—'}</div></div>
+      <div class="kpi"><div class="eyebrow">Costo financiero</div><div class="v neg">${L(costoR)}</div><div class="note">real · proyectado ${L(costoP)}</div></div>
+      <div class="kpi"><div class="eyebrow">Moras</div><div class="v ${sum('real', 'mor') ? 'neg' : ''}">${L(sum('real', 'mor'))}</div><div class="note">en el período</div></div>
+      <div class="kpi"><div class="eyebrow">Conciliadas</div><div class="v">${nConc}/${nCuo}</div><div class="note">${nSin ? `<span class="neg">${nSin} sin registros</span>` : 'ninguna vencida sin registros'}</div></div>
+    </div>
+    <div class="panel"><div class="hd"><h2 style="margin-right:auto">Pagos por ${f.agr === 'anio' ? 'año' : f.agr === 'trim' ? 'trimestre' : 'mes'}</h2><span class="leg"><span><i class="crg-swp"></i>Proyectado</span><span><i class="crg-swr"></i>Real</span><span><i style="background:var(--bad);border-radius:50%;width:7px;height:7px"></i>Cuotas sin registros</span></span></div>
+      <div class="bd" style="padding-top:6px">${Dd.lista.length ? crGrafPagos(Dd, f) : '<div class="note">Ningún crédito cumple los filtros.</div>'}<div class="note">Pasa el mouse sobre una barra para ver el detalle; tócala para listar sus cuotas.</div></div></div>
+    ${det}
+    <div class="grid2">
+      <div class="panel"><div class="hd"><h2 style="margin-right:auto">Saldo de capital</h2><span class="leg"><span><i style="background:var(--accent)"></i>Proyectado</span><span><i style="background:var(--fg)"></i>Real</span></span></div><div class="bd">${Dd.lista.length ? crGrafSaldo(Dd) : ''}</div></div>
+      <div class="panel"><div class="hd"><h2 style="margin-right:auto">Costo por crédito</h2><span class="note">arriba proyectado · abajo real</span></div><div class="bd">${crGrafCosto(Dd, f)}</div></div>
+    </div>
+    <div class="panel"><div class="hd"><h2 style="margin-right:auto">Resumen por crédito</h2><span class="note">en el período filtrado</span></div><div class="tbl-wrap"><table><thead><tr><th>Crédito</th><th>Tipo</th><th class="num">Cuotas</th>${CR_CON.filter(k => f.ver[k]).map(k => `<th class="num">${CR_N[k]} real</th>`).join('')}<th class="num">Total proyectado</th><th class="num">Total real</th><th class="num">Diferencia</th><th>Conciliadas</th></tr></thead><tbody>
+      ${Dd.porCred.map(r => { const tp = VIS.reduce((s, k) => s + r.proy[k], 0), tr = VIS.reduce((s, k) => s + r.real[k], 0); const T = CR_TIPO[r.c.tipo] || CR_TIPO.prestamo;
+        return `<tr><td><button class="linkish" data-act="cfIr" data-c="${r.c.id}">${esc(r.c.nombre)}</button></td><td><span class="cr-pill ${T[1]}">${T[0]}</span></td><td class="num">${r.cuotas}</td>${CR_CON.filter(k => f.ver[k]).map(k => `<td class="num" title="Proyectado ${L(r.proy[k])}">${L(r.real[k])}</td>`).join('')}<td class="num">${L(tp)}</td><td class="num"><b>${L(tr)}</b></td><td class="num ${Math.abs(tr - tp) > 0.004 ? 'neg' : 'muted'}">${(tr - tp > 0 ? '+' : '') + L(crR2(tr - tp))}</td><td style="white-space:nowrap"><span class="cr-bar"><i style="width:${r.cuotas ? (r.conc / r.cuotas * 100).toFixed(1) : 0}%"></i></span> <span class="num small">${r.conc}/${r.cuotas}</span>${r.sin ? ` <span class="chip bad">${r.sin}</span>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="12" class="note">Ningún crédito cumple los filtros.</td></tr>'}
+    </tbody></table></div></div>`;
+}
+
 // crEliminar: borra un crédito; la base de datos borra en cascada su plan de cuotas y sus enlaces (los registros de la app no se tocan).
 async function crEliminar(id) {
   try { await q(sb.from('creditos').delete().eq('id', id), 'Crédito eliminado'); const qs = new Set(cuotasDe(id).map(x => x.id)); S.cred = S.cred.filter(x => x.id !== id); S.ccuo = S.ccuo.filter(x => x.credito !== id); S.cenl = S.cenl.filter(x => !qs.has(x.cuota)); } catch (e) {}
@@ -3052,6 +3202,14 @@ document.addEventListener('click', async e => {
     S.confirmK = null; return borrarMov(m.id, m.tx_id ? 'Quitado. El movimiento volvió a la bandeja.' : 'Fila borrada').catch(() => {});
   }
   if (act === 'usarMonto') { const m = movDe(b); const t = m && D.byId.get(m.tx_id); if (t) return actualizarMov(m.id, {valor: t.monto}, 'Monto actualizado').catch(() => {}); return; }
+  // Análisis de créditos: pestaña, agrupación, conceptos visibles, filtros y navegación al detalle.
+  if (act === 'credTab') { S.credTab = b.dataset.t; return render(); }
+  if (act === 'cfAgr') { const f = crCf(); f.agr = b.dataset.k; f.periodo = null; return render(); }
+  if (act === 'cfCon') { const f = crCf(); f.ver[b.dataset.k] = !f.ver[b.dataset.k]; if (!CR_CON.some(k => f.ver[k])) f.ver[b.dataset.k] = true; return render(); }
+  if (act === 'cfReset') { S.cf = crCfDef(); return render(); }
+  if (act === 'cfPer') { const f = crCf(); f.periodo = f.periodo === b.dataset.k ? null : b.dataset.k; render(); if (f.periodo) { const h = [...document.querySelectorAll('.panel h2')].find(x => x.textContent.startsWith('Cuotas de')); if (h) h.scrollIntoView({behavior: 'smooth', block: 'center'}); } return; }
+  if (act === 'cfCred') { const f = crCf(); f.cred = f.cred === b.dataset.id ? '' : b.dataset.id; f.periodo = null; return render(); }
+  if (act === 'cfIr') { S.credTab = 'lista'; S.credSel = b.dataset.c; if (b.dataset.n) { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; } S.credTodo = false; render(); const h = [...document.querySelectorAll('.panel h2')].find(x => x.textContent.startsWith('Cuota ')); if (h) h.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   if (act === 'credSel') { S.credSel = b.dataset.id; S.credTodo = false; S.credBus = ''; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   if (act === 'cuoSel') { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; S.credBus = ''; return render(); }
   if (act === 'credNuevo') { S.confirmCred = null; return abrirCredForm(null); }
@@ -3237,6 +3395,7 @@ document.addEventListener('change', async e => {
     else p[f] = t.value;
     return pintarReparto();
   }
+  if (t.dataset.cf) { const f = crCf(); const k = t.dataset.cf; if ((k === 'desde' || k === 'hasta') && !t.value) return render(); f[k] = t.value; if (f.desde > f.hasta) { if (k === 'desde') f.hasta = f.desde; else f.desde = f.hasta; } f.periodo = null; return render(); }
   if (t.dataset.cpart) { const pp = t.closest('.cr-parts'); const o = {}; pp.querySelectorAll('[data-cpart]').forEach(i => { o[i.dataset.cpart] = crR2(parseFloat(String(i.value).replace(/[^0-9.\-]/g, '')) || 0); }); return crSetPartes(pp.dataset.q, pp.dataset.ref, o); }
   if (t.dataset.ctodo !== undefined && t.dataset.ctodo) { if (!t.value) return; return crSetPartes(t.dataset.q, t.dataset.ctodo, {[t.value]: crMontoRef(t.dataset.ctodo)}); }
   if (t.name === 'nrLado') { const F = $('#regForm'); const c = ctrlById(F.dataset.c); const eg = t.value === 'egreso'; S.regLado = t.value;
@@ -3287,7 +3446,7 @@ document.addEventListener('paste', e => {
 });
 /* Atajos de teclado: Enter para guardar en formularios y abrir filas, Escape para cerrar ventanas. */
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.matches && e.target.matches('tr.cr-row[data-act]')) { e.preventDefault(); e.target.click(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
