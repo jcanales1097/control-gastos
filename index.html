@@ -227,11 +227,31 @@ code.blk{display:block;white-space:pre-wrap;word-break:break-all;font-family:var
 .filters select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px;max-width:100%}
 .panel>.filters{padding:10px 14px;border-bottom:1px solid var(--line)}
 .addrow td{background:var(--sunk)}
-.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--sunk);padding:4px;border-radius:12px}
-.seg label{position:relative;cursor:pointer}.seg input{position:absolute;opacity:0;pointer-events:none}
-.seg span{display:block;text-align:center;padding:9px 10px;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted)}
-.seg input:checked+span{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.seg2{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;background:var(--sunk);padding:4px;border-radius:12px}
+.seg2 label{position:relative;cursor:pointer}.seg2 input{position:absolute;opacity:0;pointer-events:none}
+.seg2 span{display:block;text-align:center;padding:9px 10px;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg2 input:checked+span{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg2 input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.cr-pill{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.cr-intra{background:var(--accent-soft);color:var(--accent)}.cr-extra{background:var(--warn-soft);color:var(--warn)}.cr-pres{background:color-mix(in srgb,#3a6ea5 18%,transparent);color:#3a6ea5}
+tr.cr-row{cursor:pointer}tr.cr-sel td{background:var(--accent-soft)!important}
+.cr-bar{display:inline-block;width:70px;height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;vertical-align:middle}.cr-bar i{display:block;height:100%;background:var(--accent)}
+.cr-split{display:flex;height:10px;border-radius:99px;overflow:hidden;margin:12px 14px 8px}.cr-split i{display:block;height:100%}
+.cr-cap{background:var(--accent)!important}.cr-int{background:var(--bad)!important}.cr-seg{background:#3a6ea5!important}.cr-com{background:var(--warn)!important}
+.cr-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px}
+.cr-plan td,.cr-plan th{padding:6px 8px;font-size:12.5px}
+.cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:18px;align-items:start}
+@media (max-width:900px){.cr-conc{grid-template-columns:minmax(0,1fr)}}
+tr.cr-tt td{border-top:2px solid var(--fg)}
+.cr-rec{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;background:var(--panel)}
+.cr-sug{background:var(--sunk);border-style:dashed}
+.cr-rh{display:flex;gap:10px;align-items:center}.cr-rh b{font-size:13px;font-weight:600}
+.cr-parts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cr-parts label{display:grid;gap:3px;font-size:11px;font-weight:600;color:var(--muted)}
+.cr-parts input{height:32px;border:1px solid var(--line);border-radius:7px;padding:0 8px;background:var(--panel);color:var(--fg);text-align:right;width:100%;min-width:0;font-size:12.5px}
+@media (max-width:520px){.cr-parts{grid-template-columns:1fr 1fr}}
+.cr-warn{color:var(--warn);font-weight:600}
+.cr-sum .kpi{border-radius:0}
 .tipo-txt{font-weight:600;letter-spacing:.01em}
 #regForm .fld input,#regForm .fld select{height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);font:inherit;font-size:15px;width:100%;box-sizing:border-box;max-width:none}
 #regForm .fld input:disabled{opacity:.6}
@@ -474,6 +494,7 @@ async function cargarTodo() {
     if (!S.aj.inicio) S.aj.inicio = hoy().slice(0, 8) + '01';
     try { S.hist = new Map((await todo('tx_hist')).map(x => [x.tx_id, x])); } catch (e) { S.hist = null; }
     try { S.mon = new Map((await todo('tx_moneda')).map(x => [x.tx_id, x])); } catch (e) { S.mon = null; }
+    try { const [cr, cq, ce] = await Promise.all([todo('creditos', 'nombre'), todo('credito_cuotas', 'numero'), todo('credito_enlaces')]); S.cred = cr; S.ccuo = cq; S.cenl = ce; } catch (e) { S.cred = null; S.ccuo = []; S.cenl = []; }
   } else {
     S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
@@ -574,7 +595,7 @@ function route() {
   const ok = id => { const c = ctrlById(id); return !!c; };
   if ((h.startsWith('c-') || h.startsWith('p-')) && ok(h.slice(2))) S.view = h;
   else if (['inicio', 'proyectos', 'vehiculos'].includes(h)) S.view = h;
-  else if (esAdmin() && ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes'].includes(h)) S.view = h;
+  else if (esAdmin() && ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes', 'creditos'].includes(h)) S.view = h;
   else S.view = 'inicio';
 }
 window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return; route(); S.sel.clear(); render(); window.scrollTo(0, 0); });
@@ -587,6 +608,7 @@ function renderTabs() {
   familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
   if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
   if (S.veh !== undefined && (a || vehs().length)) items.push(['vehiculos', `Vehículos${a && detectados().length ? ` <span class="count warn-bg">${detectados().length}</span>` : ''}`]);
+  if (a) { const ns = S.cred ? creditos().filter(c => c.estado !== 'cancelado').reduce((t, c) => t + cuotasDe(c.id).filter(x => !x.conciliada && x.fecha < hoy() && !enlCuota(x.id).length).length, 0) : 0; items.push(['creditos', `Créditos${ns ? ` <span class="count bad-bg">${ns}</span>` : ''}`]); }
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
   const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
   $('#tabs').innerHTML = items.map(([h, l]) => `<a href="#${h}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`).join('');
@@ -610,11 +632,13 @@ function render() {
   else if (S.view === 'ajustes') html = vAjustes();
   else if (S.view === 'proyectos') html = vProyectos();
   else if (S.view === 'vehiculos') html = vVehiculos();
+  else if (S.view === 'creditos') html = vCreditos();
   else html = vControl(ctrlById(S.view.slice(2)));
   app().innerHTML = html;
   window.scrollTo(0, keep);
   dibujarGraficos(); dibujarVeh();
   if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
+  if (S._focusCB) { const el = $('#credBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusCB = false; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
 function renderEspera() {
@@ -1478,6 +1502,292 @@ function dibujarVeh() {
   });
   cargarFotosVeh();
 }
+/* ===== Créditos: proyección del plan y conciliación con registros reales (solo administrador) ===== */
+const CR_CON = ['cap', 'int', 'seg', 'com'];
+const CR_N = {cap: 'Capital', int: 'Interés', seg: 'Seguro', com: 'Comisiones'};
+const CR_TIPO = {intra: ['Intra', 'cr-intra', 'Intrafinanciamiento'], extra: ['Extra', 'cr-extra', 'Extrafinanciamiento'], prestamo: ['Préstamo', 'cr-pres', 'Préstamo']};
+const crR2 = x => Math.sign(x) * Math.round(Math.abs(x) * 100 + 1e-6) / 100;
+const crUid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ch => { const r = Math.random() * 16 | 0; return (ch === 'x' ? r : (r & 3 | 8)).toString(16); }));
+const creditos = () => (S.cred || []).slice().sort((a, b) => (a.estado === 'cancelado') - (b.estado === 'cancelado') || (a.nombre || '').localeCompare(b.nombre || ''));
+const credById = id => (S.cred || []).find(c => c.id === id);
+const cuotasDe = cid => (S.ccuo || []).filter(x => x.credito === cid).sort((a, b) => a.numero - b.numero);
+const enlCuota = qid => (S.cenl || []).filter(e => e.cuota === qid);
+const refKey = e => e.tx_id ? 't:' + e.tx_id : 'm:' + e.mov_id;
+function crAddM(iso, k) { const [y, m, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, m - 1 + k, 1)); const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(); dt.setUTCDate(Math.min(d, last)); return dt.toISOString().slice(0, 10); }
+function proyectar(c) {
+  const i = c.tasa_tipo === 'mensual' ? (+c.tasa || 0) / 100 : (+c.tasa || 0) / 1200; const n = Math.max(1, Math.round(+c.plazo || 1)); const P = +c.capital || 0;
+  const base = i ? P * i / (1 - Math.pow(1 + i, -n)) : P / n; let saldo = P; const out = [];
+  for (let k = 1; k <= n; k++) {
+    const int = crR2(saldo * i); let cap = crR2(base - int); if (k === n) cap = crR2(saldo);
+    const seg = c.seguro_tipo === 'saldo' ? crR2(saldo * (+c.seguro || 0) / 100) : crR2(+c.seguro || 0);
+    const com = crR2((+c.comision_mensual || 0) + (k === 1 ? (+c.comision_apertura || 0) : 0));
+    saldo = crR2(saldo - cap);
+    out.push({numero: k, fecha: crAddM(c.fecha_primera, k - 1), capital: cap, interes: int, seguro: seg, comisiones: com, cuota: crR2(cap + int + seg + com), saldo: Math.max(0, saldo)});
+  }
+  return out;
+}
+const qVal = q => ({cap: +q.capital || 0, int: +q.interes || 0, seg: +q.seguro || 0, com: +q.comisiones || 0});
+function realCuota(qid) { const o = {cap: 0, int: 0, seg: 0, com: 0}; enlCuota(qid).forEach(e => { o[e.concepto] = crR2(o[e.concepto] + (+e.monto || 0)); }); return o; }
+const crTot = o => crR2(o.cap + o.int + o.seg + o.com);
+function estadoCuota(q) {
+  if (q.conciliada) return ['Conciliada', 'app'];
+  const re = crTot(realCuota(q.id)), pr = +q.cuota || 0;
+  if (re > 0) return re < pr - 0.004 ? ['Parcial', 'warn'] : Math.abs(re - pr) <= 0.004 ? ['Cuadra · por conciliar', ''] : ['Con diferencia', 'bad'];
+  const dias = (new Date(q.fecha + 'T12:00') - new Date(hoy() + 'T12:00')) / 864e5;
+  if (dias < 0) return ['Sin registros', 'bad'];
+  if (dias <= 5) return ['Próxima', 'warn'];
+  return ['Pendiente', ''];
+}
+function resumenCred(c) {
+  const cs = cuotasDe(c.id); const enl = (S.cenl || []).filter(e => e.credito === c.id);
+  const capReal = enl.filter(e => e.concepto === 'cap').reduce((s, e) => s + (+e.monto || 0), 0);
+  const intReal = enl.filter(e => e.concepto === 'int').reduce((s, e) => s + (+e.monto || 0), 0);
+  const conc = cs.filter(q => q.conciliada).length;
+  const prox = cs.find(q => !q.conciliada && !crTot(realCuota(q.id)) && q.fecha >= hoy()) || null;
+  const sinReg = cs.filter(q => estadoCuota(q)[0] === 'Sin registros').length;
+  const costo = cs.reduce((s, q) => s + (+q.interes || 0) + (+q.seguro || 0) + (+q.comisiones || 0), 0);
+  return {cs, conc, prox, sinReg, capReal, intReal, saldo: crR2((+c.capital || 0) - capReal), costo, fin: cs.length ? cs[cs.length - 1].fecha : null};
+}
+function crRefInfo(e) {
+  if (e.tx_id) { const t = D.byId.get(e.tx_id); return t ? {desc: [t.nota, t.det].filter(Boolean).join(' | ') || t.cat || 'Registro de la app', fecha: t.fecha, cuenta: t.cuenta, monto: t.monto, origen: 'App'} : {desc: 'Registro de la app ya no disponible', fecha: '', cuenta: '', monto: 0, origen: 'App', falta: true}; }
+  const m = S.movs.get(e.mov_id); return m ? {desc: m.descripcion || 'Registro manual', fecha: m.fecha || '', cuenta: (ctrlById(m.control) || {}).nombre || '', monto: +m.valor || 0, origen: 'Manual'} : {desc: 'Registro manual borrado', fecha: '', cuenta: '', monto: 0, origen: 'Manual', falta: true};
+}
+function crUsadas() { const s = new Set(); (S.cenl || []).forEach(e => s.add(refKey(e))); return s; }
+function crSugeridos(c, q) {
+  const usadas = crUsadas(); const pat = (c.patron || '').trim().toUpperCase(); const f0 = new Date(q.fecha + 'T12:00');
+  const bus = (S.credBus || '').trim().toUpperCase(); const n = parseFloat(bus.replace(/[^0-9.]/g, ''));
+  const out = [];
+  for (const t of D.txs) {
+    if (usadas.has('t:' + t.id)) continue;
+    const txt = [t.nota, t.det, t.cat, t.sub, t.cuenta].join(' ').toUpperCase();
+    let ok;
+    if (bus) ok = txt.includes(bus) || (isFinite(n) && Math.abs(t.monto - n) < 0.01);
+    else { if (t.code === 0) continue; const dd = Math.abs((new Date(t.fecha + 'T12:00') - f0) / 864e5); ok = (pat && txt.includes(pat)) || (c.cuenta && t.cuenta === c.cuenta && dd <= 25); }
+    if (ok) out.push({tx_id: t.id, t, d: Math.abs((new Date(t.fecha + 'T12:00') - f0) / 864e5), p: pat && txt.includes(pat) ? 0 : 1});
+  }
+  if (bus) for (const m of S.movs.values()) { if (m.tx_id || m.estado === 'rechazado' || usadas.has('m:' + m.id)) continue; if ((m.descripcion || '').toUpperCase().includes(bus) || (isFinite(n) && Math.abs((+m.valor || 0) - n) < 0.01)) out.push({mov_id: m.id, m, d: Math.abs((new Date((m.fecha || hoy()) + 'T12:00') - f0) / 864e5)}); }
+  return out.sort((a, b) => (a.p || 0) - (b.p || 0) || a.d - b.d).slice(0, 15);
+}
+function vCreditos() {
+  const head = `<div><div class="eyebrow">Créditos</div><h1>Intra, extrafinanciamientos y préstamos</h1><div class="note">Proyecta el plan de pago y relaciónalo con los registros reales. No crea gastos ni cambia el reparto de los controles.</div></div>`;
+  if (S.cred === null) return `<div class="stack">${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de créditos (creditos.sql).</div></div></div>`;
+  const lista = creditos();
+  if (!S.credSel || !credById(S.credSel)) S.credSel = lista[0] ? lista[0].id : null;
+  let kCuota = 0, kSaldo = 0, kInt = 0, kSin = 0;
+  const filas = lista.map(c => { const R = resumenCred(c); const act = c.estado !== 'cancelado';
+    if (act) { kCuota += R.prox ? +R.prox.cuota : 0; kSaldo += R.saldo; kSin += R.sinReg; } kInt += R.intReal;
+    const e = R.prox ? estadoCuota(R.prox) : null; const T = CR_TIPO[c.tipo] || CR_TIPO.prestamo;
+    return `<tr class="cr-row ${c.id === S.credSel ? 'cr-sel' : ''}" data-act="credSel" data-id="${c.id}" tabindex="0"><td><b>${esc(c.nombre)}</b><div class="cat">${R.cs.length} cuotas${R.fin ? ' · termina ' + mesLargo(R.fin.slice(0, 7)).toLowerCase() : ''}${act ? '' : ' · cancelado'}</div></td>
+      <td><span class="cr-pill ${T[1]}">${T[0]}</span></td><td class="small muted">${esc([c.entidad, c.cuenta].filter(Boolean).join(' · '))}</td>
+      <td class="num">${R.prox ? L(+R.prox.cuota) : '—'}</td><td class="num">${L(R.saldo)}</td>
+      <td style="white-space:nowrap"><span class="cr-bar"><i style="width:${R.cs.length ? (R.conc / R.cs.length * 100).toFixed(1) : 0}%"></i></span> <span class="num small">${R.conc}/${R.cs.length}</span></td>
+      <td style="white-space:nowrap">${R.prox ? `<span class="chip ${e[1]}">${e[0]}</span> <span class="num small">${fFecha(R.prox.fecha)}</span>` : '—'}${R.sinReg ? ` <span class="chip bad">${R.sinReg} sin registros</span>` : ''}</td></tr>`; }).join('');
+  const c = credById(S.credSel);
+  return `<div class="stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="credNuevo">+ Nuevo crédito</button></div>
+    <div class="kpis"><div class="kpi"><div class="eyebrow">Próximas cuotas</div><div class="v">${L(kCuota)}</div><div class="note">proyectado de los créditos activos</div></div>
+      <div class="kpi"><div class="eyebrow">Saldo de capital</div><div class="v">${L(kSaldo)}</div><div class="note">capital menos lo pagado en registros</div></div>
+      <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v neg">${L(kInt)}</div><div class="note">según registros vinculados</div></div>
+      <div class="kpi"><div class="eyebrow">Cuotas sin registros</div><div class="v">${kSin}</div><div class="note">${kSin ? 'vencidas sin pago vinculado' : 'todo relacionado'}</div></div></div>
+    <div class="panel"><div class="hd"><h2 style="margin-right:auto">Créditos</h2></div>
+      ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Crédito</th><th>Tipo</th><th>Entidad · cuenta</th><th class="num">Próxima cuota</th><th class="num">Saldo capital</th><th>Conciliadas</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`
+        : '<div class="bd note">Todavía no hay créditos. Agrega el primero con “+ Nuevo crédito”: con capital, % de interés, plazo, seguro, comisiones y fecha de la primera cuota se proyecta el plan.</div>'}</div>
+    ${c ? vCredFicha(c) : ''}
+  </div>`;
+}
+function vCredFicha(c) {
+  const R = resumenCred(c); const cs = R.cs; const T = CR_TIPO[c.tipo] || CR_TIPO.prestamo;
+  if (!cs.length) return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">${esc(c.nombre)}</h2><button class="btn" data-act="credRecalc" data-id="${c.id}">Proyectar plan</button></div><div class="bd note">Este crédito no tiene plan todavía.</div></div>`;
+  S.cuoSel = S.cuoSel || {};
+  if (!S.cuoSel[c.id] || !cs.find(q => q.numero === S.cuoSel[c.id])) { const lim = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10); const pasadas = cs.filter(q => q.fecha <= lim); S.cuoSel[c.id] = (pasadas.find(q => !q.conciliada) || pasadas[pasadas.length - 1] || cs[0]).numero; }
+  const ks = S.cuoSel[c.id]; const q = cs.find(x => x.numero === ks);
+  const tot = cs.reduce((a, x) => ({cap: a.cap + (+x.capital || 0), int: a.int + (+x.interes || 0), seg: a.seg + (+x.seguro || 0), com: a.com + (+x.comisiones || 0)}), {cap: 0, int: 0, seg: 0, com: 0}); const TT = crTot(tot) || 1;
+  let rows = cs; if (!S.credTodo) { const a = Math.max(0, Math.min(ks - 3, cs.length - 8)); rows = cs.slice(a, a + 8); }
+  const tasa = `${(+c.tasa || 0).toLocaleString('en-US', {maximumFractionDigits: 4})} % ${c.tasa_tipo === 'mensual' ? 'mensual' : 'anual'}`;
+  const seg = +c.seguro ? (c.seguro_tipo === 'saldo' ? `${+c.seguro} % del saldo` : L(+c.seguro) + ' al mes') : 'sin seguro';
+  return `<div class="panel"><div class="hd"><div style="margin-right:auto;min-width:0"><div class="row" style="gap:8px"><h2>${esc(c.nombre)}</h2><span class="cr-pill ${T[1]}">${T[2]}</span>${c.estado === 'cancelado' ? '<span class="chip">Cancelado</span>' : ''}</div>
+      <div class="note">${esc([c.entidad, c.cuenta].filter(Boolean).join(' · '))} · capital ${L(+c.capital || 0)} · ${tasa} · ${cs.length} cuotas · ${seg}${+c.comision_mensual ? ' · comisión ' + L(+c.comision_mensual) + ' al mes' : ''}${+c.comision_apertura ? ' · apertura ' + L(+c.comision_apertura) : ''}</div></div>
+      <div class="row" style="gap:6px">${icoBtn('editar', 'Editar contrato', 'credForm')}<button class="btn sm" data-act="credPegar" data-id="${c.id}">Pegar plan del banco</button><button class="btn sm" data-act="credRecalc" data-id="${c.id}">Recalcular plan</button></div></div>
+    <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
+      <div class="kpi"><div class="eyebrow">Cuota proyectada</div><div class="v">${L(+q.cuota || 0)}</div></div>
+      <div class="kpi"><div class="eyebrow">Costo proyectado</div><div class="v neg">${L(tot.int + tot.seg + tot.com)}</div><div class="note">interés + seguro + comisiones</div></div>
+      <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v">${L(R.intReal)}</div><div class="note">según registros</div></div>
+      <div class="kpi"><div class="eyebrow">Termina</div><div class="v">${R.fin ? mesLargo(R.fin.slice(0, 7)) : '—'}</div><div class="note">${R.conc} de ${cs.length} conciliadas</div></div></div>
+    <div class="cr-split" aria-hidden="true">${CR_CON.map(k => `<i class="cr-${k}" style="width:${(tot[k] / TT * 100).toFixed(2)}%"></i>`).join('')}</div>
+    <div class="leg" style="padding:0 14px 10px">${CR_CON.map(k => `<span><i class="cr-${k}"></i>${CR_N[k]} ${L(tot[k])}</span>`).join('')}</div>
+    <div class="tbl-wrap"><table class="cr-plan"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th><th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num">${x.numero}</td><td class="num">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td><td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td><span class="chip ${e[1]}">${e[0]}</span>${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line)"><span class="note">${S.credTodo ? cs.length + ' cuotas' : `Cuotas ${rows[0].numero}–${rows[rows.length - 1].numero} de ${cs.length}`} · toca una cuota para relacionarla</span><button class="btn sm" data-act="credTodo">${S.credTodo ? 'Ver menos' : 'Ver plan completo'}</button></div>
+  </div>
+  ${vConciliar(c, q)}`;
+}
+function vConciliar(c, q) {
+  const pr = qVal(q), re = realCuota(q.id), e = estadoCuota(q);
+  const fila = (k) => { const d = crR2(re[k] - pr[k]); return `<tr><td><i class="cr-dot cr-${k}"></i>${CR_N[k]}</td><td class="num">${L(pr[k])}</td><td class="num">${re[k] ? L(re[k]) : '<span class="muted">—</span>'}</td><td class="num ${Math.abs(d) > 0.004 && (re[k] || pr[k]) ? 'neg' : 'muted'}">${re[k] || pr[k] ? (d > 0 ? '+' : '') + L(d) : '—'}</td></tr>`; };
+  const tr = crTot(re), dt = crR2(tr - (+q.cuota || 0));
+  const enl = enlCuota(q.id); const grupos = new Map(); enl.forEach(x => { const k = refKey(x); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(x); });
+  const recs = [...grupos.entries()].sort((x, y) => (crRefInfo(x[1][0]).fecha || '').localeCompare(crRefInfo(y[1][0]).fecha || '') || x[0].localeCompare(y[0])).map(([k, partes]) => { const info = crRefInfo(partes[0]); const asig = crR2(partes.reduce((s, x) => s + (+x.monto || 0), 0)); const libre = crR2(info.monto - asig);
+    return `<div class="cr-rec"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${esc(info.desc)}</b><div class="note">${info.fecha ? fFecha(info.fecha) + ' · ' : ''}${esc(info.cuenta)} · <span class="chip ${info.origen === 'App' ? 'app' : ''}">${info.origen}</span></div></div><span class="num" style="font-weight:600">${L(info.monto)}</span>${icoBtn('quitar', 'Desvincular de esta cuota', 'cenlQuitar')}</div>
+      <div class="cr-parts" data-ref="${esc(k)}" data-q="${q.id}">${CR_CON.map(cn => { const v = (partes.find(x => x.concepto === cn) || {}).monto; return `<label><span><i class="cr-dot cr-${cn}"></i>${CR_N[cn]}</span><input class="num" inputmode="decimal" data-cpart="${cn}" value="${v ? (+v).toFixed(2) : ''}" placeholder="0.00"></label>`; }).join('')}</div>
+      <div class="row" style="justify-content:space-between;gap:8px"><span class="small ${Math.abs(libre) > 0.004 ? 'cr-warn' : 'muted'}">${Math.abs(libre) > 0.004 ? (libre > 0 ? 'Sin asignar ' + L(libre) : 'Asignado de más ' + L(-libre)) : partes.length > 1 ? 'Desglosado en ' + partes.length + ' conceptos' : 'Todo en ' + CR_N[partes[0].concepto]}</span>
+        <span class="row" style="gap:6px"><button class="btn sm" data-act="cenlProy" data-ref="${esc(k)}" data-q="${q.id}">Desglosar como lo proyectado</button><select class="in" data-ctodo="${esc(k)}" data-q="${q.id}" aria-label="Asignar todo a un concepto"><option value="">Todo a…</option>${CR_CON.map(cn => `<option value="${cn}">${CR_N[cn]}</option>`).join('')}</select></span></div></div>`; }).join('');
+  const sug = crSugeridos(c, q);
+  return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">Cuota ${q.numero} de ${cuotasDe(c.id).length} · ${fFecha(q.fecha)}</h2><span class="chip ${e[1]}">${e[0]}</span>
+      <button class="btn sm ${q.conciliada ? '' : 'pri'}" data-act="cuoConc" data-id="${q.id}">${q.conciliada ? 'Quitar conciliación' : 'Marcar conciliada'}</button></div>
+    <div class="bd cr-conc">
+      <div><div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th class="num">Proyectado</th><th class="num">Real</th><th class="num">Diferencia</th></tr></thead><tbody>${CR_CON.map(fila).join('')}
+        <tr class="cr-tt"><td><b>Cuota</b></td><td class="num"><b>${L(+q.cuota || 0)}</b></td><td class="num"><b>${tr ? L(tr) : '—'}</b></td><td class="num ${tr && Math.abs(dt) > 0.004 ? 'neg' : ''}"><b>${tr ? (dt > 0 ? '+' : '') + L(dt) : '—'}</b></td></tr></tbody></table></div>
+        ${q.nota ? `<div class="note" style="margin-top:8px">${esc(q.nota)}</div>` : ''}</div>
+      <div class="stack" style="gap:8px;min-width:0">
+        <div class="eyebrow">Registros vinculados</div>
+        ${recs || '<div class="note">Ningún registro vinculado a esta cuota todavía.</div>'}
+        <div class="row" style="justify-content:space-between;margin-top:6px"><div class="eyebrow">${S.credBus ? 'Resultados de búsqueda' : 'Sugeridos · misma cuenta (±25 días) o texto del crédito'}</div><input class="in" id="credBus" placeholder="Buscar texto o monto" value="${esc(S.credBus || '')}" style="max-width:220px"></div>
+        ${sug.length ? sug.map(s => { const info = s.t ? {desc: [s.t.nota, s.t.det].filter(Boolean).join(' | ') || s.t.cat, fecha: s.t.fecha, cuenta: s.t.cuenta, monto: s.t.monto, o: 'App'} : {desc: s.m.descripcion || 'Registro manual', fecha: s.m.fecha || '', cuenta: (ctrlById(s.m.control) || {}).nombre || '', monto: +s.m.valor || 0, o: 'Manual'};
+          return `<div class="cr-rec cr-sug"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${esc(info.desc)}</b><div class="note">${info.fecha ? fFecha(info.fecha) + ' · ' : ''}${esc(info.cuenta)} · ${info.o}</div></div><span class="num" style="font-weight:600">${L(info.monto)}</span><button class="btn sm pri" data-act="cenlAdd" data-ref="${s.tx_id ? 't:' + esc(s.tx_id) : 'm:' + esc(s.mov_id)}" data-q="${q.id}">Vincular</button></div></div>`; }).join('')
+          : `<div class="note">${S.credBus ? 'Nada coincide con la búsqueda.' : 'No hay registros sugeridos. Usa la búsqueda por texto o monto.'}</div>`}
+      </div>
+    </div></div>`;
+}
+/* --- guardar --- */
+async function crSetPartes(qid, ref, partes) {
+  const q0 = (S.ccuo || []).find(x => x.id === qid); if (!q0) return;
+  const [tipo, id] = [ref.slice(0, 1), ref.slice(2)]; const col = tipo === 't' ? 'tx_id' : 'mov_id';
+  const viejos = (S.cenl || []).filter(e => e.cuota === qid && refKey(e) === ref);
+  try {
+    if (viejos.length) await q(sb.from('credito_enlaces').delete().in('id', viejos.map(e => e.id)));
+    S.cenl = S.cenl.filter(e => !viejos.includes(e));
+    const nuevos = Object.entries(partes).filter(([, v]) => crR2(v) > 0).map(([k, v]) => ({id: crUid(), cuota: qid, credito: q0.credito, [col]: id, concepto: k, monto: crR2(v)}));
+    if (nuevos.length) { const d = await q(sb.from('credito_enlaces').insert(nuevos).select()); S.cenl.push(...(d && d.length ? d : nuevos)); }
+  } catch (e) {}
+  render();
+}
+function crMontoRef(ref) { const id = ref.slice(2); if (ref[0] === 't') { const t = D.byId.get(id); return t ? t.monto : 0; } const m = S.movs.get(id); return m ? +m.valor || 0 : 0; }
+function crDesgloseProy(qid, ref, adivinar) {
+  const q0 = S.ccuo.find(x => x.id === qid); const monto = crMontoRef(ref);
+  if (adivinar) { let txt = ''; if (ref[0] === 't') { const t = D.byId.get(ref.slice(2)); txt = t ? [t.nota, t.det, t.cat, t.sub].join(' ').toLowerCase() : ''; } else { const m = S.movs.get(ref.slice(2)); txt = m ? (m.descripcion || '').toLowerCase() : ''; }
+    const g = /seguro/.test(txt) ? 'seg' : /comisi|cargo admin|administraci/.test(txt) ? 'com' : /inter[eé]s/.test(txt) ? 'int' : null; if (g) return {[g]: monto}; }
+  const ya = {cap: 0, int: 0, seg: 0, com: 0}; (S.cenl || []).filter(e => e.cuota === qid && refKey(e) !== ref).forEach(e => { ya[e.concepto] += +e.monto || 0; });
+  const pr = qVal(q0); const out = {}; let rest = monto;
+  for (const k of CR_CON) { const v = crR2(Math.min(Math.max(0, pr[k] - ya[k]), rest)); if (v > 0) { out[k] = v; rest = crR2(rest - v); } }
+  return out;
+}
+async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = false} = {}) {
+  const ex = cuotasDe(c.id); const porN = new Map(ex.map(x => [x.numero, x]));
+  const upd = [], ins = []; const maxN = Math.max(...filas.map(f => f.numero));
+  for (const f of filas) { const o = porN.get(f.numero);
+    const row = {fecha: f.fecha, capital: f.capital, interes: f.interes, seguro: f.seguro, comisiones: f.comisiones, cuota: f.cuota, saldo: f.saldo};
+    if (marcarEditada) row.editada = true;
+    if (o) { if (soloNoEditadas && o.editada) continue; upd.push([o, row]); } else ins.push(Object.assign({id: crUid(), credito: c.id, numero: f.numero, editada: !!marcarEditada, conciliada: false}, row)); }
+  const sobran = ex.filter(x => x.numero > maxN); const conEnl = sobran.filter(x => enlCuota(x.id).length || x.conciliada);
+  try {
+    for (const [o, row] of upd) { const d = await q(sb.from('credito_cuotas').update(row).eq('id', o.id).select()); Object.assign(o, d && d[0] ? d[0] : row); }
+    for (let i = 0; i < ins.length; i += 200) { const ch = ins.slice(i, i + 200); const d = await q(sb.from('credito_cuotas').insert(ch).select()); S.ccuo.push(...(d && d.length ? d : ch)); }
+    const borrar = sobran.filter(x => !conEnl.includes(x)); if (borrar.length) { await q(sb.from('credito_cuotas').delete().in('id', borrar.map(x => x.id))); S.ccuo = S.ccuo.filter(x => !borrar.includes(x)); }
+    toast(`Plan guardado: ${filas.length} cuotas${conEnl.length ? ` · ${conEnl.length} cuotas sobrantes se conservaron porque tienen registros` : ''}`);
+  } catch (e) {}
+}
+/* --- ventanas --- */
+function abrirCredForm(id) {
+  const c = id ? credById(id) : null; const v = (k, d = '') => esc(c && c[k] != null ? String(c[k]) : d);
+  const cuentas = [...new Set(D.txs.map(t => t.cuenta).filter(Boolean))].sort();
+  const tipo = c ? c.tipo : 'prestamo';
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="crT" style="max-width:720px">
+    <div class="hd"><h2 id="crT" style="margin-right:auto">${c ? 'Editar crédito' : 'Nuevo crédito'}</h2><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
+    <div class="bd stack" id="credF" data-id="${c ? c.id : ''}">
+      <div class="seg2" role="radiogroup" aria-label="Tipo de crédito">${Object.entries(CR_TIPO).map(([k, t]) => `<label><input type="radio" name="crTipo" value="${k}" ${k === tipo ? 'checked' : ''}><span>${t[2]}</span></label>`).join('')}</div>
+      <div class="form">
+        <label style="grid-column:1/-1">Nombre<input id="crNombre" value="${v('nombre')}" placeholder="Ej.: Hipoteca casa, Anillos 36 meses"></label>
+        <label>Entidad<input id="crEnt" value="${v('entidad')}" placeholder="BAC, BanPaís, Atlántida…"></label>
+        <label>Cuenta de pago (como en la app)<input id="crCuenta" list="crCuentas" value="${v('cuenta')}"><datalist id="crCuentas">${cuentas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+        <label>Capital<input id="crCap" class="num" inputmode="decimal" value="${v('capital')}"></label>
+        <label>Plazo (cuotas)<input id="crPlazo" class="num" inputmode="numeric" value="${v('plazo', '12')}"></label>
+        <label>% interés<input id="crTasa" class="num" inputmode="decimal" value="${v('tasa', '0')}"></label>
+        <label>Tasa expresada<select id="crTasaT"><option value="anual" ${c && c.tasa_tipo === 'mensual' ? '' : 'selected'}>Anual</option><option value="mensual" ${c && c.tasa_tipo === 'mensual' ? 'selected' : ''}>Mensual</option></select></label>
+        <label>Seguro<input id="crSeg" class="num" inputmode="decimal" value="${v('seguro', '0')}"></label>
+        <label>Seguro como<select id="crSegT"><option value="fijo" ${c && c.seguro_tipo === 'saldo' ? '' : 'selected'}>L fijo al mes</option><option value="saldo" ${c && c.seguro_tipo === 'saldo' ? 'selected' : ''}>% del saldo</option></select></label>
+        <label>Comisión mensual<input id="crCom" class="num" inputmode="decimal" value="${v('comision_mensual', '0')}"></label>
+        <label>Comisión de apertura<input id="crApe" class="num" inputmode="decimal" value="${v('comision_apertura', '0')}"></label>
+        <label>Primera cuota<input id="crFecha" type="date" value="${v('fecha_primera', hoy())}"></label>
+        <label>Moneda<select id="crMon"><option ${c && c.moneda === 'USD' ? '' : 'selected'}>HNL</option><option ${c && c.moneda === 'USD' ? 'selected' : ''}>USD</option></select></label>
+        <label>Texto para reconocer pagos<input id="crPat" value="${v('patron')}" placeholder="Ej.: /360, Anillos, EXTRA"></label>
+        <label>Estado<select id="crEst"><option value="activo" ${c && c.estado === 'cancelado' ? '' : 'selected'}>Activo</option><option value="cancelado" ${c && c.estado === 'cancelado' ? 'selected' : ''}>Cancelado</option></select></label>
+        <label style="grid-column:1/-1">Notas<input id="crNotas" value="${v('notas')}"></label>
+      </div>
+      ${c ? '<div class="note">Al guardar, las cuotas que no corregiste a mano se recalculan con los datos nuevos. Las cuotas corregidas o pegadas del banco se conservan.</div>' : '<div class="note">Al guardar se proyecta el plan de pago con cuota fija. Después puedes corregir cuotas o pegar el plan del banco.</div>'}
+      <div class="row" style="justify-content:space-between">${c ? `<button class="btn ghost danger" data-act="credBorrar" data-id="${c.id}">${S.confirmCred === c.id ? '¿Eliminar con su plan y enlaces? Sí' : 'Eliminar crédito'}</button>` : '<span></span>'}<span class="row"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="credGuardar">${c ? 'Guardar cambios' : 'Crear y proyectar'}</button></span></div>
+    </div></div></div>`;
+  $('#crNombre').focus();
+}
+async function guardarCred() {
+  const F = $('#credF'); const id = F.dataset.id; const n = s => parseFloat(String($(s).value).replace(/[^0-9.\-]/g, ''));
+  const row = {tipo: (document.querySelector('input[name=crTipo]:checked') || {}).value || 'prestamo', nombre: $('#crNombre').value.trim(), entidad: $('#crEnt').value.trim() || null, cuenta: $('#crCuenta').value.trim() || null,
+    capital: n('#crCap'), plazo: Math.round(n('#crPlazo')), tasa: n('#crTasa') || 0, tasa_tipo: $('#crTasaT').value, seguro: n('#crSeg') || 0, seguro_tipo: $('#crSegT').value,
+    comision_mensual: n('#crCom') || 0, comision_apertura: n('#crApe') || 0, fecha_primera: $('#crFecha').value, moneda: $('#crMon').value, patron: $('#crPat').value.trim() || null, estado: $('#crEst').value, notas: $('#crNotas').value.trim() || null};
+  if (!row.nombre) return toast('Escribe un nombre.'); if (!(row.capital > 0)) return toast('Escribe el capital.'); if (!(row.plazo > 0 && row.plazo <= 600)) return toast('El plazo debe estar entre 1 y 600 cuotas.'); if (!row.fecha_primera) return toast('Elige la fecha de la primera cuota.');
+  try {
+    let c;
+    if (id) { const d = await q(sb.from('creditos').update(row).eq('id', id).select(), 'Crédito actualizado'); c = credById(id); Object.assign(c, d && d[0] ? d[0] : row); }
+    else { const nuevo = Object.assign({id: crUid()}, row); const d = await q(sb.from('creditos').insert(nuevo).select(), 'Crédito creado'); c = d && d[0] ? d[0] : nuevo; S.cred.push(c); S.credSel = c.id; }
+    $('#modalRoot').innerHTML = '';
+    await crGuardarPlan(c, proyectar(c), {soloNoEditadas: !!id});
+  } catch (e) {}
+  render();
+}
+function abrirCuoForm(qid) {
+  const x = S.ccuo.find(y => y.id === qid); if (!x) return;
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="cqT" style="max-width:560px">
+    <div class="hd"><h2 id="cqT" style="margin-right:auto">Corregir cuota ${x.numero}</h2><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
+    <div class="bd stack" id="cuoF" data-id="${x.id}"><div class="form">
+      <label>Fecha<input type="date" id="cqFecha" value="${esc(x.fecha)}"></label>
+      ${CR_CON.map(k => `<label>${CR_N[k]}<input class="num" inputmode="decimal" id="cq_${k}" value="${(+qVal(x)[k]).toFixed(2)}"></label>`).join('')}
+      <label>Saldo después<input class="num" inputmode="decimal" id="cqSaldo" value="${(+x.saldo || 0).toFixed(2)}"></label>
+      <label style="grid-column:1/-1">Nota<input id="cqNota" value="${esc(x.nota || '')}" placeholder="Ej.: el banco cobró seguro distinto"></label></div>
+      <div class="note">La cuota queda marcada como editada y no se recalcula al cambiar el contrato.</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="cuoGuardar">Guardar cuota</button></div></div></div></div>`;
+}
+async function guardarCuo() {
+  const x = S.ccuo.find(y => y.id === $('#cuoF').dataset.id); const n = s => crR2(parseFloat(String($(s).value).replace(/[^0-9.\-]/g, '')) || 0);
+  const row = {fecha: $('#cqFecha').value || x.fecha, capital: n('#cq_cap'), interes: n('#cq_int'), seguro: n('#cq_seg'), comisiones: n('#cq_com'), saldo: n('#cqSaldo'), nota: $('#cqNota').value.trim() || null, editada: true};
+  row.cuota = crR2(row.capital + row.interes + row.seguro + row.comisiones);
+  try { const d = await q(sb.from('credito_cuotas').update(row).eq('id', x.id).select(), 'Cuota corregida'); Object.assign(x, d && d[0] ? d[0] : row); } catch (e) {}
+  $('#modalRoot').innerHTML = ''; render();
+}
+function crNum(s) { s = String(s || '').trim(); if (!s) return 0; const neg = /^\(.*\)$/.test(s) || /^-/.test(s); s = s.replace(/[^0-9.,]/g, ''); if (/,\d{2}$/.test(s) && !/\.\d{2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/,/g, ''); const v = parseFloat(s) || 0; return neg ? -v : v; }
+function crFechaTxt(s) { s = String(s || '').trim(); let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`; m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; } return null; }
+function crParsePlan(txt) {
+  const out = [];
+  for (const ln of String(txt || '').split(/\r?\n/)) { const cols = ln.split(/\t|;|\s{2,}/).map(x => x.trim()).filter(x => x !== ''); if (cols.length < 4) continue;
+    const num = parseInt(cols[0], 10); const fecha = crFechaTxt(cols[1]); if (!isFinite(num) || !fecha) continue;
+    const v = cols.slice(2).map(crNum); const [capital, interes, seguro = 0, comisiones = 0] = v;
+    out.push({numero: num, fecha, capital: crR2(capital), interes: crR2(interes), seguro: crR2(seguro), comisiones: crR2(comisiones)}); }
+  out.sort((a, b) => a.numero - b.numero); return out;
+}
+function abrirPegar(cid) {
+  const c = credById(cid);
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="cpT" style="max-width:760px">
+    <div class="hd"><h2 id="cpT" style="margin-right:auto">Pegar plan del banco · ${esc(c.nombre)}</h2><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
+    <div class="bd stack" id="pegF" data-id="${cid}">
+      <div class="note">Copia la tabla de amortización desde Excel o el PDF del banco. Columnas en este orden: <b>número, fecha, capital, interés, seguro, comisiones</b> (seguro y comisiones son opcionales). El saldo se calcula desde el capital del contrato.</div>
+      <textarea id="pegTxt" rows="10" style="width:100%;font-family:var(--f-num);font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel);color:var(--fg)" placeholder="1	15/07/2025	655.10	11479.17	652.50	0.00"></textarea>
+      <div id="pegPrev" class="note">Pega las filas para ver la vista previa.</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="pegGuardar" disabled>Reemplazar plan</button></div></div></div></div>`;
+  $('#pegTxt').focus();
+}
+function prevPegar() {
+  const filas = crParsePlan($('#pegTxt').value); const b = document.querySelector('[data-act=pegGuardar]');
+  b.disabled = !filas.length;
+  $('#pegPrev').innerHTML = filas.length ? `<b>${filas.length} cuotas reconocidas</b> · de la ${filas[0].numero} (${fFecha(filas[0].fecha)}) a la ${filas[filas.length - 1].numero} (${fFecha(filas[filas.length - 1].fecha)}) · capital ${L(filas.reduce((s, f) => s + f.capital, 0))} · interés ${L(filas.reduce((s, f) => s + f.interes, 0))}` : 'No se reconoce ninguna fila. Revisa que la primera columna sea el número de cuota y la segunda la fecha.';
+}
+async function guardarPegar() {
+  const c = credById($('#pegF').dataset.id); const filas = crParsePlan($('#pegTxt').value); if (!filas.length) return;
+  let saldo = +c.capital || 0; for (const f of filas) { saldo = crR2(saldo - f.capital); f.saldo = Math.max(0, saldo); f.cuota = crR2(f.capital + f.interes + f.seguro + f.comisiones); }
+  $('#modalRoot').innerHTML = '';
+  await crGuardarPlan(c, filas, {marcarEditada: true});
+  if (filas.length !== +c.plazo) { try { const d = await q(sb.from('creditos').update({plazo: filas.length}).eq('id', c.id).select()); Object.assign(c, d && d[0] ? d[0] : {plazo: filas.length}); } catch (e) {} }
+  render();
+}
+
 /* ===== iconos de acción ===== */
 const ICO = {
   editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -1505,7 +1815,7 @@ function abrirRegistro(cid, mes, movId) {
     <div class="hd"><h2 id="nrT" style="margin-right:auto">${nuevo ? 'Nuevo registro' : 'Editar registro'}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
     <div class="bd stack" id="regForm" data-c="${c.id}" data-m="${esc(mes)}" data-id="${esc(movId || '')}">
       <div class="note">${esc(c.nombre)}${fam && mes !== 'general' ? ' · ' + esc(mesLargo(mes)) : ''}${desdeApp ? ' · viene de la app: la fecha y la descripción se cambian en Registro Contable' : ''}</div>
-      ${nuevo ? `<div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
+      ${nuevo ? `<div class="seg2" role="radiogroup" aria-label="Tipo de movimiento">
         <label><input type="radio" name="nrLado" value="egreso" ${eg ? 'checked' : ''}><span>Egreso (gasto)</span></label>
         <label><input type="radio" name="nrLado" value="ingreso" ${eg ? '' : 'checked'}><span>Ingreso (abono)</span></label></div>` : `<div><span class="chip">${eg ? 'Egreso' : 'Ingreso'}</span></div>`}
       <div class="form">
@@ -2415,6 +2725,24 @@ document.addEventListener('click', async e => {
     S.confirmK = null; return borrarMov(m.id, m.tx_id ? 'Quitado. El movimiento volvió a la bandeja.' : 'Fila borrada').catch(() => {});
   }
   if (act === 'usarMonto') { const m = movDe(b); const t = m && D.byId.get(m.tx_id); if (t) return actualizarMov(m.id, {valor: t.monto}, 'Monto actualizado').catch(() => {}); return; }
+  if (act === 'credSel') { S.credSel = b.dataset.id; S.credTodo = false; S.credBus = ''; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'cuoSel') { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; S.credBus = ''; return render(); }
+  if (act === 'credNuevo') { S.confirmCred = null; return abrirCredForm(null); }
+  if (act === 'credForm') { S.confirmCred = null; return abrirCredForm(S.credSel); }
+  if (act === 'credGuardar') return guardarCred();
+  if (act === 'credBorrar') { const id = b.dataset.id; if (S.confirmCred !== id) { S.confirmCred = id; return abrirCredForm(id); } S.confirmCred = null;
+    try { await q(sb.from('creditos').delete().eq('id', id), 'Crédito eliminado'); const qs = new Set(cuotasDe(id).map(x => x.id)); S.cred = S.cred.filter(x => x.id !== id); S.ccuo = S.ccuo.filter(x => x.credito !== id); S.cenl = S.cenl.filter(x => !qs.has(x.cuota)); } catch (e) {}
+    $('#modalRoot').innerHTML = ''; S.credSel = null; return render(); }
+  if (act === 'credRecalc') { const c = credById(b.dataset.id); if (c) { await crGuardarPlan(c, proyectar(c), {soloNoEditadas: true}); render(); } return; }
+  if (act === 'credPegar') return abrirPegar(b.dataset.id);
+  if (act === 'pegGuardar') return guardarPegar();
+  if (act === 'credTodo') { S.credTodo = !S.credTodo; return render(); }
+  if (act === 'cuoForm') { const tr = b.closest('tr'); const x = cuotasDe(tr.dataset.c).find(y => y.numero === +tr.dataset.n); return x && abrirCuoForm(x.id); }
+  if (act === 'cuoGuardar') return guardarCuo();
+  if (act === 'cuoConc') { const x = S.ccuo.find(y => y.id === b.dataset.id); if (!x) return; try { const d = await q(sb.from('credito_cuotas').update({conciliada: !x.conciliada}).eq('id', x.id).select(), x.conciliada ? 'Conciliación quitada' : 'Cuota conciliada'); Object.assign(x, d && d[0] ? d[0] : {conciliada: !x.conciliada}); } catch (e) {} return render(); }
+  if (act === 'cenlAdd') { S.credBus = ''; return crSetPartes(b.dataset.q, b.dataset.ref, crDesgloseProy(b.dataset.q, b.dataset.ref, true)); }
+  if (act === 'cenlProy') return crSetPartes(b.dataset.q, b.dataset.ref, crDesgloseProy(b.dataset.q, b.dataset.ref, false));
+  if (act === 'cenlQuitar') { const pp = b.closest('.cr-rec').querySelector('.cr-parts'); return crSetPartes(pp.dataset.q, pp.dataset.ref, {}); }
   if (act === 'nuevoReg') return abrirRegistro(b.dataset.c, b.dataset.m);
   if (act === 'editarMov') { const m = movDe(b); if (!m) return; return abrirRegistro(m.control, m.mes, m.id); }
   if (act === 'guardarReg') return guardarRegistro();
@@ -2580,6 +2908,8 @@ document.addEventListener('change', async e => {
     else p[f] = t.value;
     return pintarReparto();
   }
+  if (t.dataset.cpart) { const pp = t.closest('.cr-parts'); const o = {}; pp.querySelectorAll('[data-cpart]').forEach(i => { o[i.dataset.cpart] = crR2(parseFloat(String(i.value).replace(/[^0-9.\-]/g, '')) || 0); }); return crSetPartes(pp.dataset.q, pp.dataset.ref, o); }
+  if (t.dataset.ctodo !== undefined && t.dataset.ctodo) { if (!t.value) return; return crSetPartes(t.dataset.q, t.dataset.ctodo, {[t.value]: crMontoRef(t.dataset.ctodo)}); }
   if (t.name === 'nrLado') { const F = $('#regForm'); const c = ctrlById(F.dataset.c); const eg = t.value === 'egreso'; S.regLado = t.value;
     $('#nrTipo').innerHTML = tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, F.dataset.m)[0] || 'COMPARTIDO'), t.value, F.dataset.m);
     $('#nrTipoL').textContent = eg ? 'Tipo' : 'Persona'; $('#nrDesc').placeholder = eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'; return; }
@@ -2612,6 +2942,8 @@ document.addEventListener('change', async e => {
 });
 let qT;
 document.addEventListener('input', e => {
+  if (e.target.id === 'credBus') { S.credBus = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => { S._focusCB = true; render(); }, 250); return; }
+  if (e.target.id === 'pegTxt') return prevPegar();
   if (e.target.id === 'asocQ' && S.asoc) { S.asoc.q = e.target.value; clearTimeout(S._asocT); S._asocT = setTimeout(() => { S._focusAsoc = true; pintarAsoc(); }, 200); return; }
   if (e.target.dataset.ftab === 'q') { const k = e.target.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {q: e.target.value}); clearTimeout(qT); qT = setTimeout(() => { S._focusF = k; render(); }, 250); return; }
   if (e.target.id === 'fq') { S.filtros.q = e.target.value; clearTimeout(qT); qT = setTimeout(() => { S._focusQ = true; S.limite = 300; render(); }, 250); }
@@ -2624,6 +2956,7 @@ document.addEventListener('paste', e => {
   procesarPayload(txt);
 });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches && e.target.matches('tr.cr-row[data-act]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
