@@ -1797,7 +1797,8 @@ function vCreditos() {
       <td><span class="cr-pill ${T[1]}">${T[0]}</span></td><td class="small muted">${esc([c.entidad, c.cuenta].filter(Boolean).join(' · '))}</td>
       <td class="num">${R.prox ? L(+R.prox.cuota) : '—'}</td><td class="num">${L(R.saldo)}</td>
       <td style="white-space:nowrap"><span class="cr-bar"><i style="width:${R.cs.length ? (R.conc / R.cs.length * 100).toFixed(1) : 0}%"></i></span> <span class="num small">${R.conc}/${R.cs.length}</span></td>
-      <td style="white-space:nowrap">${R.prox ? `<span class="chip ${e[1]}">${e[0]}</span> <span class="num small">${fFecha(R.prox.fecha)}</span>` : '—'}${R.sinReg ? ` <span class="chip bad">${R.sinReg} sin registros</span>` : ''}</td></tr>`; }).join('');
+      <td style="white-space:nowrap">${R.prox ? `<span class="chip ${e[1]}">${e[0]}</span> <span class="num small">${fFecha(R.prox.fecha)}</span>` : '—'}${R.sinReg ? ` <span class="chip bad">${R.sinReg} sin registros</span>` : ''}</td>
+      <td class="acc"><div class="acc-row">${S.confirmCredL === c.id ? `<button class="btn sm danger" data-act="credBorrarL" title="Elimina el crédito con su plan y enlaces">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="credBorrarNo">No</button>` : icoBtn('borrar', 'Eliminar crédito', 'credBorrarL', '', 'danger')}</div></td></tr>`; }).join('');
   const c = credById(S.credSel);
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="credNuevo">+ Nuevo crédito</button></div>
@@ -1806,7 +1807,7 @@ function vCreditos() {
       <div class="kpi"><div class="eyebrow">Interés pagado</div><div class="v neg">${L(kInt)}</div><div class="note">según registros vinculados</div></div>
       <div class="kpi"><div class="eyebrow">Cuotas sin registros</div><div class="v">${kSin}</div><div class="note">${kSin ? 'vencidas sin pago vinculado' : 'todo relacionado'}</div></div></div>
     <div class="panel"><div class="hd"><h2 style="margin-right:auto">Créditos</h2></div>
-      ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Crédito</th><th>Tipo</th><th>Entidad · cuenta</th><th class="num">Próxima cuota</th><th class="num">Saldo capital</th><th>Conciliadas</th><th>Estado</th></tr></thead><tbody>${filas}</tbody></table></div>`
+      ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Crédito</th><th>Tipo</th><th>Entidad · cuenta</th><th class="num">Próxima cuota</th><th class="num">Saldo capital</th><th>Conciliadas</th><th>Estado</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`
         : '<div class="bd note">Todavía no hay créditos. Agrega el primero con “+ Nuevo crédito”: con capital, % de interés, plazo, seguro, comisiones y fecha de la primera cuota se proyecta el plan.</div>'}</div>
     ${c ? vCredFicha(c) : ''}
   </div>`;
@@ -1824,7 +1825,7 @@ function vCredFicha(c) {
   const seg = +c.seguro ? (c.seguro_tipo === 'saldo' ? `${+c.seguro} % del saldo` : L(+c.seguro) + ' al mes') : 'sin seguro';
   return `<div class="panel"><div class="hd"><div style="margin-right:auto;min-width:0"><div class="row" style="gap:8px"><h2>${esc(c.nombre)}</h2><span class="cr-pill ${T[1]}">${T[2]}</span>${c.estado === 'cancelado' ? '<span class="chip">Cancelado</span>' : ''}</div>
       <div class="note">${esc([c.entidad, c.cuenta].filter(Boolean).join(' · '))} · capital ${L(+c.capital || 0)} · ${tasa} · ${cs.length} cuotas · ${seg}${+c.comision_mensual ? ' · comisión ' + L(+c.comision_mensual) + ' al mes' : ''}${+c.comision_apertura ? ' · apertura ' + L(+c.comision_apertura) : ''}</div></div>
-      <div class="row" style="gap:6px">${icoBtn('editar', 'Editar contrato', 'credForm')}<button class="btn sm" data-act="credPegar" data-id="${c.id}">Pegar plan del banco</button><button class="btn sm" data-act="credRecalc" data-id="${c.id}">Recalcular plan</button></div></div>
+      <div class="row" style="gap:6px">${icoBtn('editar', 'Editar contrato', 'credForm')}${S.confirmCredL === c.id ? `<button class="btn sm danger" data-act="credBorrarL" data-id="${c.id}">¿Eliminar crédito? Sí</button><button class="btn sm ghost" data-act="credBorrarNo">No</button>` : icoBtn('borrar', 'Eliminar crédito', 'credBorrarL', '', 'danger')}<button class="btn sm" data-act="credPegar" data-id="${c.id}">Pegar plan del banco</button><button class="btn sm" data-act="credRecalc" data-id="${c.id}">Recalcular plan</button></div></div>
     <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Cuota proyectada</div><div class="v">${L(+q.cuota || 0)}</div></div>
       <div class="kpi"><div class="eyebrow">Costo proyectado</div><div class="v neg">${L(tot.int + tot.seg + tot.com)}</div><div class="note">interés + seguro + comisiones</div></div>
@@ -1908,6 +1909,11 @@ async function crGuardarPlan(c, filas, {soloNoEditadas = false, marcarEditada = 
     const borrar = sobran.filter(x => !conEnl.includes(x)); if (borrar.length) { await q(sb.from('credito_cuotas').delete().in('id', borrar.map(x => x.id))); S.ccuo = S.ccuo.filter(x => !borrar.includes(x)); }
     toast(`Plan guardado: ${filas.length} cuotas${conEnl.length ? ` · ${conEnl.length} cuotas sobrantes se conservaron porque tienen registros` : ''}`);
   } catch (e) {}
+}
+// crEliminar: borra un crédito; la base de datos borra en cascada su plan de cuotas y sus enlaces (los registros de la app no se tocan).
+async function crEliminar(id) {
+  try { await q(sb.from('creditos').delete().eq('id', id), 'Crédito eliminado'); const qs = new Set(cuotasDe(id).map(x => x.id)); S.cred = S.cred.filter(x => x.id !== id); S.ccuo = S.ccuo.filter(x => x.credito !== id); S.cenl = S.cenl.filter(x => !qs.has(x.cuota)); } catch (e) {}
+  if (S.credSel === id) S.credSel = null; render();
 }
 /* --- ventanas --- */
 // abrirCredForm: Ventana para crear o editar un crédito.
@@ -3046,9 +3052,10 @@ document.addEventListener('click', async e => {
   if (act === 'credNuevo') { S.confirmCred = null; return abrirCredForm(null); }
   if (act === 'credForm') { S.confirmCred = null; return abrirCredForm(S.credSel); }
   if (act === 'credGuardar') return guardarCred();
-  if (act === 'credBorrar') { const id = b.dataset.id; if (S.confirmCred !== id) { S.confirmCred = id; return abrirCredForm(id); } S.confirmCred = null;
-    try { await q(sb.from('creditos').delete().eq('id', id), 'Crédito eliminado'); const qs = new Set(cuotasDe(id).map(x => x.id)); S.cred = S.cred.filter(x => x.id !== id); S.ccuo = S.ccuo.filter(x => x.credito !== id); S.cenl = S.cenl.filter(x => !qs.has(x.cuota)); } catch (e) {}
-    $('#modalRoot').innerHTML = ''; S.credSel = null; return render(); }
+  if (act === 'credBorrar') { const id = b.dataset.id; if (S.confirmCred !== id) { S.confirmCred = id; return abrirCredForm(id); } S.confirmCred = null; $('#modalRoot').innerHTML = ''; return crEliminar(id); }
+  // Eliminar desde la lista o la ficha: primer toque pide confirmar, segundo elimina.
+  if (act === 'credBorrarL') { const id = b.dataset.id || (b.closest('tr') || {}).dataset?.id || S.credSel; if (S.confirmCredL !== id) { S.confirmCredL = id; return render(); } S.confirmCredL = null; return crEliminar(id); }
+  if (act === 'credBorrarNo') { S.confirmCredL = null; return render(); }
   if (act === 'credRecalc') { const c = credById(b.dataset.id); if (c) { await crGuardarPlan(c, proyectar(c), {soloNoEditadas: true}); render(); } return; }
   if (act === 'credPegar') return abrirPegar(b.dataset.id);
   if (act === 'pegGuardar') return guardarPegar();
