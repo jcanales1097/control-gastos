@@ -590,7 +590,7 @@ function renderTabs() {
   $('#btnSync').hidden = !a;
   const ls = S.aj.ultimaSync;
   $('#syncMeta').textContent = a ? (ls ? `Sincronizado: ${new Date(ls.at).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}` : 'Sin sincronizar') : '';
-  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost" href="guia.html" target="_blank" rel="noopener" title="Cómo funciona la plataforma">Guía</a><button class="btn sm ghost" data-act="salir">Salir</button>`;
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost" href="guia.html?n=${encodeURIComponent(((S.me.nombre || '').trim().split(/\s+/)[0]) || '')}&p=${encodeURIComponent(S.me.persona || '')}" target="_blank" rel="noopener" title="Cómo funciona la plataforma">Guía</a><button class="btn sm ghost" data-act="salir">Salir</button>`;
 }
 function render() {
   if (!S.me) return renderAuth();
