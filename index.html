@@ -224,6 +224,14 @@ code.blk{display:block;white-space:pre-wrap;word-break:break-all;font-family:var
 .filters select{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 8px;max-width:100%}
 .panel>.filters{padding:10px 14px;border-bottom:1px solid var(--line)}
 .addrow td{background:var(--sunk)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--sunk);padding:4px;border-radius:12px}
+.seg label{position:relative;cursor:pointer}.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;text-align:center;padding:9px 10px;border-radius:9px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg input:checked+span{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.tipo-txt{font-weight:600;letter-spacing:.01em}
+#regForm .fld input,#regForm .fld select{height:42px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);font:inherit;font-size:15px;width:100%;box-sizing:border-box;max-width:none}
+#regForm .fld input:disabled{opacity:.6}
 .loading{padding:60px 16px;text-align:center;color:var(--muted)}
 @media (max-width:600px){.brand span{display:none}.sync-meta{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -807,7 +815,7 @@ function vControl(c) {
       <div><div class="eyebrow">${esProy(c) ? '<a href="#proyectos" class="muted small" style="text-decoration:none">← Proyectos</a> ' : ''}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(esProy(c) ? 'Proyecto' : c.nombre)}</span> ${esProy(c) ? `<span class="chip ${cerrado(c) ? '' : 'app'}">${cerrado(c) ? 'Cerrado el ' + fFecha(c.cerradoEl) : 'Abierto'}</span>` : ''}</div>
       <h1>${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>
       ${pend ? `<div class="note"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</a></div>` : ''}</div>
-      <div class="row"><details class="menu"><summary class="btn">Reporte PDF ▾</summary><div class="menu-pop">
+      <div class="row">${cerrado(c) ? '' : `<button class="btn pri" data-act="nuevoReg" data-c="${c.id}" data-m="${esc(mes)}">+ Nuevo registro</button>`}<details class="menu"><summary class="btn">Reporte PDF ▾</summary><div class="menu-pop">
         <button data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte completo</button>
         ${(() => { const ps = [...new Set([...personasDe(c, mes), ...R.per.map(x => x.p)])].filter(Boolean); return ps.length ? `<div class="sep"></div><div class="eyebrow">Solo para una persona</div>${ps.map(p => `<button data-act="pdf" data-c="${c.id}" data-m="${mes}" data-p="${esc(p)}">${esc(p)} <span class="muted small">· sus gastos y los compartidos</span></button>`).join('')}` : ''; })()}
       </div></details><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
@@ -986,12 +994,12 @@ function tablaFilas(c, h, lado) {
   <div class="tbl-wrap"><table><thead><tr>${thOrd(okey, 'fecha', 'Fecha', odef)}${thOrd(okey, 'tipo', eg ? 'Tipo' : 'Persona', odef)}${eg && fam ? thOrd(okey, 'cat', 'Categoría', odef) : ''}${thOrd(okey, 'desc', 'Descripción', odef)}${thOrd(okey, 'valor', 'Valor', odef, 'num')}${thOrd(okey, 'estado', 'Estado', odef)}<th></th></tr></thead><tbody>
   ${(() => { const filaH = r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}${r.grupo && microById(r.grupo) ? ' en-grupo' : ''}">
     <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
-    <td><select class="in" data-edit="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}" ${puedeEditar(r) ? '' : 'disabled'}>${tipoOptions(c, r.tipo, lado, h.mes)}</select></td>
+    <td class="small"><span class="tipo-txt">${esc(r.tipo || '—')}</span></td>
     ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
     <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
-    <td class="num"><input class="in num" data-edit="valor" value="${(+r.valor || 0).toFixed(2)}" inputmode="decimal" aria-label="Valor" ${puedeEditar(r) ? '' : 'disabled'}>${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
+    <td class="num" style="white-space:nowrap">${L(+r.valor || 0)}${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
     <td style="white-space:nowrap">${origenChip(r)}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? ' <button class="btn sm ghost" data-act="dividirMov">Dividir</button>' : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? ' <button class="btn sm ghost" data-act="asociar" title="Asociar esta fila a un registro de la app">Asociar</button>' : ''}${a && r.estado === 'pendiente' ? ' <a class="btn sm" href="#validar">Validar</a>' : ''}</td>
-    <td>${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`;
+    <td style="white-space:nowrap">${puedeEditar(r) ? '<button class="btn sm ghost" data-act="editarMov">Editar</button>' : ''}${puedeBorrar(r) ? `<button class="btn sm ghost danger" data-act="quitar">${S.confirmK === r.id ? '¿Quitar? Sí' : (r.tx_id ? 'Quitar' : 'Borrar')}</button>` : ''}</td></tr>`;
     const hechos = new Set(); const nc = cols; const ivalor = 3 + (eg && fam ? 1 : 0);
     const sueltas = rowsO.filter(r => !(r.grupo && microById(r.grupo)));
     const grupos = [...new Set(rowsO.filter(r => r.grupo && microById(r.grupo)).map(r => r.grupo))].sort((x, y) => microById(x).nombre.localeCompare(microById(y).nombre, 'es'));
@@ -1006,14 +1014,9 @@ function tablaFilas(c, h, lado) {
         ${orden.map(t => `<tr class="grp-sub"><td></td><td>${esc(t)}</td>${vacios(ivalor - 2)}<td class="num">${L(sub[t])}</td>${vacios(nc - ivalor - 1)}</tr>`).join('')}
         ${abierto ? del.map(filaH).join('') : ''}`;
     }).join(''); })()}
-  ${ro ? '' : `<tr class="addrow" data-c="${c.id}" data-m="${esc(h.mes)}" data-lado="${lado}"><td><input type="date" class="in" data-new="fecha" aria-label="Fecha" value="${fechaDef}"></td>
-    <td><select class="in" data-new="tipo" aria-label="${eg ? 'Tipo' : 'Persona'}">${tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, h.mes)[0] || 'COMPARTIDO'), lado, h.mes)}</select></td>
-    ${eg && fam ? '<td></td>' : ''}<td><input class="in" style="max-width:none;width:100%" data-new="desc" placeholder="${eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'}" aria-label="Descripción">${fam && microsDe(c.id, true).length ? `<select class="in" data-new="grupo" aria-label="Micro proyecto" style="margin-top:4px">${microOptions(c.id, '', 'Sin micro proyecto')}</select>` : ''}</td>
-    <td class="num"><input class="in num" data-new="valor" inputmode="decimal" placeholder="0.00" aria-label="Valor"></td>
-    <td colspan="2"><button class="btn sm ${a ? '' : 'pri'}" data-act="agregar">${a ? 'Agregar' : 'Registrar'}</button></td></tr>`}
   </tbody></table></div>
   ${filtrado && !rows.length ? '<div class="bd note">Ninguna fila coincide con la búsqueda o los filtros.</div>' : ''}
-  ${todas.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno manual en la última fila.' : `Registra un ${eg ? 'gasto' : 'ingreso'} en la última fila; quedará por validar.`}</div>`}</div>`;
+  ${todas.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno con “+ Nuevo registro”.' : `Registra un ${eg ? 'gasto' : 'ingreso'} con “+ Nuevo registro”; quedará por validar.`}</div>`}</div>`;
 }
 
 /* ================= participantes por mes ================= */
@@ -1471,6 +1474,53 @@ function dibujarVeh() {
     else vBarras(box, pm, [{k: 'km', n: 'Kilómetros', c: 'var(--azul)'}], x => nf(x) + ' km');
   });
   cargarFotosVeh();
+}
+/* ===== registro manual: nuevo / editar en ventana emergente ===== */
+function abrirRegistro(cid, mes, movId) {
+  const c = ctrlById(cid); if (!c) return; const a = esAdmin();
+  const m = movId ? S.movs.get(movId) : null; const nuevo = !m;
+  const lado = m ? m.lado : (S.regLado || 'egreso'); const eg = lado === 'egreso';
+  const desdeApp = !!(m && m.tx_id); const fam = c.porMes;
+  const fechaDef = fam && mes !== 'general' ? (hoy().slice(0, 7) === mes ? hoy() : mes + '-01') : hoy();
+  const tipoDef = m ? m.tipo : (eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, mes)[0] || 'COMPARTIDO'));
+  const micros = fam ? microsDe(c.id, true) : []; const grp = m && m.grupo && microById(m.grupo);
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="nrT" style="max-width:560px">
+    <div class="hd"><h2 id="nrT" style="margin-right:auto">${nuevo ? 'Nuevo registro' : 'Editar registro'}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+    <div class="bd stack" id="regForm" data-c="${c.id}" data-m="${esc(mes)}" data-id="${esc(movId || '')}">
+      <div class="note">${esc(c.nombre)}${fam && mes !== 'general' ? ' · ' + esc(mesLargo(mes)) : ''}${desdeApp ? ' · viene de la app: la fecha y la descripción se cambian en Registro Contable' : ''}</div>
+      ${nuevo ? `<div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
+        <label><input type="radio" name="nrLado" value="egreso" ${eg ? 'checked' : ''}><span>Egreso (gasto)</span></label>
+        <label><input type="radio" name="nrLado" value="ingreso" ${eg ? '' : 'checked'}><span>Ingreso (abono)</span></label></div>` : `<div><span class="chip">${eg ? 'Egreso' : 'Ingreso'}</span></div>`}
+      <div class="form">
+        <label class="fld">Fecha<input type="date" id="nrFecha" value="${esc(m ? (m.fecha || '') : fechaDef)}" ${desdeApp ? 'disabled' : ''}></label>
+        <label class="fld"><span id="nrTipoL">${eg ? 'Tipo' : 'Persona'}</span><select id="nrTipo">${tipoOptions(c, tipoDef, lado, mes)}</select></label>
+        <label class="fld" style="grid-column:1/-1">Descripción<input id="nrDesc" value="${esc(m ? (m.descripcion || '') : '')}" placeholder="${eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'}" ${desdeApp ? 'disabled' : ''}></label>
+        ${micros.length || grp ? `<label class="fld">Micro proyecto<select id="nrGrupo">${microOptions(c.id, m ? (m.grupo || '') : '', 'Sin micro proyecto')}</select></label>` : ''}
+        <label class="fld">Valor (L)<input id="nrValor" class="num" inputmode="decimal" placeholder="0.00" value="${m ? (+m.valor || 0).toFixed(2) : ''}" style="text-align:right"></label>
+      </div>
+      ${!a && nuevo ? '<div class="note">Tu registro queda “Por validar” hasta que el administrador lo revise.</div>' : ''}
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="guardarReg">${nuevo ? (a ? 'Agregar' : 'Registrar') : 'Guardar cambios'}</button></div>
+    </div></div></div>`;
+  const f = $('#nrValor'); f && (nuevo ? $('#nrDesc').focus() : f.focus());
+}
+async function guardarRegistro() {
+  const F = $('#regForm'); if (!F) return; const c = ctrlById(F.dataset.c); if (!c || cerrado(c)) return;
+  const id = F.dataset.id; const m = id ? S.movs.get(id) : null;
+  const v = parseFloat(($('#nrValor').value || '').replace(/[^0-9.\-]/g, '')); if (!isFinite(v) || v === 0) return toast('Escribe un valor.');
+  const fecha = $('#nrFecha').value || null; const desc = $('#nrDesc').value.trim(); const tipo = $('#nrTipo').value;
+  const gs = $('#nrGrupo'); const grupo = gs ? (gs.value || null) : undefined;
+  if (!esAdmin() && !desc) return toast('Escribe una descripción para que se pueda validar.');
+  if (m) {
+    const ch = {valor: v, tipo}; if (!m.tx_id) { ch.fecha = fecha; ch.descripcion = desc; } if (grupo !== undefined) ch.grupo = grupo;
+    $('#modalRoot').innerHTML = ''; return actualizarMov(m.id, ch, 'Registro actualizado').catch(() => {});
+  }
+  const lado = (document.querySelector('input[name=nrLado]:checked') || {}).value || 'egreso'; S.regLado = lado;
+  const mes = c.porMes ? F.dataset.m : 'general';
+  const row = {control: c.id, mes, lado, fecha, tipo, descripcion: desc, valor: v}; if (grupo) row.grupo = grupo;
+  if (esAdmin()) Object.assign(row, {estado: 'valido', origen: 'manual', validado_por: S.me.id, validado_el: new Date().toISOString()});
+  else Object.assign(row, {estado: 'pendiente', origen: 'usuario'});
+  $('#modalRoot').innerHTML = '';
+  return insertarMovs([row], esAdmin() ? 'Registro agregado' : 'Registrado. Queda por validar.').catch(() => {});
 }
 /* formulario de vehículo */
 function abrirVehForm(id) {
@@ -2348,6 +2398,9 @@ document.addEventListener('click', async e => {
     S.confirmK = null; return borrarMov(m.id, m.tx_id ? 'Quitado. El movimiento volvió a la bandeja.' : 'Fila borrada').catch(() => {});
   }
   if (act === 'usarMonto') { const m = movDe(b); const t = m && D.byId.get(m.tx_id); if (t) return actualizarMov(m.id, {valor: t.monto}, 'Monto actualizado').catch(() => {}); return; }
+  if (act === 'nuevoReg') return abrirRegistro(b.dataset.c, b.dataset.m);
+  if (act === 'editarMov') { const m = movDe(b); if (!m) return; return abrirRegistro(m.control, m.mes, m.id); }
+  if (act === 'guardarReg') return guardarRegistro();
   if (act === 'agregar') {
     const tr = b.closest('tr'); const c = ctrlById(tr.dataset.c); if (!c || cerrado(c)) return;
     const v = parseFloat(($('[data-new=valor]', tr).value || '').replace(/[^0-9.\-]/g, '')); if (!isFinite(v) || v === 0) return toast('Escribe un valor.');
@@ -2510,6 +2563,9 @@ document.addEventListener('change', async e => {
     else p[f] = t.value;
     return pintarReparto();
   }
+  if (t.name === 'nrLado') { const F = $('#regForm'); const c = ctrlById(F.dataset.c); const eg = t.value === 'egreso'; S.regLado = t.value;
+    $('#nrTipo').innerHTML = tipoOptions(c, eg ? (c.tipoDefecto || 'COMPARTIDO') : (S.me.persona || personasDe(c, F.dataset.m)[0] || 'COMPARTIDO'), t.value, F.dataset.m);
+    $('#nrTipoL').textContent = eg ? 'Tipo' : 'Persona'; $('#nrDesc').placeholder = eg ? 'Comercio | detalle del gasto' : 'De dónde viene el ingreso'; return; }
   if (t.dataset.edit) {
     const m = movDe(t); if (!m) return;
     if (t.dataset.edit === 'valor') { const v = parseFloat(t.value.replace(/[^0-9.\-]/g, '')); if (!isFinite(v)) { t.value = (+m.valor).toFixed(2); return toast('Valor no válido'); } return actualizarMov(m.id, {valor: v}).catch(() => {}); }
@@ -2553,6 +2609,7 @@ document.addEventListener('paste', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
+  if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('.addrow') && e.target.matches('input')) { e.preventDefault(); const bb = e.target.closest('tr').querySelector('[data-act=agregar]'); bb && bb.click(); }
 });
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('on'); } });
