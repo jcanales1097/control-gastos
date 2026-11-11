@@ -258,7 +258,14 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 .cr-sum .kpi{border-radius:0}
 .modal.cr-modal{max-width:1180px;width:min(1180px,calc(100vw - 24px))}
 .cr-modal .bd.cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
-.cr-modal .cr-conc>div{overflow:auto;max-height:calc(100vh - 200px);padding-right:4px}
+.cr-modal .cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
+.cr-modal .cr-conc>div{overflow:auto;max-height:calc(100vh - 330px);padding-right:4px}
+.cr-cmp{border:1px solid var(--line);border-radius:10px;background:var(--sunk);padding:4px 6px}
+.cr-cmp table td,.cr-cmp table th{padding:5px 8px;font-size:12.5px;background:transparent}
+.cr-cmp th{position:static}
+.cr-mas{color:#b26b00}
+.cr-plan-wrap{max-height:min(62vh,600px);overflow:auto}
+.cr-plan-wrap thead th{position:sticky;top:0;z-index:2;background:var(--panel);box-shadow:0 1px 0 var(--line)}
 .cr-cf{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .cr-cf #credBus{flex:1 1 200px;max-width:none;height:32px}
 .cr-ck{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg)}
@@ -268,7 +275,7 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 .cr-cand:hover{border-color:var(--accent)}.cr-cand.on{background:var(--accent-soft);border-color:var(--accent)}
 .cr-cand input{width:16px;height:16px;flex:none;accent-color:var(--accent)}
 .cr-cand b{font-size:13px;font-weight:600}
-@media (max-width:900px){.cr-modal .bd.cr-conc{grid-template-columns:minmax(0,1fr)}.cr-modal .cr-conc>div{max-height:none}}
+@media (max-width:900px){.cr-modal .cr-conc{grid-template-columns:minmax(0,1fr)}.cr-modal .cr-conc>div{max-height:none}}
 .cr-filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;align-items:end}
 .cr-filtros label{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:var(--muted)}
 .cr-filtros .in{max-width:none;width:100%;height:32px}
@@ -776,7 +783,10 @@ function render() {
   else if (S.view === 'vehiculos') html = vVehiculos();
   else if (S.view === 'creditos') html = vCreditos();
   else html = vControl(ctrlById(S.view.slice(2)));
+  const pw0 = document.querySelector('.cr-plan-wrap'); const planPos = pw0 ? {c: pw0.dataset.c, top: pw0.scrollTop} : null;
   app().innerHTML = html;
+  const pw = document.querySelector('.cr-plan-wrap');
+  if (pw) { if (planPos && planPos.c === pw.dataset.c) pw.scrollTop = planPos.top; else { const tr = pw.querySelector('tr.cr-sel'); if (tr) pw.scrollTop = Math.max(0, tr.offsetTop - pw.clientHeight / 2); } }
   window.scrollTo(0, keep);
   dibujarGraficos(); dibujarVeh();
   if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
@@ -1877,7 +1887,7 @@ function vCredFicha(c) {
   const tot = cs.reduce((a, x) => ({cap: a.cap + (+x.capital || 0), int: a.int + (+x.interes || 0), seg: a.seg + (+x.seguro || 0), com: a.com + (+x.comisiones || 0), mor: a.mor + (+x.mora || 0)}), {cap: 0, int: 0, seg: 0, com: 0, mor: 0}); const TT = crTot(tot) || 1;
   // conMora: la columna y el concepto Mora solo se muestran si el crédito tiene alguna mora proyectada o pagada.
   const conMora = cs.some(x => +x.mora) || (S.cenl || []).some(e => e.credito === c.id && e.concepto === 'mor'); const CONV = conMora ? CR_CON : CR_CON.filter(k => k !== 'mor');
-  let rows = cs; if (!S.credTodo) { const a = Math.max(0, Math.min(ks - 3, cs.length - 8)); rows = cs.slice(a, a + 8); }
+  const rows = cs;  // el plan completo va dentro de su propia caja con barra de desplazamiento (el encabezado del crédito no se mueve)
   const tasa = `${(+c.tasa || 0).toLocaleString('en-US', {maximumFractionDigits: 4})} % ${c.tasa_tipo === 'mensual' ? 'mensual' : 'anual'}`;
   const seg = +c.seguro ? (c.seguro_tipo === 'saldo' ? `${+c.seguro} % del saldo` : L(+c.seguro) + ' al mes') : 'sin seguro';
   return `<div class="panel"><div class="hd"><div style="margin-right:auto;min-width:0"><div class="row" style="gap:8px"><h2>${esc(c.nombre)}</h2><span class="cr-pill ${T[1]}">${T[2]}</span>${c.estado === 'cancelado' ? '<span class="chip">Cancelado</span>' : ''}</div>
@@ -1890,10 +1900,10 @@ function vCredFicha(c) {
       <div class="kpi"><div class="eyebrow">Termina</div><div class="v">${R.fin ? mesLargo(R.fin.slice(0, 7)) : '—'}</div><div class="note">${R.conc} de ${cs.length} conciliadas</div></div></div>
     <div class="cr-split" aria-hidden="true">${CONV.map(k => `<i class="cr-${k}" style="width:${(tot[k] / TT * 100).toFixed(2)}%"></i>`).join('')}</div>
     <div class="leg" style="padding:0 14px 10px">${CONV.map(k => `<span><i class="cr-${k}"></i>${CR_N[k]} ${L(tot[k])}</span>`).join('')}</div>
-    <div class="tbl-wrap"><table class="cr-plan"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th>${conMora ? '<th class="num">Mora</th>' : ''}<th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap cr-plan-wrap" data-c="${c.id}"><table class="cr-plan"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th>${conMora ? '<th class="num">Mora</th>' : ''}<th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
       ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num">${x.numero}</td><td class="num">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td>${conMora ? `<td class="num ${+x.mora ? 'neg' : 'muted'}">${+x.mora ? L(+x.mora) : '—'}</td>` : ''}<td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td><span class="chip ${e[1]}">${e[0]}</span>${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}${+x.mora || realCuota(x.id).mor ? ' <span class="chip bad" title="Esta cuota tiene mora">mora</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
     </tbody></table></div>
-    <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line)"><span class="note">${S.credTodo ? cs.length + ' cuotas' : `Cuotas ${rows[0].numero}–${rows[rows.length - 1].numero} de ${cs.length}`} · toca una cuota para vincular sus registros</span><button class="btn sm" data-act="credTodo">${S.credTodo ? 'Ver menos' : 'Ver plan completo'}</button></div>
+    <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px"><span class="note">${cs.length} cuotas · toca una cuota para vincular sus registros</span><button class="btn sm ghost" data-act="planHoy" data-c="${c.id}">Ir a la cuota actual</button></div>
   </div>
 `;
 }
@@ -1916,11 +1926,10 @@ function vConciliar(c, q) {
       <span class="chip ${e[1]}">${e[0]}</span>
       <button class="btn sm ghost" data-act="concNav" data-d="-1" ${iq <= 0 ? 'disabled' : ''} title="Cuota anterior" aria-label="Cuota anterior">‹</button><button class="btn sm ghost" data-act="concNav" data-d="1" ${iq >= cs.length - 1 ? 'disabled' : ''} title="Cuota siguiente" aria-label="Cuota siguiente">›</button>
       <button class="btn sm ${q.conciliada ? '' : 'pri'}" data-act="cuoConc" data-id="${q.id}">${q.conciliada ? 'Quitar conciliación' : 'Marcar conciliada'}</button><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
-    <div class="bd cr-conc">
+    <div class="bd" style="gap:12px">
+    ${crResumenComp(q, pr, re, cand)}
+    <div class="cr-conc">
       <div class="stack" style="gap:10px;min-width:0">
-        <div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th class="num">Proyectado</th><th class="num">Real</th><th class="num">Diferencia</th></tr></thead><tbody>${CR_CON.map(fila).join('')}
-          <tr class="cr-tt"><td><b>Cuota</b></td><td class="num"><b>${L(+q.cuota || 0)}</b></td><td class="num"><b>${tr ? L(tr) : '—'}</b></td><td class="num ${tr && Math.abs(dt) > 0.004 ? 'neg' : ''}"><b>${tr ? (dt > 0 ? '+' : '') + L(dt) : '—'}</b></td></tr></tbody></table></div>
-        ${q.nota ? `<div class="note">${esc(q.nota)}</div>` : ''}
         <div class="eyebrow">Registros vinculados</div>
         ${recs || '<div class="note">Ningún registro vinculado todavía. Marca registros a la derecha y toca “Vincular seleccionados”.</div>'}
       </div>
@@ -1939,7 +1948,20 @@ function vConciliar(c, q) {
             <span class="num" style="font-weight:600">${L(x.monto)}</span></label>`).join('')
           : `<div class="note" style="padding:8px 0">${o.todas ? 'Nada coincide.' : `No hay registros sin vincular en ± ${rango} días. Marca “Cualquier fecha” o busca por texto o monto.`}</div>`}</div>
       </div>
-    </div></div></div>`;
+    </div></div></div></div>`;
+}
+// crResumenComp: resumen fijo arriba de la ventana: proyectado vs vinculado por concepto, diferencia y lo que sumarían los registros marcados.
+function crResumenComp(q, pr, re, cand) {
+  const ks = CR_CON.filter(k => k !== 'mor' || pr.mor || re.mor || true);
+  const tP = crTot(pr), tR = crTot(re), dif = crR2(tR - tP);
+  const marc = cand.filter(x => S.concSel && S.concSel.has(x.ref)).reduce((s, x) => s + x.monto, 0);
+  const cel = (v, cls = '') => `<td class="num ${cls}">${v}</td>`;
+  const dCls = d => Math.abs(d) > 0.004 ? (d > 0 ? 'cr-mas' : 'neg') : 'muted';
+  return `<div class="cr-cmp tbl-wrap"><table><thead><tr><th></th>${ks.map(k => `<th class="num"><i class="cr-dot cr-${k}"></i>${CR_N[k]}</th>`).join('')}<th class="num">Cuota</th></tr></thead><tbody>
+    <tr><td>Proyectado</td>${ks.map(k => cel(L(pr[k]), pr[k] ? '' : 'muted')).join('')}${cel('<b>' + L(tP) + '</b>')}</tr>
+    <tr><td>Vinculado</td>${ks.map(k => cel(re[k] ? L(re[k]) : '—', re[k] ? '' : 'muted')).join('')}${cel('<b>' + (tR ? L(tR) : '—') + '</b>')}</tr>
+    <tr class="cr-tt"><td>Diferencia</td>${ks.map(k => { const d = crR2(re[k] - pr[k]); return cel(re[k] || pr[k] ? (d > 0 ? '+' : '') + L(d) : '—', dCls(d)); }).join('')}${cel('<b>' + (tR ? (dif > 0 ? '+' : '') + L(dif) : 'falta ' + L(tP)) + '</b>', tR ? dCls(dif) : 'neg')}</tr>
+  </tbody></table>${marc ? `<div class="note" style="padding:6px 2px 0">Marcados para vincular: <b>${L(marc)}</b> · el vinculado quedaría en <b>${L(crR2(tR + marc))}</b> (${crR2(tR + marc - tP) > 0 ? '+' : ''}${L(crR2(tR + marc - tP))} vs proyectado)</div>` : ''}</div>`;
 }
 // abrirConc: abre la ventana de conciliación de una cuota (al tocar una cuota del plan o "Conciliar" en el análisis).
 function abrirConc(cid, n) { const qq = cuotasDe(cid).find(x => x.numero === n); if (!qq) return; S.cuoSel = S.cuoSel || {}; S.cuoSel[cid] = n; S.concQ = qq.id; S.concSel = new Set(); pintarConc(); }
@@ -3279,8 +3301,8 @@ document.addEventListener('click', async e => {
   if (act === 'cfCred') { const f = crCf(); f.cred = f.cred.length === 1 && f.cred[0] === b.dataset.id ? [] : [b.dataset.id]; f.periodo = null; return render(); }
   if (act === 'crfTodos') { e.preventDefault(); const f = crCf(); f[b.dataset.k] = []; f.periodo = null; S.cfOpen = b.dataset.k; return render(); }
   if (act === 'crfSolo') { e.preventDefault(); const f = crCf(); const k = b.dataset.k; const todas = [...b.closest('.msel').querySelectorAll('[data-crfm]')].map(i => i.value); const sel = new Set(f[k] || []); f[k] = todas.filter(v => !sel.has(v)); f.periodo = null; S.cfOpen = k; return render(); }
-  if (act === 'cfIr') { S.credTab = 'lista'; S.credSel = b.dataset.c; S.credTodo = false; render(); if (b.dataset.n) abrirConc(b.dataset.c, +b.dataset.n); else { const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); } return; }
-  if (act === 'credSel') { S.credSel = b.dataset.id; S.credTodo = false; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'cfIr') { S.credTab = 'lista'; S.credSel = b.dataset.c; render(); if (b.dataset.n) abrirConc(b.dataset.c, +b.dataset.n); else { const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); } return; }
+  if (act === 'credSel') { S.credSel = b.dataset.id; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   if (act === 'cuoSel') { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; render(); return abrirConc(b.dataset.c, +b.dataset.n); }
   if (act === 'concNav') { const qq = S.ccuo.find(x => x.id === S.concQ); if (!qq) return; const cs = cuotasDe(qq.credito); const i = cs.findIndex(x => x.id === qq.id) + (+b.dataset.d); if (cs[i]) { abrirConc(qq.credito, cs[i].numero); render(); } return; }
   if (act === 'cenlVarios') { const refs = [...(S.concSel || [])]; if (!refs.length) return; b.disabled = true; return crVincularVarios(b.dataset.q, refs); }
@@ -3294,7 +3316,7 @@ document.addEventListener('click', async e => {
   if (act === 'credRecalc') { const c = credById(b.dataset.id); if (c) { await crGuardarPlan(c, proyectar(c), {soloNoEditadas: true}); render(); } return; }
   if (act === 'credPegar') return abrirPegar(b.dataset.id);
   if (act === 'pegGuardar') return guardarPegar();
-  if (act === 'credTodo') { S.credTodo = !S.credTodo; return render(); }
+  if (act === 'planHoy') { const w = document.querySelector('.cr-plan-wrap'); const qs = cuotasDe(b.dataset.c); const k = (qs.find(x => x.fecha >= hoy()) || qs[qs.length - 1] || {}).numero; const tr = w && w.querySelector(`tr[data-n="${k}"]`); if (tr) w.scrollTo({top: tr.offsetTop - w.clientHeight / 2, behavior: 'smooth'}); return; }
   if (act === 'cuoForm') { const tr = b.closest('tr'); const x = cuotasDe(tr.dataset.c).find(y => y.numero === +tr.dataset.n); return x && abrirCuoForm(x.id); }
   if (act === 'cuoGuardar') return guardarCuo();
   if (act === 'cuoConc') { const x = S.ccuo.find(y => y.id === b.dataset.id); if (!x) return; try { const d = await q(sb.from('credito_cuotas').update({conciliada: !x.conciliada}).eq('id', x.id).select(), x.conciliada ? 'Conciliación quitada' : 'Cuota conciliada'); Object.assign(x, d && d[0] ? d[0] : {conciliada: !x.conciliada}); } catch (e) {} render(); return pintarConc(); }
