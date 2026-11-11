@@ -270,6 +270,7 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 .cr-cf #credBus{flex:1 1 200px;max-width:none;height:32px}
 .cr-ck{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--fg)}
 .cr-ck select.in{height:28px}
+.cr-ck input[type=date].in{height:30px;width:auto;max-width:150px;padding:0 6px}
 .cr-cands{display:grid;gap:6px}
 .cr-cand{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 10px;cursor:pointer;background:var(--panel)}
 .cr-cand:hover{border-color:var(--accent)}.cr-cand.on{background:var(--accent-soft);border-color:var(--accent)}
@@ -1816,16 +1817,26 @@ function crRefInfo(e) {
 }
 // crUsadas: Registros que ya están enlazados a alguna cuota (para no sugerirlos de nuevo).
 function crUsadas() { const s = new Set(); (S.cenl || []).forEach(e => s.add(refKey(e))); return s; }
+// crRango: rango de fechas para buscar registros de una cuota. Por defecto va del día siguiente a la cuota anterior hasta la fecha de la cuota
+// (el período que paga esa cuota). Se puede cambiar con "Del / al" en la ventana; al pasar a otra cuota vuelve al período de esa cuota.
+function crRango(q) {
+  if (S.concRango && S.concRango.q === q.id) return S.concRango;
+  const cs = cuotasDe(q.credito); const i = cs.findIndex(x => x.id === q.id);
+  const sig = d => { const x = new Date(d + 'T12:00'); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); };
+  const desde = i > 0 ? sig(cs[i - 1].fecha) : sig(crAddM(q.fecha, -1));
+  return (S.concRango = {q: q.id, desde, hasta: q.fecha, def: true});
+}
 // crCandidatos: registros que se pueden vincular a una cuota. Por defecto: sin vincular, de la fecha de la cuota (± días elegidos)
 // y del crédito (misma cuenta o con su texto). "Cualquier fecha" quita el filtro de fecha; con "solo del crédito" apagado muestra todos; el buscador filtra por texto o monto.
 function crCandidatos(c, q) {
   const o = S.concOpt || {}; const usadas = crUsadas(); const pat = (c.patron || '').trim().toUpperCase(); const f0 = new Date(q.fecha + 'T12:00');
-  const bus = (o.q || '').trim().toUpperCase(); const n = parseFloat(bus.replace(/[^0-9.]/g, '')); const rango = o.dias == null ? 10 : o.dias;
+  const bus = (o.q || '').trim().toUpperCase(); const n = parseFloat(bus.replace(/[^0-9.]/g, '')); const R = crRango(q);
+  const fuera = f => !f || f < R.desde || f > R.hasta;
   const out = []; const dd = f => Math.abs((new Date((f || hoy()) + 'T12:00') - f0) / 864e5);
   for (const t of D.txs) {
     if (usadas.has('t:' + t.id)) continue;
     const txt = [t.nota, t.det, t.cat, t.sub, t.cuenta].join(' ').toUpperCase(); const d = dd(t.fecha);
-    if (!o.todas && d > rango) continue;
+    if (!o.todas && fuera(t.fecha)) continue;
     const delCred = (pat && txt.includes(pat)) || (c.cuenta && t.cuenta === c.cuenta);
     if (o.soloCred !== false && !delCred && !bus) continue;
     if (bus && !(txt.includes(bus) || (isFinite(n) && Math.abs(t.monto - n) < 0.01))) continue;
@@ -1835,7 +1846,7 @@ function crCandidatos(c, q) {
   for (const m of S.movs.values()) {
     if (m.tx_id || m.estado === 'rechazado' || usadas.has('m:' + m.id)) continue;
     const txt = (m.descripcion || '').toUpperCase(); const d = dd(m.fecha);
-    if (!o.todas && d > rango) continue;
+    if (!o.todas && fuera(m.fecha)) continue;
     const delCred = !!(pat && txt.includes(pat));
     if (o.soloCred !== false && !delCred && !bus) continue;
     if (bus && !(txt.includes(bus) || (isFinite(n) && Math.abs((+m.valor || 0) - n) < 0.01))) continue;
@@ -1920,7 +1931,7 @@ function vConciliar(c, q) {
         <span class="row" style="gap:6px"><button class="btn sm" data-act="cenlProy" data-ref="${esc(k)}" data-q="${q.id}">Desglosar como lo proyectado</button><select class="in" data-ctodo="${esc(k)}" data-q="${q.id}" aria-label="Asignar todo a un concepto"><option value="">Todo a…</option>${CR_CON.map(cn => `<option value="${cn}">${CR_N[cn]}</option>`).join('')}</select></span></div></div>`; }).join('');
   const cand = crCandidatos(c, q); const vis = new Set(cand.map(x => x.ref)); [...S.concSel].forEach(r => { if (!vis.has(r)) S.concSel.delete(r); });
   const selTot = cand.filter(x => S.concSel.has(x.ref)).reduce((s, x) => s + x.monto, 0);
-  const rango = o.dias == null ? 10 : o.dias; const cs = cuotasDe(c.id); const iq = cs.findIndex(x => x.id === q.id);
+  const R = crRango(q); const cs = cuotasDe(c.id); const iq = cs.findIndex(x => x.id === q.id);
   return `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal" role="dialog" aria-modal="true" aria-labelledby="ccT">
     <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="ccT">${esc(c.nombre)} · cuota ${q.numero} de ${cs.length}</h2><div class="note">Vence el ${fFecha(q.fecha)} · proyectado ${L(+q.cuota || 0)}</div></div>
       <span class="chip ${e[1]}">${e[0]}</span>
@@ -1938,7 +1949,7 @@ function vConciliar(c, q) {
         <div class="cr-cf">
           <input class="in" id="credBus" placeholder="Buscar texto o monto" value="${esc(o.q || '')}">
           <label class="cr-ck"><input type="checkbox" data-copt="todas" ${o.todas ? 'checked' : ''}> Cualquier fecha</label>
-          ${o.todas ? '' : `<label class="cr-ck">± <select class="in" data-copt="dias">${[0, 3, 5, 10, 15, 31].map(n => `<option value="${n}" ${rango === n ? 'selected' : ''}>${n ? n + ' días' : 'mismo día'}</option>`).join('')}</select> de ${fFecha(q.fecha)}</label>`}
+          ${o.todas ? '' : `<span class="cr-ck">Del <input class="in" type="date" data-crng="desde" value="${R.desde}" aria-label="Fecha inicial"> al <input class="in" type="date" data-crng="hasta" value="${R.hasta}" aria-label="Fecha final">${R.def ? '' : ` <button class="linkish small" data-act="crngDef" title="Volver al período de la cuota">período de la cuota</button>`}</span>`}
           <label class="cr-ck"><input type="checkbox" data-copt="soloCred" ${o.soloCred === false ? '' : 'checked'}> Solo de la cuenta o texto del crédito</label>
         </div>
         <div class="row" style="justify-content:space-between"><span class="note">${cand.length} ${cand.length === 1 ? 'registro' : 'registros'}${cand.length >= 80 ? ' (primeros 80; afina la búsqueda)' : ''}${S.concSel.size ? ` · <b>${S.concSel.size} marcados = ${L(selTot)}</b>` : ''}</span>
@@ -1946,7 +1957,7 @@ function vConciliar(c, q) {
         <div class="cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${S.concSel.has(x.ref) ? 'on' : ''}"><input type="checkbox" data-csel="${esc(x.ref)}" ${S.concSel.has(x.ref) ? 'checked' : ''}>
             <span style="min-width:0;flex:1"><b>${esc(x.desc)}</b><span class="note" style="display:block">${x.fecha ? fFecha(x.fecha) : 'sin fecha'}${x.fecha && Math.round(x.d) ? ` (${x.fecha < q.fecha ? '−' : '+'}${Math.round(x.d)} d)` : ''} · ${esc(x.cuenta)}${x.sub ? ' · ' + esc(x.sub) : ''} · ${x.origen}</span></span>
             <span class="num" style="font-weight:600">${L(x.monto)}</span></label>`).join('')
-          : `<div class="note" style="padding:8px 0">${o.todas ? 'Nada coincide.' : `No hay registros sin vincular en ± ${rango} días. Marca “Cualquier fecha” o busca por texto o monto.`}</div>`}</div>
+          : `<div class="note" style="padding:8px 0">${o.todas ? 'Nada coincide.' : `No hay registros sin vincular del ${fFecha(R.desde)} al ${fFecha(R.hasta)}. Cambia el rango, marca “Cualquier fecha” o busca por texto o monto.`}</div>`}</div>
       </div>
     </div></div></div></div>`;
 }
@@ -3304,6 +3315,7 @@ document.addEventListener('click', async e => {
   if (act === 'cfIr') { S.credTab = 'lista'; S.credSel = b.dataset.c; render(); if (b.dataset.n) abrirConc(b.dataset.c, +b.dataset.n); else { const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); } return; }
   if (act === 'credSel') { S.credSel = b.dataset.id; render(); const f = document.querySelector('.cr-plan'); if (f) f.closest('.panel').scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
   if (act === 'cuoSel') { S.cuoSel = S.cuoSel || {}; S.cuoSel[b.dataset.c] = +b.dataset.n; render(); return abrirConc(b.dataset.c, +b.dataset.n); }
+  if (act === 'crngDef') { S.concRango = null; return pintarConc(); }
   if (act === 'concNav') { const qq = S.ccuo.find(x => x.id === S.concQ); if (!qq) return; const cs = cuotasDe(qq.credito); const i = cs.findIndex(x => x.id === qq.id) + (+b.dataset.d); if (cs[i]) { abrirConc(qq.credito, cs[i].numero); render(); } return; }
   if (act === 'cenlVarios') { const refs = [...(S.concSel || [])]; if (!refs.length) return; b.disabled = true; return crVincularVarios(b.dataset.q, refs); }
   if (act === 'credNuevo') { S.confirmCred = null; return abrirCredForm(null); }
@@ -3489,6 +3501,7 @@ document.addEventListener('change', async e => {
     return pintarReparto();
   }
   if (t.dataset.csel) { S.concSel = S.concSel || new Set(); t.checked ? S.concSel.add(t.dataset.csel) : S.concSel.delete(t.dataset.csel); return pintarConc(); }
+  if (t.dataset.crng) { const qq = S.ccuo.find(x => x.id === S.concQ); if (!qq || !t.value) return pintarConc(); const R = crRango(qq); R[t.dataset.crng] = t.value; if (R.desde > R.hasta) { if (t.dataset.crng === 'desde') R.hasta = R.desde; else R.desde = R.hasta; } R.def = false; return pintarConc(); }
   if (t.dataset.copt) { S.concOpt = S.concOpt || {}; const k = t.dataset.copt; S.concOpt[k] = t.type === 'checkbox' ? t.checked : +t.value; return pintarConc(); }
   if (t.dataset.crfm) { const f = crCf(); const k = t.dataset.crfm; const a = new Set(f[k] || []); t.checked ? a.add(t.value) : a.delete(t.value); f[k] = [...a]; f.periodo = null; S.cfOpen = k; return render(); }
   if (t.dataset.crf) { const f = crCf(); const k = t.dataset.crf; if ((k === 'desde' || k === 'hasta') && !t.value) return render(); f[k] = t.value; if (f.desde > f.hasta) { if (k === 'desde') f.hasta = f.desde; else f.desde = f.hasta; } f.periodo = null; return render(); }
