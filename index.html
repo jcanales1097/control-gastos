@@ -260,6 +260,10 @@ tr.cr-tt td{border-top:2px solid var(--fg)}
 .cr-modal .bd.cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
 .cr-modal .cr-conc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start}
 .cr-modal .cr-conc>div{overflow:auto;max-height:calc(100vh - 330px);padding-right:4px}
+.cr-nav{display:inline-flex;gap:4px}
+.cr-navft{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 18px;border-top:1px solid var(--line);background:var(--sunk);border-radius:0 0 12px 12px}
+.cr-navft .btn{display:inline-flex;align-items:center;gap:6px}
+.cr-modal .cr-conc>div{max-height:calc(100vh - 390px)!important}
 .cr-cmp{border:1px solid var(--line);border-radius:10px;background:var(--sunk);padding:4px 6px}
 .cr-cmp table td,.cr-cmp table th{padding:5px 8px;font-size:12.5px;background:transparent}
 .cr-cmp th{position:static}
@@ -1935,7 +1939,7 @@ function vConciliar(c, q) {
   return `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal" role="dialog" aria-modal="true" aria-labelledby="ccT">
     <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="ccT">${esc(c.nombre)} · cuota ${q.numero} de ${cs.length}</h2><div class="note">Vence el ${fFecha(q.fecha)} · proyectado ${L(+q.cuota || 0)}</div></div>
       <span class="chip ${e[1]}">${e[0]}</span>
-      <button class="btn sm ghost" data-act="concNav" data-d="-1" ${iq <= 0 ? 'disabled' : ''} title="Cuota anterior" aria-label="Cuota anterior">‹</button><button class="btn sm ghost" data-act="concNav" data-d="1" ${iq >= cs.length - 1 ? 'disabled' : ''} title="Cuota siguiente" aria-label="Cuota siguiente">›</button>
+      ${crNavBtns(cs, iq, false)}
       <button class="btn sm ${q.conciliada ? '' : 'pri'}" data-act="cuoConc" data-id="${q.id}">${q.conciliada ? 'Quitar conciliación' : 'Marcar conciliada'}</button><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="bd" style="gap:12px">
     ${crResumenComp(q, pr, re, cand)}
@@ -1959,7 +1963,8 @@ function vConciliar(c, q) {
             <span class="num" style="font-weight:600">${L(x.monto)}</span></label>`).join('')
           : `<div class="note" style="padding:8px 0">${o.todas ? 'Nada coincide.' : `No hay registros sin vincular del ${fFecha(R.desde)} al ${fFecha(R.hasta)}. Cambia el rango, marca “Cualquier fecha” o busca por texto o monto.`}</div>`}</div>
       </div>
-    </div></div></div></div>`;
+    </div></div>
+    <div class="cr-navft">${crNavBtns(cs, iq, true)}</div></div></div>`;
 }
 // crResumenComp: resumen fijo arriba de la ventana: proyectado vs vinculado por concepto, diferencia y lo que sumarían los registros marcados.
 function crResumenComp(q, pr, re, cand) {
@@ -1973,6 +1978,14 @@ function crResumenComp(q, pr, re, cand) {
     <tr><td>Vinculado</td>${ks.map(k => cel(re[k] ? L(re[k]) : '—', re[k] ? '' : 'muted')).join('')}${cel('<b>' + (tR ? L(tR) : '—') + '</b>')}</tr>
     <tr class="cr-tt"><td>Diferencia</td>${ks.map(k => { const d = crR2(re[k] - pr[k]); return cel(re[k] || pr[k] ? (d > 0 ? '+' : '') + L(d) : '—', dCls(d)); }).join('')}${cel('<b>' + (tR ? (dif > 0 ? '+' : '') + L(dif) : 'falta ' + L(tP)) + '</b>', tR ? dCls(dif) : 'neg')}</tr>
   </tbody></table>${marc ? `<div class="note" style="padding:6px 2px 0">Marcados para vincular: <b>${L(marc)}</b> · el vinculado quedaría en <b>${L(crR2(tR + marc))}</b> (${crR2(tR + marc - tP) > 0 ? '+' : ''}${L(crR2(tR + marc - tP))} vs proyectado)</div>` : ''}</div>`;
+}
+// crNavBtns: flechas para pasar a la cuota anterior o siguiente (arriba en el encabezado y abajo al pie de la ventana; también con las teclas ← →).
+function crNavBtns(cs, iq, largo) {
+  const a = cs[iq - 1], b = cs[iq + 1]; const est = x => { const e = estadoCuota(x); return `<span class="chip ${e[1]}">${e[0]}</span>`; };
+  if (!largo) return `<span class="cr-nav"><button class="btn sm" data-act="concNav" data-d="-1" ${a ? '' : 'disabled'} title="Cuota anterior (←)">‹ ${a ? 'Cuota ' + a.numero : 'Anterior'}</button><button class="btn sm" data-act="concNav" data-d="1" ${b ? '' : 'disabled'} title="Cuota siguiente (→)">${b ? 'Cuota ' + b.numero : 'Siguiente'} ›</button></span>`;
+  return `<button class="btn" data-act="concNav" data-d="-1" ${a ? '' : 'disabled'}>‹ ${a ? `Cuota ${a.numero} · ${fFecha(a.fecha)} ${est(a)}` : 'No hay cuota anterior'}</button>
+    <span class="note">Cuota ${cs[iq].numero} de ${cs.length} · también con las teclas ← →</span>
+    <button class="btn" data-act="concNav" data-d="1" ${b ? '' : 'disabled'}>${b ? `${est(b)} Cuota ${b.numero} · ${fFecha(b.fecha)}` : 'No hay cuota siguiente'} ›</button>`;
 }
 // abrirConc: abre la ventana de conciliación de una cuota (al tocar una cuota del plan o "Conciliar" en el análisis).
 function abrirConc(cid, n) { const qq = cuotasDe(cid).find(x => x.numero === n); if (!qq) return; S.cuoSel = S.cuoSel || {}; S.cuoSel[cid] = n; S.concQ = qq.id; S.concSel = new Set(); pintarConc(); }
@@ -3555,6 +3568,7 @@ document.addEventListener('paste', e => {
 });
 /* Atajos de teclado: Enter para guardar en formularios y abrir filas, Escape para cerrar ventanas. */
 document.addEventListener('keydown', e => {
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
