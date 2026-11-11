@@ -2021,11 +2021,19 @@ function crMontoRef(ref) { const id = ref.slice(2); if (ref[0] === 't') { const 
 // crDesgloseProy: Propone el desglose de un registro: por palabra clave (seguro, comisión, interés) o según lo que falta de lo proyectado.
 function crDesgloseProy(qid, ref, adivinar) {
   const q0 = S.ccuo.find(x => x.id === qid); const monto = crMontoRef(ref);
-  if (adivinar) { let txt = ''; if (ref[0] === 't') { const t = D.byId.get(ref.slice(2)); txt = t ? [t.nota, t.det, t.cat, t.sub].join(' ').toLowerCase() : ''; } else { const m = S.movs.get(ref.slice(2)); txt = m ? (m.descripcion || '').toLowerCase() : ''; }
-    const g = /mora|moratori|recargo|atraso|penalidad|penalizaci/.test(txt) ? 'mor' : /seguro/.test(txt) ? 'seg' : /comisi|cargo admin|administraci/.test(txt) ? 'com' : /inter[eé]s/.test(txt) ? 'int' : null; if (g) return {[g]: monto}; }
+  if (adivinar) {
+    // Se adivina por la descripción del registro (no por la categoría): mora, seguro, comisión, abono a capital o interés.
+    let txt = ''; if (ref[0] === 't') { const t = D.byId.get(ref.slice(2)); txt = t ? [t.nota, t.det].join(' ').toLowerCase() : ''; } else { const m = S.movs.get(ref.slice(2)); txt = m ? (m.descripcion || '').toLowerCase() : ''; }
+    const cap = /capital|abono/.test(txt), int = /inter[eé]s/.test(txt);
+    const g = /mora|moratori|recargo|atraso|penalidad|penalizaci/.test(txt) ? 'mor' : /seguro/.test(txt) ? 'seg' : /comisi|cargo admin|administraci/.test(txt) ? 'com' : cap && int ? null : cap ? 'cap' : int ? 'int' : null;
+    if (g) return {[g]: monto};
+  }
+  // Si no se adivina: se reparte según lo que falta de lo proyectado y lo que sobra va a Capital
+  // (antes, si la cuota ya estaba cubierta, el registro quedaba sin nada asignado y no se vinculaba).
   const ya = {cap: 0, int: 0, seg: 0, com: 0, mor: 0}; (S.cenl || []).filter(e => e.cuota === qid && refKey(e) !== ref).forEach(e => { ya[e.concepto] += +e.monto || 0; });
   const pr = qVal(q0); const out = {}; let rest = monto;
   for (const k of CR_CON) { const v = crR2(Math.min(Math.max(0, pr[k] - ya[k]), rest)); if (v > 0) { out[k] = v; rest = crR2(rest - v); } }
+  if (rest > 0.004) out.cap = crR2((out.cap || 0) + rest);
   return out;
 }
 // crGuardarPlan: Guarda el plan: actualiza cuotas existentes, agrega las nuevas y borra las sobrantes sin registros.
