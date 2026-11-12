@@ -325,6 +325,18 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 #regForm .fld input:disabled{opacity:.6}
 .loading{padding:60px 16px;text-align:center;color:var(--muted)}
 @media (max-width:600px){.brand span{display:none}.sync-meta{display:none}}
+/* ===== Tarjetas de crédito ===== */
+.tj-plastic{display:inline-block;flex:none;width:34px;height:22px;border-radius:4px;background:linear-gradient(135deg,var(--accent),var(--ca));position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+.tj-plastic::after{content:"";position:absolute;left:5px;top:7px;width:8px;height:6px;border-radius:1.5px;background:var(--warn-soft)}
+.tj-plastic.lg{width:46px;height:30px}.tj-plastic.lg::after{left:7px;top:10px;width:10px;height:8px}
+.tj-ctas{display:flex;flex-wrap:wrap;gap:4px}.tj-ctas span{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--sunk);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tj-tasa{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.tj-cmp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tj-cmp>div{display:grid;gap:3px;align-content:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
+.tj-cmp b{font-family:var(--f-num);font-size:16px}
+@media (max-width:760px){.tj-cmp{grid-template-columns:1fr 1fr}.tj-cmp .row{flex-wrap:wrap}.tj-cmp input{width:100%!important;min-width:0}}
+.tj-it{display:flex;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)}.tj-it b{font-size:12.5px;font-weight:600}
+.tj-ctasel{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px;max-height:260px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
 /* ================= TELÉFONO =================
    Barra superior compacta (marca + botones en una línea, pestañas deslizables), campos de 16px para que el iPhone no haga zoom,
    ventanas emergentes como hoja desde abajo, filtros en dos columnas y botones más fáciles de tocar. */
@@ -681,6 +693,8 @@ async function cargarTodo() {
     try { S.hist = new Map((await todo('tx_hist')).map(x => [x.tx_id, x])); } catch (e) { S.hist = null; }
     try { S.mon = new Map((await todo('tx_moneda')).map(x => [x.tx_id, x])); } catch (e) { S.mon = null; }
     try { const [cr, cq, ce] = await Promise.all([todo('creditos', 'nombre'), todo('credito_cuotas', 'numero'), todo('credito_enlaces')]); S.cred = cr; S.ccuo = cq; S.cenl = ce; } catch (e) { S.cred = null; S.ccuo = []; S.cenl = []; }
+    // Tarjetas de crédito (si aún no se corrió tarjetas.sql, S.tj queda en null y la pestaña lo avisa).
+    try { const [tj, tp, tg] = await Promise.all([todo('tarjetas', 'banco'), todo('tarjeta_periodos', 'corte'), todo('tarjeta_pagos')]); S.tj = tj; S.tjp = tp; S.tjpg = tg; } catch (e) { S.tj = null; S.tjp = []; S.tjpg = []; }
   } else {
     S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
@@ -808,7 +822,7 @@ function route() {
   const ok = id => { const c = ctrlById(id); return !!c; };
   if ((h.startsWith('c-') || h.startsWith('p-')) && ok(h.slice(2))) S.view = h;
   else if (['inicio', 'proyectos', 'vehiculos'].includes(h)) S.view = h;
-  else if (esAdmin() && ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes', 'creditos'].includes(h)) S.view = h;
+  else if (esAdmin() && ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes', 'creditos', 'tarjetas'].includes(h)) S.view = h;
   else S.view = 'inicio';
 }
 window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return; route(); S.sel.clear(); render(); window.scrollTo(0, 0); });
@@ -822,7 +836,8 @@ function renderTabs() {
   familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
   if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
   if (S.veh !== undefined && (a || vehs().length)) items.push(['vehiculos', `Vehículos${a && detectados().length ? ` <span class="count warn-bg">${detectados().length}</span>` : ''}`]);
-  if (a) { const ns = S.cred ? creditos().filter(c => c.estado !== 'cancelado').reduce((t, c) => t + cuotasDe(c.id).filter(x => !x.conciliada && x.fecha < hoy() && !enlCuota(x.id).length).length, 0) : 0; items.push(['creditos', `Créditos${ns ? ` <span class="count bad-bg">${ns}</span>` : ''}`]); }
+  if (a) { const ns = S.cred ? creditos().filter(c => c.estado !== 'cancelado').reduce((t, c) => t + cuotasDe(c.id).filter(x => !x.conciliada && x.fecha < hoy() && !enlCuota(x.id).length).length, 0) : 0; items.push(['creditos', `Créditos${ns ? ` <span class="count bad-bg">${ns}</span>` : ''}`]);
+    const nv = S.tj ? tjs().filter(t => t.estado !== 'cerrada').reduce((n, t) => n + tjPeriodos(t).filter(p => p.est[0] === 'Vencido').length, 0) : 0; items.push(['tarjetas', `Tarjetas${nv ? ` <span class="count bad-bg">${nv}</span>` : ''}`]); }
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
   const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
   $('#tabs').innerHTML = items.map(([h, l]) => `<a href="#${h}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`).join('');
@@ -849,6 +864,7 @@ function render() {
   else if (S.view === 'proyectos') html = vProyectos();
   else if (S.view === 'vehiculos') html = vVehiculos();
   else if (S.view === 'creditos') html = vCreditos();
+  else if (S.view === 'tarjetas') html = vTarjetas();
   else html = vControl(ctrlById(S.view.slice(2)));
   const pw0 = document.querySelector('.cr-plan-wrap'); const planPos = pw0 ? {c: pw0.dataset.c, top: pw0.scrollTop} : null;
   app().innerHTML = html;
@@ -3344,6 +3360,235 @@ const movDe = el => { const tr = el.closest('[data-mov]'); return tr && S.movs.g
 document.addEventListener('submit', e => { if (e.target.id === 'authForm') { e.preventDefault(); enviarAuth(e.target); } });
 document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) { d.open = false; if (d.classList.contains('msel')) S.cfOpen = null; } }); }, true);
 document.addEventListener('toggle', e => { const d = e.target; if (d.classList && d.classList.contains('msel')) { if (d.open) { S.cfOpen = d.dataset.k; document.querySelectorAll('details.msel[open]').forEach(x => { if (x !== d) x.open = false; }); } else if (S.cfOpen === d.dataset.k) S.cfOpen = null; } }, true);
+/* ===== TARJETAS DE CRÉDITO (solo administrador) =====
+   Cada tarjeta agrupa varias cuentas de Registro Contable (L, $, extensiones). La plataforma arma los períodos de corte
+   con sus gastos; los pagos se vinculan a mano a cada período y el período se marca como pagado a mano.
+   El límite se guarda en dólares y se compara usando la tasa de cambio del día (se obtiene sola una vez al día). */
+// tjs: tarjetas ordenadas (activas primero).
+const tjs = () => (S.tj || []).slice().sort((a, b) => (a.estado === 'cerrada') - (b.estado === 'cerrada') || (a.banco || '').localeCompare(b.banco || '') || (a.nombre || '').localeCompare(b.nombre || ''));
+const tjById = id => (S.tj || []).find(t => t.id === id);
+const tjCta = c => String(c || '').trim();
+// tjEsUSD: una cuenta es en dólares si su nombre termina en "$".
+const tjEsUSD = c => /\$\s*$/.test(String(c || ''));
+// tjDir: dirección de un registro en una cuenta de tarjeta: 'gasto' (compras, cargos, avances que salen) o 'abono' (pagos, devoluciones que entran).
+function tjDir(t) {
+  if (t.code === 1) return 'gasto'; if (t.code === 0) return 'abono';
+  if (t.code === 3) { const m = String(t.tipoMov || '').toLowerCase(); if (/gast|salid|envi|retir|out/.test(m)) return 'gasto'; return 'abono'; }
+  return null;
+}
+// tjMontos: monto en lempiras o en dólares según la cuenta (en $ usa el monto original en dólares si se importó la moneda).
+const tjMonto = t => tjEsUSD(t.cuenta) ? {usd: t.moneda ? (+t.original || 0) : (+t.monto || 0), l: 0} : {l: +t.monto || 0, usd: 0};
+// tjTxs: registros de la app de las cuentas de una tarjeta (índice por tarjeta, se recalcula si cambian los datos).
+function tjTxs(tar) { const set = new Set((tar.cuentas || []).map(tjCta)); return D.txs.filter(t => set.has(tjCta(t.cuenta))); }
+// tjFechaDia: fecha con el día pedido ajustado al último día del mes.
+function tjFechaDia(y, m0, d) { const dt = new Date(Date.UTC(y, m0, 1)); const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(); dt.setUTCDate(Math.min(d, last)); return dt.toISOString().slice(0, 10); }
+const tjMas1 = d => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
+// tjPeriodos: períodos de corte desde "desde" hasta el período en curso. Fecha de pago: el día de pago del mismo mes si es después del corte, si no del mes siguiente.
+function tjPeriodos(tar) {
+  const dc = +tar.dia_corte || 1, dp = +tar.dia_pago || 1; const txs = tjTxs(tar); const hoyD = hoy();
+  let ini = tar.desde || (txs.length ? txs.reduce((m, t) => t.fecha < m ? t.fecha : m, hoyD) : hoyD);
+  let y = +ini.slice(0, 4), m0 = +ini.slice(5, 7) - 1; if (+ini.slice(8, 10) > dc) m0++;
+  const regs = new Map((S.tjp || []).filter(p => p.tarjeta === tar.id).map(p => [p.corte, p]));
+  const pagosPor = new Map(); (S.tjpg || []).filter(x => x.tarjeta === tar.id).forEach(x => { if (!pagosPor.has(x.periodo)) pagosPor.set(x.periodo, []); pagosPor.get(x.periodo).push(x); });
+  const out = []; let guard = 0;
+  while (guard++ < 240) {
+    const corte = tjFechaDia(y, m0, dc), prev = tjFechaDia(y, m0 - 1, dc); const desdeP = tjMas1(prev);
+    if (desdeP > hoyD) break;
+    const fp = dp > dc ? tjFechaDia(y, m0, dp) : tjFechaDia(y, m0 + 1, dp);
+    const reg = regs.get(corte) || null;
+    const g = txs.filter(t => t.fecha >= desdeP && t.fecha <= corte && tjDir(t) === 'gasto');
+    const gL = crR2(g.reduce((s, t) => s + tjMonto(t).l, 0)), gU = crR2(g.reduce((s, t) => s + tjMonto(t).usd, 0));
+    const pg = reg ? (pagosPor.get(reg.id) || []) : [];
+    const pL = crR2(pg.filter(x => !x.usd).reduce((s, x) => s + (+x.monto || 0), 0)), pU = crR2(pg.filter(x => x.usd).reduce((s, x) => s + (+x.monto || 0), 0));
+    const baseL = reg && reg.monto_estado != null ? +reg.monto_estado : gL, baseU = reg && reg.monto_estado_usd != null ? +reg.monto_estado_usd : gU;
+    const fpago = reg && reg.fecha_pago ? reg.fecha_pago : fp; const abierto = corte >= hoyD;
+    const vacio = !g.length && !pg.length && !(reg && (reg.monto_estado || reg.monto_estado_usd));   // corte sin cargos ni pagos: no se cuenta como vencido
+    const est = reg && reg.pagado ? ['Pagado', 'app'] : abierto ? ['En curso', ''] : vacio ? ['Sin cargos', ''] : fpago < hoyD ? ['Vencido', 'bad'] : ['Por pagar', 'warn'];
+    out.push({corte, desde: desdeP, fpago, g, gL, gU, pg, pL, pU, sL: crR2(baseL - pL), sU: crR2(baseU - pU), reg, abierto, est});
+    m0++;
+  }
+  return out;
+}
+/* --- tasa de cambio del día --- */
+// tasaUSD: tasa de lempiras por dólar. Se obtiene sola una vez al día de open.er-api.com; si falla usa la última guardada. Se puede escribir a mano.
+const tasaUSD = () => (S.tasa && +S.tasa.valor) || (S.aj && S.aj.tasaUSD && +S.aj.tasaUSD.valor) || 0;
+async function obtenerTasa(forzar) {
+  const guardada = (S.aj && S.aj.tasaUSD) || null; if (!S.tasa && guardada) S.tasa = guardada;
+  if (!forzar && S.tasa && S.tasa.fecha === hoy()) return;
+  if (S._tasaPidiendo) return; S._tasaPidiendo = true;
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD', {cache: 'no-store'}); const j = await r.json();
+    const v = j && j.rates && +j.rates.HNL;
+    if (v > 0) { S.tasa = {valor: Math.round(v * 10000) / 10000, fecha: hoy(), fuente: 'automática'}; if (esAdmin()) guardarAjuste('tasaUSD', S.tasa).catch(() => {}); if (S.view === 'tarjetas') render(); }
+  } catch (e) { /* sin internet o servicio caído: se queda la última tasa guardada */ }
+  S._tasaPidiendo = false;
+}
+/* --- vista --- */
+function vTarjetas() {
+  const head = `<div><div class="eyebrow">Tarjetas de crédito</div><h1>Cortes, pagos y saldos</h1><div class="note">Cada tarjeta agrupa sus cuentas de la app. Vincula los pagos a cada período y márcalo como pagado.</div></div>`;
+  if (S.tj === null) return `<div class="stack">${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de tarjetas (tarjetas.sql).</div></div></div>`;
+  obtenerTasa();
+  const lista = tjs(); if (!S.tjSel || !tjById(S.tjSel)) S.tjSel = lista[0] ? lista[0].id : null;
+  const tasa = tasaUSD(); let kSL = 0, kSU = 0, kGL = 0, kGU = 0, kV = 0, prox = null;
+  const filas = lista.map(t => { const ps = tjPeriodos(t); const act = ps.find(p => p.abierto); const ult = [...ps].reverse().find(p => !p.abierto);
+    const pend = ps.filter(p => !p.abierto && !(p.reg && p.reg.pagado) && p.est[0] !== 'Sin cargos'); const sL = crR2(pend.reduce((s, p) => s + p.sL, 0)), sU = crR2(pend.reduce((s, p) => s + p.sU, 0));
+    const vivo = t.estado !== 'cerrada';
+    if (vivo) { kSL += sL; kSU += sU; kGL += act ? act.gL : 0; kGU += act ? act.gU : 0; kV += ps.filter(p => p.est[0] === 'Vencido').length; const pf = pend.find(p => p.fpago >= hoy()); if (pf && (!prox || pf.fpago < prox.f)) prox = {f: pf.fpago, t, sL: pf.sL, sU: pf.sU}; }
+    const pp = pend[0]; const deudaU = crR2(sU + (act ? act.gU : 0) + (tasa ? (sL + (act ? act.gL : 0)) / tasa : 0)); const uso = +t.limite_usd && tasa ? Math.round(deudaU / +t.limite_usd * 100) : null;
+    return `<tr class="cr-row ${t.id === S.tjSel ? 'cr-sel' : ''}" data-act="tjSel" data-id="${t.id}" tabindex="0"><td><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="tj-plastic" aria-hidden="true"></span><div><b>${esc(t.banco || '')} · ${esc(t.nombre || '')}</b><div class="cat">•••• ${esc(t.ultimos4 || '')}${vivo ? '' : ' · cerrada'}</div></div></div></td>
+      <td><span class="tj-ctas">${(t.cuentas || []).map(c => `<span>${esc(c)}</span>`).join('')}</span></td><td class="small muted" style="white-space:nowrap">corte ${t.dia_corte} · pago ${t.dia_pago}</td>
+      <td class="num">${act ? L(act.gL) + (act.gU ? `<div class="cat">${tjU(act.gU)}</div>` : '') : '—'}</td>
+      <td class="num">${L(sL)}${sU ? `<div class="cat">${tjU(sU)}</div>` : ''}</td>
+      <td style="white-space:nowrap">${uso != null ? `<span class="cr-bar"><i style="width:${Math.min(100, uso)}%;${uso > 80 ? 'background:var(--bad)' : ''}"></i></span> <span class="num small">${uso} %</span>` : '<span class="muted small">—</span>'}</td>
+      <td style="white-space:nowrap">${ult ? `<span class="chip ${ult.est[1]}">${ult.est[0]}</span> <span class="num small">${fFecha(ult.corte)}</span>` : '—'}</td>
+      <td style="white-space:nowrap">${pp ? `<span class="num small ${pp.fpago < hoy() ? 'neg' : ''}">${fFecha(pp.fpago)}</span>` : '<span class="muted small">al día</span>'}</td>
+      <td class="acc"><div class="acc-row">${S.confirmTj === t.id ? `<button class="btn sm danger" data-act="tjBorrar">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="tjBorrarNo">No</button>` : icoBtn('editar', 'Editar tarjeta', 'tjForm') + icoBtn('borrar', 'Eliminar tarjeta', 'tjBorrar', '', 'danger')}</div></td></tr>`; }).join('');
+  const t = tjById(S.tjSel);
+  return `<div class="stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>
+    <div class="tj-tasa"><span class="eyebrow">Tasa del día</span> <b class="num">${tasa ? 'L ' + tasa.toFixed(4) + ' por $' : 'sin tasa'}</b> <span class="note">${S.tasa ? (S.tasa.fuente === 'manual' ? 'escrita a mano' : 'automática') + ' · ' + fFecha(S.tasa.fecha) : 'no se pudo obtener; escríbela'}</span>
+      <input class="in num" id="tasaMan" inputmode="decimal" placeholder="escribir tasa" style="width:120px" aria-label="Tasa manual"><button class="btn sm ghost" data-act="tasaAuto">Actualizar automática</button></div>
+    <div class="kpis">
+      <div class="kpi"><div class="eyebrow">Saldo pendiente</div><div class="v">${L(kSL)}</div><div class="note">${kSU ? tjU(kSU) + ' · ' : ''}cortes sin marcar pagados</div></div>
+      <div class="kpi"><div class="eyebrow">Próximo pago</div><div class="v">${prox ? fFecha(prox.f) : '—'}</div><div class="note">${prox ? esc(prox.t.banco + ' ' + prox.t.nombre) + ' · ' + L(prox.sL) + (prox.sU ? ' + ' + tjU(prox.sU) : '') : 'nada por vencer'}</div></div>
+      <div class="kpi"><div class="eyebrow">Gasto del período actual</div><div class="v">${L(kGL)}</div><div class="note">${kGU ? tjU(kGU) + ' · ' : ''}todas las tarjetas</div></div>
+      <div class="kpi"><div class="eyebrow">Cortes vencidos</div><div class="v ${kV ? 'neg' : ''}">${kV}</div><div class="note">pasó la fecha de pago sin marcar pagado</div></div>
+    </div>
+    <div class="panel"><div class="hd"><h2 style="margin-right:auto">Tarjetas</h2></div>
+      ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Tarjeta</th><th>Cuentas en la app</th><th>Días</th><th class="num">Gasto período actual</th><th class="num">Saldo pendiente</th><th>Uso del límite</th><th>Último corte</th><th>Pago pendiente</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`
+        : '<div class="bd note">Todavía no hay tarjetas. Agrega la primera con “+ Nueva tarjeta” y elige las cuentas de la app que le pertenecen.</div>'}</div>
+    ${t ? vTjFicha(t) : ''}
+  </div>`;
+}
+const tjU = v => (v < 0 ? '−' : '') + '$ ' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+function vTjFicha(t) {
+  const ps = tjPeriodos(t).reverse(); const act = ps.find(p => p.abierto); const usd = (t.cuentas || []).some(tjEsUSD); const tasa = tasaUSD();
+  const pend = ps.filter(p => !p.abierto && !(p.reg && p.reg.pagado) && p.est[0] !== 'Sin cargos');
+  const deudaL = crR2(pend.reduce((s, p) => s + p.sL, 0) + (act ? act.gL : 0)), deudaU = crR2(pend.reduce((s, p) => s + p.sU, 0) + (act ? act.gU : 0));
+  const usadoU = tasa ? crR2(deudaU + deudaL / tasa) : null; const lim = +t.limite_usd || 0;
+  return `<div class="panel"><div class="hd"><div class="row" style="gap:12px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><div style="min-width:0"><h2>${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2><span class="tj-ctas">${(t.cuentas || []).map(c => `<span>${esc(c)}</span>`).join('')}</span></div></div>
+      ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}</div>
+    <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
+      <div class="kpi"><div class="eyebrow">Corte · pago</div><div class="v">día ${t.dia_corte} · ${t.dia_pago}</div><div class="note">${act ? 'período actual ' + fFecha(act.desde).slice(0, 5) + ' – ' + fFecha(act.corte).slice(0, 5) : ''}</div></div>
+      <div class="kpi"><div class="eyebrow">Límite</div><div class="v">${lim ? tjU(lim) : '—'}</div><div class="note">${lim && tasa ? '≈ ' + L(lim * tasa) + ' a tasa del día' : ''}</div></div>
+      <div class="kpi"><div class="eyebrow">Usado</div><div class="v">${usadoU != null ? tjU(usadoU) : '—'}</div><div class="note">${L(deudaL)}${deudaU ? ' + ' + tjU(deudaU) : ''} sin pagar</div></div>
+      <div class="kpi"><div class="eyebrow">Disponible aprox.</div><div class="v ${lim && usadoU != null && usadoU > lim * .8 ? 'neg' : ''}">${lim && usadoU != null ? tjU(crR2(lim - usadoU)) : '—'}</div><div class="note">${lim && usadoU != null ? Math.round(usadoU / lim * 100) + ' % del límite usado' : 'agrega el límite y la tasa'}</div></div></div>
+    <div class="tbl-wrap cr-plan-wrap" data-c="tj-${t.id}"><table class="cr-plan"><thead><tr><th>Período de corte</th><th>Fecha de pago</th><th class="num">Gastos</th><th class="num">Pagos vinculados</th><th class="num">Saldo</th>${usd ? '<th class="num">Gastos $</th><th class="num">Pagos $</th><th class="num">Saldo $</th>' : ''}<th>Estado</th></tr></thead><tbody>
+      ${ps.map(p => `<tr class="cr-row" data-act="tjPer" data-t="${t.id}" data-c="${p.corte}" tabindex="0"><td><b>Corte ${fFecha(p.corte)}</b><div class="cat">${fFecha(p.desde)} – ${fFecha(p.corte)} · ${p.g.length} cargos</div></td><td class="num" style="text-align:left">${fFecha(p.fpago)}</td>
+        <td class="num">${L(p.gL)}${p.reg && p.reg.monto_estado != null ? `<div class="cat">estado ${L(+p.reg.monto_estado)}</div>` : ''}</td><td class="num">${p.pL ? L(p.pL) : '<span class="muted">—</span>'}</td><td class="num ${p.sL > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${L(p.sL)}</td>
+        ${usd ? `<td class="num">${tjU(p.gU)}</td><td class="num">${p.pU ? tjU(p.pU) : '<span class="muted">—</span>'}</td><td class="num ${p.sU > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${tjU(p.sU)}</td>` : ''}
+        <td><span class="chip ${p.est[1]}">${p.est[0]}</span>${!p.reg?.pagado && (p.pL || p.pU) ? ' <span class="chip">con pagos</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="note">Sin períodos todavía.</td></tr>'}
+    </tbody></table></div>
+    <div class="bd note" style="border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px">${ps.length} períodos · toca uno para vincular sus pagos y marcarlo como pagado</div></div>`;
+}
+/* --- ventana del período --- */
+function tjCandidatos(t, p) {
+  const o = S.tjOpt || {}; const usados = new Set((S.tjpg || []).map(x => x.tx_id).filter(Boolean)); const R = S.tjRango || {};
+  const bus = (o.q || '').trim().toUpperCase();
+  return tjTxs(t).filter(x => tjDir(x) === 'abono' && !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 80);
+}
+function abrirTjPer(tid, corte) {
+  S.tjPer = {t: tid, c: corte}; S.tjSelP = new Set(); S.tjOpt = {}; const x = new Date(corte + 'T12:00Z'); x.setUTCMonth(x.getUTCMonth() + 1);
+  // Rango inicial: del día después del corte hasta 10 días después del corte siguiente o de la fecha de pago (la que sea más tarde).
+  const t = tjById(tid); const p = tjPeriodos(t).find(z => z.corte === corte); const sig = tjFechaDia(x.getUTCFullYear(), x.getUTCMonth(), +t.dia_corte);
+  const fin = new Date(((p && p.fpago > sig) ? p.fpago : sig) + 'T12:00Z'); fin.setUTCDate(fin.getUTCDate() + 10);
+  S.tjRango = {d: tjMas1(corte), h: fin.toISOString().slice(0, 10)}; pintarTjPer();
+}
+function pintarTjPer(foco) {
+  const P = S.tjPer; if (!P) return; const t = tjById(P.t); if (!t) return; const ps = tjPeriodos(t); const i = ps.findIndex(x => x.corte === P.c); const p = ps[i]; if (!p) return;
+  const usd = (t.cuentas || []).some(tjEsUSD); const cand = tjCandidatos(t, p); const sel = S.tjSelP || new Set();
+  const smL = cand.filter(x => sel.has(x.id) && !tjEsUSD(x.cuenta)).reduce((s, x) => s + tjMonto(x).l, 0), smU = cand.filter(x => sel.has(x.id) && tjEsUSD(x.cuenta)).reduce((s, x) => s + tjMonto(x).usd, 0);
+  const desc = x => esc([x.nota, x.det].filter(Boolean).join(' | ') || x.cat || 'Registro');
+  const mon = x => tjEsUSD(x.cuenta) ? tjU(tjMonto(x).usd) : L(tjMonto(x).l);
+  const prev = [...document.querySelectorAll('.tj-modal .lst')].map(d => d.scrollTop);
+  const nav = (largo) => { const a = ps[i - 1], b = ps[i + 1]; return largo
+    ? `<button class="btn" data-act="tjNav" data-d="-1" ${a ? '' : 'disabled'}>‹ ${a ? 'Corte ' + fFecha(a.corte) + ` <span class="chip ${a.est[1]}">${a.est[0]}</span>` : 'No hay anterior'}</button><span class="note">también con las teclas ← →</span><button class="btn" data-act="tjNav" data-d="1" ${b ? '' : 'disabled'}>${b ? `<span class="chip ${b.est[1]}">${b.est[0]}</span> Corte ` + fFecha(b.corte) : 'No hay siguiente'} ›</button>`
+    : `<span class="cr-nav"><button class="btn sm" data-act="tjNav" data-d="-1" ${a ? '' : 'disabled'} title="Período anterior (←)">‹ Anterior</button><button class="btn sm" data-act="tjNav" data-d="1" ${b ? '' : 'disabled'} title="Período siguiente (→)">Siguiente ›</button></span>`; };
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal tj-modal" role="dialog" aria-modal="true" aria-labelledby="tpT">
+    <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="tpT">${esc(t.banco + ' ' + t.nombre)} · corte ${fFecha(p.corte)}</h2><div class="note">${fFecha(p.desde)} – ${fFecha(p.corte)} · fecha de pago ${fFecha(p.fpago)}</div></div>
+      <span class="chip ${p.est[1]}">${p.est[0]}</span>${nav(false)}
+      ${p.abierto ? '' : `<button class="btn sm ${p.reg && p.reg.pagado ? '' : 'pri'}" data-act="tjPagado">${p.reg && p.reg.pagado ? 'Quitar pagado' : 'Marcar pagado'}</button>`}<button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
+    <div class="bd" style="gap:12px">
+      <div class="tj-cmp">
+        <div><span class="eyebrow">Gastos del período</span><b>${L(p.gL)}</b>${usd ? `<span class="note">${tjU(p.gU)}</span>` : ''}</div>
+        <div><span class="eyebrow">Monto del estado de cuenta</span><span class="row" style="gap:4px"><input class="in num" data-tjm="monto_estado" inputmode="decimal" placeholder="L opcional" value="${p.reg && p.reg.monto_estado != null ? (+p.reg.monto_estado).toFixed(2) : ''}" style="width:115px">${usd ? `<input class="in num" data-tjm="monto_estado_usd" inputmode="decimal" placeholder="$ opcional" value="${p.reg && p.reg.monto_estado_usd != null ? (+p.reg.monto_estado_usd).toFixed(2) : ''}" style="width:100px">` : ''}</span></div>
+        <div><span class="eyebrow">Pagos vinculados</span><b>${L(p.pL)}</b>${usd ? `<span class="note">${tjU(p.pU)}</span>` : ''}</div>
+        <div><span class="eyebrow">Saldo</span><b class="${p.sL > 0.004 ? 'neg' : ''}">${L(p.sL)}</b>${usd ? `<span class="note ${p.sU > 0.004 ? 'neg' : ''}">${tjU(p.sU)}</span>` : ''}</div>
+      </div>
+      ${smL || smU ? `<div class="note">Marcados: <b>${L(smL)}${smU ? ' + ' + tjU(smU) : ''}</b> · el saldo quedaría en <b>${L(crR2(p.sL - smL))}${usd ? ' / ' + tjU(crR2(p.sU - smU)) : ''}</b></div>` : ''}
+      <div class="cr-conc">
+        <div class="stack" style="gap:8px;min-width:0">
+          <div class="eyebrow">Pagos vinculados a este período</div>
+          <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.usd ? tjU(+x.monto) : L(+x.monto)}</span>${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
+          <div class="eyebrow" style="margin-top:6px">Cargos del período · ${p.g.length}</div>
+          <div class="lst" style="max-height:240px">${p.g.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${esc(x.cuenta)}${x.code === 3 ? ' · traslado' : ''}</div></div><span class="num">${mon(x)}</span></div>`).join('') || '<div class="note">Sin cargos.</div>'}</div>
+        </div>
+        <div class="stack" style="gap:8px;min-width:0">
+          <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
+          <div class="cr-cf"><input class="in" id="tjBus" placeholder="Buscar texto o monto" value="${esc((S.tjOpt || {}).q || '')}">
+            <label class="cr-ck"><input type="checkbox" data-tjo="todas" ${(S.tjOpt || {}).todas ? 'checked' : ''}> Cualquier fecha</label>
+            ${(S.tjOpt || {}).todas ? '' : `<span class="cr-ck">Del <input class="in" type="date" data-tjr="d" value="${S.tjRango.d}"> al <input class="in" type="date" data-tjr="h" value="${S.tjRango.h}"></span>`}</div>
+          <div class="row" style="justify-content:space-between"><span class="note">${cand.length} sin vincular</span><button class="btn sm pri" data-act="tjVinc" ${sel.size ? '' : 'disabled'}>Vincular seleccionados${sel.size ? ' (' + sel.size + ')' : ''}</button></div>
+          <div class="lst cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${fFecha(x.fecha)} · a ${esc(x.cuenta)}${x.cat ? ' · ' + esc(x.cat) : ''}${x.code === 0 ? ' · ingreso' : ''}</span></span><span class="num" style="font-weight:600">${mon(x)}</span></label>`).join('')
+            : `<div class="note" style="padding:8px 0">No hay pagos sin vincular ${(S.tjOpt || {}).todas ? '' : `del ${fFecha(S.tjRango.d)} al ${fFecha(S.tjRango.h)}`}. Cambia el rango o marca “Cualquier fecha”.</div>`}</div>
+        </div>
+      </div>
+    </div>
+    <div class="cr-navft">${nav(true)}</div></div></div>`;
+  document.querySelectorAll('.tj-modal .lst').forEach((d, k) => { d.scrollTop = prev[k] || 0; });
+  if (foco) { const el = $('#tjBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+}
+// tjRegPeriodo: devuelve (y crea si no existe) el registro guardado de un período, necesario para marcar pagado o vincular pagos.
+async function tjRegPeriodo(t, p) {
+  if (p.reg) return p.reg;
+  const row = {id: crUid(), tarjeta: t.id, corte: p.corte, fecha_pago: p.fpago, pagado: false};
+  const d = await q(sb.from('tarjeta_periodos').insert(row).select()); const r = d && d[0] ? d[0] : row; S.tjp.push(r); return r;
+}
+const tjPerActual = () => { const P = S.tjPer; if (!P) return {}; const t = tjById(P.t); const p = t && tjPeriodos(t).find(x => x.corte === P.c); return {t, p}; };
+/* --- formulario de tarjeta --- */
+function abrirTjForm(id) {
+  const t = id ? tjById(id) : null; const v = (k, d = '') => esc(t && t[k] != null ? String(t[k]) : d);
+  const usadas = new Map(); (S.tj || []).forEach(x => { if (x.id !== id) (x.cuentas || []).forEach(c => usadas.set(tjCta(c), x.banco + ' ' + x.nombre)); });
+  const cnt = new Map(); D.txs.forEach(x => { const c = tjCta(x.cuenta); if (c) cnt.set(c, (cnt.get(c) || 0) + 1); });
+  const todas = [...cnt.keys()].sort((a, b) => (/TC|TARJ|CRED|AMEX|VISA|MASTER/i.test(b) - /TC|TARJ|CRED|AMEX|VISA|MASTER/i.test(a)) || a.localeCompare(b));
+  const mias = new Set((t && t.cuentas || []).map(tjCta));
+  const seis = new Date(); seis.setMonth(seis.getMonth() - 6);
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="tfT" style="max-width:760px">
+    <div class="hd"><h2 id="tfT" style="margin-right:auto">${t ? 'Editar tarjeta' : 'Nueva tarjeta'}</h2><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
+    <div class="bd stack" id="tjF" data-id="${t ? t.id : ''}">
+      <div class="form">
+        <label>Banco<input id="tfBanco" value="${v('banco')}" placeholder="BAC, BanPaís…"></label>
+        <label>Nombre<input id="tfNombre" value="${v('nombre')}" placeholder="Visa Oro, AMEX…"></label>
+        <label>Últimos 4 dígitos<input id="tfU4" value="${v('ultimos4')}" inputmode="numeric" maxlength="4"></label>
+        <label>Límite en dólares<input id="tfLim" class="num" inputmode="decimal" value="${v('limite_usd')}" placeholder="$"></label>
+        <label>Día de corte<input id="tfCorte" class="num" inputmode="numeric" value="${v('dia_corte', '26')}"></label>
+        <label>Día de pago<input id="tfPago" class="num" inputmode="numeric" value="${v('dia_pago', '15')}"></label>
+        <label>Seguir desde<input id="tfDesde" type="date" value="${v('desde', seis.toISOString().slice(0, 10))}"></label>
+        <label>Estado<select id="tfEst"><option value="activa" ${t && t.estado === 'cerrada' ? '' : 'selected'}>Activa</option><option value="cerrada" ${t && t.estado === 'cerrada' ? 'selected' : ''}>Cerrada</option></select></label>
+        <label style="grid-column:1/-1">Notas<input id="tfNotas" value="${v('notas')}"></label>
+      </div>
+      <div><div class="eyebrow" style="margin-bottom:6px">Cuentas de la app que forman la tarjeta</div>
+        <div class="tj-ctasel">${todas.map(c => `<label class="cr-ck ${usadas.has(c) ? 'muted' : ''}"><input type="checkbox" data-tfc value="${esc(c)}" ${mias.has(c) ? 'checked' : ''}> ${esc(c)} <span class="note">· ${cnt.get(c)}${usadas.has(c) ? ' · en ' + esc(usadas.get(c)) : ''}</span></label>`).join('')}</div></div>
+      <div class="note">El día de pago se toma del mismo mes si es después del corte, o del mes siguiente si es antes. Cada fecha de pago se puede corregir en su período.</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="tjGuardar">${t ? 'Guardar cambios' : 'Crear tarjeta'}</button></div>
+    </div></div></div>`;
+  $('#tfBanco').focus();
+}
+async function guardarTj() {
+  const F = $('#tjF'); const id = F.dataset.id; const n = s => parseFloat(String($(s).value).replace(/[^0-9.]/g, ''));
+  const row = {banco: $('#tfBanco').value.trim(), nombre: $('#tfNombre').value.trim(), ultimos4: $('#tfU4').value.trim() || null, limite_usd: n('#tfLim') || null,
+    dia_corte: Math.round(n('#tfCorte')), dia_pago: Math.round(n('#tfPago')), desde: $('#tfDesde').value || null, estado: $('#tfEst').value, notas: $('#tfNotas').value.trim() || null,
+    cuentas: [...document.querySelectorAll('[data-tfc]:checked')].map(i => i.value)};
+  if (!row.banco || !row.nombre) return toast('Escribe banco y nombre.'); if (!(row.dia_corte >= 1 && row.dia_corte <= 31) || !(row.dia_pago >= 1 && row.dia_pago <= 31)) return toast('Los días de corte y pago van del 1 al 31.');
+  if (!row.cuentas.length) return toast('Elige al menos una cuenta de la app.');
+  try {
+    if (id) { const d = await q(sb.from('tarjetas').update(row).eq('id', id).select(), 'Tarjeta actualizada'); Object.assign(tjById(id), d && d[0] ? d[0] : row); }
+    else { const nueva = Object.assign({id: crUid()}, row); const d = await q(sb.from('tarjetas').insert(nueva).select(), 'Tarjeta creada'); const r = d && d[0] ? d[0] : nueva; S.tj.push(r); S.tjSel = r.id; }
+    $('#modalRoot').innerHTML = '';
+  } catch (e) {}
+  render();
+}
+
 /* ================= acciones de la interfaz =================
    Un solo escuchador para todos los botones: busca el elemento con data-act
    más cercano al clic y ejecuta la acción con ese nombre. */
@@ -3351,7 +3596,7 @@ document.addEventListener('click', async e => {
   const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
-  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') { $('#modalRoot').innerHTML = ''; S.concQ = null; } return; }
+  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') { $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null; } return; }
   if (act === 'recargar') return location.reload();
   if (act === 'salir') { await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
   if (act === 'guardarSetup') { const u = $('#sbUrl').value.trim().replace(/\/$/, ''), k = $('#sbKey').value.trim(); if (!/^https:\/\/.+/.test(u) || k.length < 20) return toast('Revisa la URL y la clave.'); lsSet('cg-sb-url', u); lsSet('cg-sb-key', k); return location.reload(); }
@@ -3391,6 +3636,24 @@ document.addEventListener('click', async e => {
   if (act === 'usarMonto') { const m = movDe(b); const t = m && D.byId.get(m.tx_id); if (t) return actualizarMov(m.id, {valor: t.monto}, 'Monto actualizado').catch(() => {}); return; }
   // Análisis de créditos: pestaña, agrupación, conceptos visibles, filtros y navegación al detalle.
   if (act === 'tema') { const t = TEMAS[(TEMAS.indexOf(temaActual()) + 1) % 3]; lsSet('tema', t); aplicarTema(); toast('Tema: ' + NOM_TEMA[t]); return render(); }
+  /* --- tarjetas de crédito --- */
+  if (act === 'tjSel') { S.tjSel = b.dataset.id; S.confirmTj = null; return render(); }
+  if (act === 'tjNueva') return abrirTjForm(null);
+  if (act === 'tjForm') { const r = b.closest('[data-id]'); return abrirTjForm(r ? r.dataset.id : S.tjSel); }
+  if (act === 'tjGuardar') return guardarTj();
+  if (act === 'tjBorrarNo') { S.confirmTj = null; return render(); }
+  if (act === 'tjBorrar') { const r = b.closest('[data-id]'); const id = r ? r.dataset.id : S.tjSel; if (S.confirmTj !== id) { S.confirmTj = id; return render(); }
+    S.confirmTj = null; try { await q(sb.from('tarjetas').delete().eq('id', id), 'Tarjeta eliminada'); S.tj = S.tj.filter(x => x.id !== id); const ps = new Set(S.tjp.filter(x => x.tarjeta === id).map(x => x.id)); S.tjp = S.tjp.filter(x => x.tarjeta !== id); S.tjpg = S.tjpg.filter(x => !ps.has(x.periodo) && x.tarjeta !== id); } catch (er) {} return render(); }
+  if (act === 'tjPer') return abrirTjPer(b.dataset.t, b.dataset.c);
+  if (act === 'tjNav') { const {t} = tjPerActual(); const ps = tjPeriodos(t); const i = ps.findIndex(x => x.corte === S.tjPer.c) + (+b.dataset.d); if (ps[i]) abrirTjPer(t.id, ps[i].corte); return; }
+  if (act === 'tjVinc') { const {t, p} = tjPerActual(); if (!p) return; const ids = [...(S.tjSelP || [])]; if (!ids.length) return;
+    try { const reg = await tjRegPeriodo(t, p); const rows = ids.map(id => D.byId.get(id)).filter(Boolean).map(x => ({id: crUid(), periodo: reg.id, tarjeta: t.id, tx_id: x.id, usd: tjEsUSD(x.cuenta), monto: tjEsUSD(x.cuenta) ? tjMonto(x).usd : tjMonto(x).l}));
+      const d = await q(sb.from('tarjeta_pagos').insert(rows).select(), rows.length === 1 ? 'Pago vinculado' : rows.length + ' pagos vinculados'); S.tjpg.push(...(d && d.length ? d : rows)); S.tjSelP = new Set(); } catch (er) {}
+    pintarTjPer(); return render(); }
+  if (act === 'tjDesv') { const id = b.closest('[data-pid]').dataset.pid; try { await q(sb.from('tarjeta_pagos').delete().eq('id', id), 'Pago desvinculado'); S.tjpg = S.tjpg.filter(x => x.id !== id); } catch (er) {} pintarTjPer(); return render(); }
+  if (act === 'tjPagado') { const {t, p} = tjPerActual(); if (!p) return; try { const reg = await tjRegPeriodo(t, p); const v = !reg.pagado; const ch = {pagado: v, pagado_el: v ? hoy() : null};
+      await q(sb.from('tarjeta_periodos').update(ch).eq('id', reg.id), v ? 'Período marcado como pagado' : 'Se quitó “pagado”'); Object.assign(reg, ch); } catch (er) {} pintarTjPer(); return render(); }
+  if (act === 'tasaAuto') { S.tasa = null; await obtenerTasa(true); if (!S.tasa) toast('No se pudo obtener la tasa; escríbela a mano.'); else toast('Tasa del día: L ' + S.tasa.valor.toFixed(4)); return render(); }
   if (act === 'credTab') { S.credTab = b.dataset.t; return render(); }
   if (act === 'cfAgr') { const f = crCf(); f.agr = b.dataset.k; f.periodo = null; return render(); }
   if (act === 'cfCon') { const f = crCf(); f.ver[b.dataset.k] = !f.ver[b.dataset.k]; if (!CR_CON.some(k => f.ver[k])) f.ver[b.dataset.k] = true; return render(); }
@@ -3558,6 +3821,13 @@ document.addEventListener('click', async e => {
 /* Cambios en listas, casillas y campos (se disparan al salir del campo o elegir una opción). */
 document.addEventListener('change', async e => {
   const t = e.target;
+  /* tarjetas: tasa manual, monto del estado de cuenta, filtros y selección de pagos */
+  if (t.id === 'tasaMan') { const v = parseFloat(String(t.value).replace(/[^0-9.]/g, '')); if (!(v > 1)) return toast('Escribe la tasa en lempiras por dólar, por ejemplo 26.45'); S.tasa = {valor: v, fecha: hoy(), fuente: 'manual'}; await guardarAjuste('tasaUSD', S.tasa).catch(() => {}); toast('Tasa guardada'); return render(); }
+  if (t.dataset.tjm) { const {t: tar, p} = tjPerActual(); if (!p) return; const raw = String(t.value).trim(); const v = raw === '' ? null : parseFloat(raw.replace(/[^0-9.\-]/g, ''));
+    try { const reg = await tjRegPeriodo(tar, p); await q(sb.from('tarjeta_periodos').update({[t.dataset.tjm]: v}).eq('id', reg.id), 'Monto del estado guardado'); reg[t.dataset.tjm] = v; } catch (er) {} pintarTjPer(); return render(); }
+  if (t.dataset.tjo) { S.tjOpt = S.tjOpt || {}; S.tjOpt[t.dataset.tjo] = t.checked; return pintarTjPer(); }
+  if (t.dataset.tjr) { if (t.value) S.tjRango[t.dataset.tjr] = t.value; return pintarTjPer(); }
+  if (t.dataset.tjs != null) { S.tjSelP = S.tjSelP || new Set(); if (t.checked) S.tjSelP.add(t.dataset.tjs); else S.tjSelP.delete(t.dataset.tjs); return pintarTjPer(); }
   if (t.id === 'fctrl') { S.filtros.ctrl = t.value; S.limite = 300; return render(); }
   if (t.dataset.ftab === 'sub' || t.dataset.ftab === 'cuenta' || t.dataset.ftab === 'mes') { const k = t.dataset.k; S.ftab = S.ftab || {}; S.ftab[k] = Object.assign({q: '', sub: '', cuenta: ''}, S.ftab[k], {[t.dataset.ftab]: t.value}); return render(); }
   if (t.dataset.fmov) { S.fmov = S.fmov || {cat: '', sub: '', cuenta: ''}; S.fmov[t.dataset.fmov] = t.value; if (t.dataset.fmov === 'cat') S.fmov.sub = ''; S.limite = 300; return render(); }
@@ -3627,6 +3897,7 @@ document.addEventListener('change', async e => {
 let qT;
 /* Escritura en buscadores y campos que se actualizan mientras escribes. */
 document.addEventListener('input', e => {
+  if (e.target.id === 'tjBus') { S.tjOpt = S.tjOpt || {}; S.tjOpt.q = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer(true), 250); return; }
   if (e.target.id === 'credBus') { S.concOpt = S.concOpt || {}; S.concOpt.q = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => pintarConc(true), 250); return; }
   if (e.target.id === 'pegTxt') return prevPegar();
   if (e.target.id === 'asocQ' && S.asoc) { S.asoc.q = e.target.value; clearTimeout(S._asocT); S._asocT = setTimeout(() => { S._focusAsoc = true; pintarAsoc(); }, 200); return; }
@@ -3642,6 +3913,7 @@ document.addEventListener('paste', e => {
 });
 /* Atajos de teclado: Enter para guardar en formularios y abrir filas, Escape para cerrar ventanas. */
 document.addEventListener('keydown', e => {
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
