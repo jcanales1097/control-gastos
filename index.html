@@ -3370,22 +3370,41 @@ const tjById = id => (S.tj || []).find(t => t.id === id);
 const tjCta = c => String(c || '').trim();
 // tjEsUSD: una cuenta es en dólares si su nombre termina en "$".
 const tjEsUSD = c => /\$\s*$/.test(String(c || ''));
-// tjDir: dirección de un registro en una cuenta de tarjeta: 'gasto' (compras, cargos, avances que salen) o 'abono' (pagos, devoluciones que entran).
-function tjDir(t) {
-  if (t.code === 1) return 'gasto'; if (t.code === 0) return 'abono';
-  if (t.code === 3) { const m = String(t.tipoMov || '').toLowerCase(); if (/gast|salid|envi|retir|out/.test(m)) return 'gasto'; return 'abono'; }
-  return null;
+/* Pagos y cargos por TRASLADO: en Registro Contable los pagos a la tarjeta son traslados entre cuentas (no ingresos) y también puede salir
+   dinero de la tarjeta por traslado (avances, pasar saldo a otra cuenta o tarjeta). Un traslado puede venir en dos filas (la que sale y la que entra)
+   o en una sola fila desde la cuenta de origen con la cuenta destino en la categoría. Aquí se toman en cuenta ambos casos sin contarlos dos veces. */
+// tjEsTras: el registro es un traslado entre cuentas.
+const tjEsTras = t => t.code === 3 || t.code === 4 || /dinero (ingresad|gastad)|transfer|traslad/i.test(String(t.tipoMov || ''));
+// tjSentido: desde el punto de vista de su propia cuenta, si el dinero 'entra' o 'sale' (null si el texto no lo dice).
+const tjSentido = t => { const m = String(t.tipoMov || '').toLowerCase(); if (t.code === 4 || /ingres|entrad|recib|deposit/.test(m)) return 'entra'; if (/gast|salid|envi|retir|transfer.*out/.test(m)) return 'sale'; return null; };
+// tjIdx: índice de traslados por fecha|monto|cuenta|contraparte para encontrar la "fila espejo" del otro lado.
+let _tjIdx = null, _tjIdxD = null;
+const tjKey = (f, m, a, b) => f + '|' + (+m).toFixed(2) + '|' + tjCta(a) + '|' + tjCta(b);
+function tjIdx() { if (_tjIdxD !== D.txs) { _tjIdx = new Map(); D.txs.forEach(t => { if (tjEsTras(t)) _tjIdx.set(tjKey(t.fecha, t.montoApp != null ? t.montoApp : t.monto, t.cuenta, t.cat), t); }); _tjIdxD = D.txs; } return _tjIdx; }
+const tjEspejo = t => tjIdx().get(tjKey(t.fecha, t.montoApp != null ? t.montoApp : t.monto, t.cat, t.cuenta));
+// tjDir: qué es un registro para la tarjeta (set = sus cuentas): 'gasto' (compras, cargos y traslados que salen de la tarjeta)
+// o 'abono' (traslados que entran a la tarjeta = pagos; ingresos = devoluciones o reembolsos).
+function tjDir(t, set) {
+  const mia = set.has(tjCta(t.cuenta));
+  if (!tjEsTras(t)) { if (!mia) return null; return t.code === 0 ? 'abono' : 'gasto'; }
+  let d = tjSentido(t); if (!d) { const e = tjEspejo(t); const de = e && tjSentido(e); if (de) d = de === 'sale' ? 'entra' : 'sale'; }
+  if (!d) d = mia ? 'entra' : 'sale';   // sin dato: se asume que el dinero va hacia la tarjeta (pago), que es lo más común
+  return mia ? (d === 'sale' ? 'gasto' : 'abono') : (d === 'sale' ? 'abono' : 'gasto');
 }
-// tjMontos: monto en lempiras o en dólares según la cuenta (en $ usa el monto original en dólares si se importó la moneda).
+// tjRuta: texto "de cuenta → a cuenta" para un traslado.
+function tjRuta(t, set) { if (!tjEsTras(t)) return esc(t.cuenta) + (t.code === 0 ? ' · ingreso o devolución' : ''); const mia = set.has(tjCta(t.cuenta)); const dir = tjDir(t, set);
+  const [de, a] = (mia ? dir === 'abono' : dir === 'gasto') ? [t.cat, t.cuenta] : [t.cuenta, t.cat]; return 'traslado de ' + esc(tjCta(de)) + ' → ' + esc(tjCta(a)); }
+// tjMonto: monto en lempiras o en dólares según la cuenta del registro (en $ usa el monto original en dólares si se importó la moneda).
 const tjMonto = t => tjEsUSD(t.cuenta) ? {usd: t.moneda ? (+t.original || 0) : (+t.monto || 0), l: 0} : {l: +t.monto || 0, usd: 0};
-// tjTxs: registros de la app de las cuentas de una tarjeta (índice por tarjeta, se recalcula si cambian los datos).
-function tjTxs(tar) { const set = new Set((tar.cuentas || []).map(tjCta)); return D.txs.filter(t => set.has(tjCta(t.cuenta))); }
+const tjSet = tar => new Set((tar.cuentas || []).map(tjCta));
+// tjTxs: registros de las cuentas de la tarjeta, más los traslados hechos desde otra cuenta hacia la tarjeta (o desde la tarjeta) que no tengan su fila espejo.
+function tjTxs(tar) { const set = tjSet(tar); return D.txs.filter(t => set.has(tjCta(t.cuenta)) || (tjEsTras(t) && set.has(tjCta(t.cat)) && !tjEspejo(t))); }
 // tjFechaDia: fecha con el día pedido ajustado al último día del mes.
 function tjFechaDia(y, m0, d) { const dt = new Date(Date.UTC(y, m0, 1)); const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(); dt.setUTCDate(Math.min(d, last)); return dt.toISOString().slice(0, 10); }
 const tjMas1 = d => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
 // tjPeriodos: períodos de corte desde "desde" hasta el período en curso. Fecha de pago: el día de pago del mismo mes si es después del corte, si no del mes siguiente.
 function tjPeriodos(tar) {
-  const dc = +tar.dia_corte || 1, dp = +tar.dia_pago || 1; const txs = tjTxs(tar); const hoyD = hoy();
+  const dc = +tar.dia_corte || 1, dp = +tar.dia_pago || 1; const txs = tjTxs(tar); const set = tjSet(tar); const hoyD = hoy();
   let ini = tar.desde || (txs.length ? txs.reduce((m, t) => t.fecha < m ? t.fecha : m, hoyD) : hoyD);
   let y = +ini.slice(0, 4), m0 = +ini.slice(5, 7) - 1; if (+ini.slice(8, 10) > dc) m0++;
   const regs = new Map((S.tjp || []).filter(p => p.tarjeta === tar.id).map(p => [p.corte, p]));
@@ -3396,7 +3415,7 @@ function tjPeriodos(tar) {
     if (desdeP > hoyD) break;
     const fp = dp > dc ? tjFechaDia(y, m0, dp) : tjFechaDia(y, m0 + 1, dp);
     const reg = regs.get(corte) || null;
-    const g = txs.filter(t => t.fecha >= desdeP && t.fecha <= corte && tjDir(t) === 'gasto');
+    const g = txs.filter(t => t.fecha >= desdeP && t.fecha <= corte && tjDir(t, set) === 'gasto');
     const gL = crR2(g.reduce((s, t) => s + tjMonto(t).l, 0)), gU = crR2(g.reduce((s, t) => s + tjMonto(t).usd, 0));
     const pg = reg ? (pagosPor.get(reg.id) || []) : [];
     const pL = crR2(pg.filter(x => !x.usd).reduce((s, x) => s + (+x.monto || 0), 0)), pU = crR2(pg.filter(x => x.usd).reduce((s, x) => s + (+x.monto || 0), 0));
@@ -3485,7 +3504,8 @@ function vTjFicha(t) {
 function tjCandidatos(t, p) {
   const o = S.tjOpt || {}; const usados = new Set((S.tjpg || []).map(x => x.tx_id).filter(Boolean)); const R = S.tjRango || {};
   const bus = (o.q || '').trim().toUpperCase();
-  return tjTxs(t).filter(x => tjDir(x) === 'abono' && !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 80);
+  const set = tjSet(t);
+  return tjTxs(t).filter(x => tjDir(x, set) === 'abono' && !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => (tjEsTras(b) - tjEsTras(a)) || a.fecha.localeCompare(b.fecha)).slice(0, 80);
 }
 function abrirTjPer(tid, corte) {
   S.tjPer = {t: tid, c: corte}; S.tjSelP = new Set(); S.tjOpt = {}; const x = new Date(corte + 'T12:00Z'); x.setUTCMonth(x.getUTCMonth() + 1);
@@ -3496,7 +3516,7 @@ function abrirTjPer(tid, corte) {
 }
 function pintarTjPer(foco) {
   const P = S.tjPer; if (!P) return; const t = tjById(P.t); if (!t) return; const ps = tjPeriodos(t); const i = ps.findIndex(x => x.corte === P.c); const p = ps[i]; if (!p) return;
-  const usd = (t.cuentas || []).some(tjEsUSD); const cand = tjCandidatos(t, p); const sel = S.tjSelP || new Set();
+  const usd = (t.cuentas || []).some(tjEsUSD); const set = tjSet(t); const cand = tjCandidatos(t, p); const sel = S.tjSelP || new Set();
   const smL = cand.filter(x => sel.has(x.id) && !tjEsUSD(x.cuenta)).reduce((s, x) => s + tjMonto(x).l, 0), smU = cand.filter(x => sel.has(x.id) && tjEsUSD(x.cuenta)).reduce((s, x) => s + tjMonto(x).usd, 0);
   const desc = x => esc([x.nota, x.det].filter(Boolean).join(' | ') || x.cat || 'Registro');
   const mon = x => tjEsUSD(x.cuenta) ? tjU(tjMonto(x).usd) : L(tjMonto(x).l);
@@ -3521,7 +3541,7 @@ function pintarTjPer(foco) {
           <div class="eyebrow">Pagos vinculados a este período</div>
           <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.usd ? tjU(+x.monto) : L(+x.monto)}</span>${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
           <div class="eyebrow" style="margin-top:6px">Cargos del período · ${p.g.length}</div>
-          <div class="lst" style="max-height:240px">${p.g.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${esc(x.cuenta)}${x.code === 3 ? ' · traslado' : ''}</div></div><span class="num">${mon(x)}</span></div>`).join('') || '<div class="note">Sin cargos.</div>'}</div>
+          <div class="lst" style="max-height:240px">${p.g.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || '<div class="note">Sin cargos.</div>'}</div>
         </div>
         <div class="stack" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
@@ -3529,7 +3549,7 @@ function pintarTjPer(foco) {
             <label class="cr-ck"><input type="checkbox" data-tjo="todas" ${(S.tjOpt || {}).todas ? 'checked' : ''}> Cualquier fecha</label>
             ${(S.tjOpt || {}).todas ? '' : `<span class="cr-ck">Del <input class="in" type="date" data-tjr="d" value="${S.tjRango.d}"> al <input class="in" type="date" data-tjr="h" value="${S.tjRango.h}"></span>`}</div>
           <div class="row" style="justify-content:space-between"><span class="note">${cand.length} sin vincular</span><button class="btn sm pri" data-act="tjVinc" ${sel.size ? '' : 'disabled'}>Vincular seleccionados${sel.size ? ' (' + sel.size + ')' : ''}</button></div>
-          <div class="lst cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${fFecha(x.fecha)} · a ${esc(x.cuenta)}${x.cat ? ' · ' + esc(x.cat) : ''}${x.code === 0 ? ' · ingreso' : ''}</span></span><span class="num" style="font-weight:600">${mon(x)}</span></label>`).join('')
+          <div class="lst cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${fFecha(x.fecha)} · ${tjRuta(x, set)}${!tjEsTras(x) && x.cat ? ' · ' + esc(x.cat) : ''}</span></span><span class="num" style="font-weight:600">${mon(x)}</span></label>`).join('')
             : `<div class="note" style="padding:8px 0">No hay pagos sin vincular ${(S.tjOpt || {}).todas ? '' : `del ${fFecha(S.tjRango.d)} al ${fFecha(S.tjRango.h)}`}. Cambia el rango o marca “Cualquier fecha”.</div>`}</div>
         </div>
       </div>
