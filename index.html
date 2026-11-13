@@ -3523,12 +3523,9 @@ function tjCandidatos(t, p) {
   const set = tjSet(t);
   // rel: orden de la lista: primero los traslados que van a la tarjeta, luego los que mencionan el banco o los últimos 4 dígitos, luego el resto.
   const pistas = [t.ultimos4, t.banco].map(v => String(v || '').trim().toUpperCase()).filter(v => v.length >= 3);
-  const rel = x => (set.has(tjDestino(x)) || set.has(tjCta(x.cuenta)) ? 4 : 0) + (pistas.some(v => [x.nota, x.det, x.sub].join(' ').toUpperCase().includes(v)) ? 2 : 0) + (tjEsTras(x) ? 1 : 0);
-  const base = tjTxs(t).filter(x => tjDir(x, set) === 'abono'); const ya = new Set(base.map(x => x.id));
-  // Traslados que salen de otra cuenta y la app no dice a dónde fueron: pueden ser pagos a la tarjeta, se muestran para que los elijas.
-  // Con "Todos los traslados" aparecen todos los traslados de las demás cuentas.
-  const extra = D.txs.filter(x => !ya.has(x.id) && tjEsTras(x) && !set.has(tjCta(x.cuenta)) && !set.has(tjDestino(x)) && (o.trasTodos || (!tjDestino(x) && tjSentido(x) !== 'entra')));
-  return base.concat(extra).filter(x => !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => rel(b) - rel(a) || a.fecha.localeCompare(b.fecha)).slice(0, 120);
+  const rel = x => (pistas.some(v => [x.nota, x.det, x.sub].join(' ').toUpperCase().includes(v)) ? 2 : 0) + (tjEsTras(x) ? 1 : 0);
+  // Solo registros relacionados con las cuentas de la tarjeta: los de esas cuentas y los traslados cuyo origen o destino es una de ellas.
+  return tjTxs(t).filter(x => tjDir(x, set) === 'abono').filter(x => !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => rel(b) - rel(a) || a.fecha.localeCompare(b.fecha)).slice(0, 120);
 }
 function abrirTjPer(tid, corte) {
   S.tjPer = {t: tid, c: corte}; S.tjSelP = new Set(); S.tjOpt = {}; const x = new Date(corte + 'T12:00Z'); x.setUTCMonth(x.getUTCMonth() + 1);
@@ -3570,7 +3567,6 @@ function pintarTjPer(foco) {
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
           <div class="cr-cf"><input class="in" id="tjBus" placeholder="Buscar texto o monto" value="${esc((S.tjOpt || {}).q || '')}">
             <label class="cr-ck"><input type="checkbox" data-tjo="todas" ${(S.tjOpt || {}).todas ? 'checked' : ''}> Cualquier fecha</label>
-            <label class="cr-ck" title="Muestra los traslados de todas las cuentas, aunque vayan a otra cuenta"><input type="checkbox" data-tjo="trasTodos" ${(S.tjOpt || {}).trasTodos ? 'checked' : ''}> Todos los traslados</label>
             ${(S.tjOpt || {}).todas ? '' : `<span class="cr-ck">Del <input class="in" type="date" data-tjr="d" value="${S.tjRango.d}"> al <input class="in" type="date" data-tjr="h" value="${S.tjRango.h}"></span>`}</div>
           <div class="row" style="justify-content:space-between"><span class="note">${cand.length} sin vincular</span><button class="btn sm pri" data-act="tjVinc" ${sel.size ? '' : 'disabled'}>Vincular seleccionados${sel.size ? ' (' + sel.size + ')' : ''}</button></div>
           <div class="lst cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${fFecha(x.fecha)} · ${tjRuta(x, set)}${!tjEsTras(x) && x.cat ? ' · ' + esc(x.cat) : ''}</span></span><span class="num" style="font-weight:600">${mon(x)}</span></label>`).join('')
