@@ -3454,7 +3454,11 @@ function tjTasaEn(fecha) {
 function tjPagoMonto(t, set) {
   if (!(set && tjEsTras(t) && set.has(tjCta(t.cuenta)) && tjDir(t, set) === 'gasto')) return tjMonto(t);
   if (tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0, cruce: true};
-  const hnl = +t.monto || 0; const ts = tjTasaEn(t.fecha) || tasaUSD();
+  const hnl = +t.monto || 0;
+  // Dato exacto primero: el Excel de monedas trae el traslado con su monto en dólares (ej. US$ 0.50 por L 13.05).
+  if (t.moneda === 'USD' && +t.original) return {usd: +t.original, l: 0, hnl, tasa: t.tasa, cruce: true};
+  if (t.x) for (const k in t.x) { const v = parseFloat(t.x[k]); if (v > 0 && /money|amount|cash|monto|usd|org/i.test(k) && hnl / v > 15 && hnl / v < 40) return {usd: crR2(v), l: 0, hnl, tasa: hnl / v, cruce: true}; }
+  const ts = tjTasaEn(t.fecha) || tasaUSD();
   return ts ? {usd: crR2(hnl / ts), l: 0, hnl, est: true, tasa: ts, cruce: true} : {usd: 0, l: 0, hnl, sinTasa: true, cruce: true};
 }
 function tjMonto(t) {
@@ -3633,7 +3637,7 @@ function pintarTjPer(foco) {
   const smL = cand.filter(x => sel.has(x.id)).reduce((s, x) => s + tjPagoMonto(x, set).l, 0), smU = cand.filter(x => sel.has(x.id)).reduce((s, x) => s + tjPagoMonto(x, set).usd, 0);
   const desc = x => esc([x.nota, x.det].filter(Boolean).join(' | ') || x.cat || 'Registro');
   // monP: monto como pago (en la moneda en la que abona); para un cruce entre monedas de la tarjeta muestra también el monto original.
-  const monP = x => { const m = tjPagoMonto(x, set); if (!m.cruce) return mon(x); return m.usd || m.sinTasa ? `<span title="Abona en dólares: ${L(m.hnl)} ÷ tasa ${m.tasa ? m.tasa.toFixed(4) : '—'}">≈ ${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)} · cambio de moneda</div>` : `${L(m.l)}<div class="cat" style="text-align:right">desde cuenta $ · cambio de moneda</div>`; };
+  const monP = x => { const m = tjPagoMonto(x, set); if (!m.cruce) return mon(x); return m.usd || m.sinTasa ? `<span title="Abona en dólares: ${L(m.hnl)} ÷ tasa ${m.tasa ? (+m.tasa).toFixed(4) : '—'}${m.est ? ' (aproximado)' : ' (dato de la app)'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)} · cambio de moneda</div>` : `${L(m.l)}<div class="cat" style="text-align:right">desde cuenta $ · cambio de moneda</div>`; };
   const mon = x => { if (!tjEsUSD(x.cuenta)) return L(tjMonto(x).l); const m = tjMonto(x); return `<span title="${m.est ? 'Aproximado: ' + L(m.hnl) + ' ÷ tasa ' + m.tasa.toFixed(4) : m.sinTasa ? 'Falta la tasa de cambio' : ''}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)}</div>`; };
   const prev = [...document.querySelectorAll('.tj-modal .lst')].map(d => d.scrollTop);
   const nav = (largo) => { const a = ps[i - 1], b = ps[i + 1]; return largo
