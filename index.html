@@ -335,6 +335,9 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-cmp>div{display:grid;gap:3px;align-content:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
 .tj-cmp b{font-family:var(--f-num);font-size:16px}
 @media (max-width:760px){.tj-cmp{grid-template-columns:1fr 1fr}.tj-cmp .row{flex-wrap:wrap}.tj-cmp input{width:100%!important;min-width:0}}
+.modal.tj-fmodal{padding:0;overflow:hidden}.tj-fmodal>.panel{border:0;border-radius:inherit;margin:0;box-shadow:none}
+.tj-fmodal .cr-plan-wrap{max-height:calc(100vh - 330px)}
+.tj-fmodal .cr-plan .cat{white-space:nowrap}
 .tj-glob{background:var(--sunk)}
 /* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
 .tj-it{display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}
@@ -3470,14 +3473,14 @@ function vTarjetas() {
   const head = `<div><div class="eyebrow">Tarjetas de crédito</div><h1>Cortes, pagos y saldos</h1><div class="note">Cada tarjeta agrupa sus cuentas de la app. Vincula los pagos a cada período y márcalo como pagado.</div></div>`;
   if (S.tj === null) return `<div class="stack">${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de tarjetas (tarjetas.sql).</div></div></div>`;
   obtenerTasa();
-  const lista = tjs(); if (!S.tjSel || !tjById(S.tjSel)) S.tjSel = lista[0] ? lista[0].id : null;
+  const lista = tjs();
   const tasa = tasaUSD(); let kSL = 0, kSU = 0, kGL = 0, kGU = 0, kV = 0, prox = null;
   const filas = lista.map(t => { const ps = tjPeriodos(t); const act = ps.find(p => p.abierto); const ult = [...ps].reverse().find(p => !p.abierto);
     const pend = ps.filter(p => !p.abierto && !(p.reg && p.reg.pagado) && p.est[0] !== 'Sin cargos'); const sL = crR2(pend.reduce((s, p) => s + p.sL, 0)), sU = crR2(pend.reduce((s, p) => s + p.sU, 0));
     const vivo = t.estado !== 'cerrada';
     if (vivo) { kSL += sL; kSU += sU; kGL += act ? act.gL : 0; kGU += act ? act.gU : 0; kV += ps.filter(p => p.est[0] === 'Vencido').length; const pf = pend.find(p => p.fpago >= hoy()); if (pf && (!prox || pf.fpago < prox.f)) prox = {f: pf.fpago, t, sL: pf.sL, sU: pf.sU}; }
     const pp = pend[0]; const deudaU = crR2(sU + (act ? act.gU : 0) + (tasa ? (sL + (act ? act.gL : 0)) / tasa : 0)); const uso = +t.limite_usd && tasa ? Math.round(deudaU / +t.limite_usd * 100) : null;
-    return `<tr class="cr-row ${t.id === S.tjSel ? 'cr-sel' : ''}" data-act="tjSel" data-id="${t.id}" tabindex="0"><td><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="tj-plastic" aria-hidden="true"></span><div><b>${esc(t.banco || '')} · ${esc(t.nombre || '')}</b><div class="cat">•••• ${esc(t.ultimos4 || '')}${vivo ? '' : ' · cerrada'}</div></div></div></td>
+    return `<tr class="cr-row" data-act="tjSel" data-id="${t.id}" tabindex="0" title="Ver el detalle de la tarjeta"><td><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="tj-plastic" aria-hidden="true"></span><div><b>${esc(t.banco || '')} · ${esc(t.nombre || '')}</b><div class="cat">•••• ${esc(t.ultimos4 || '')}${vivo ? '' : ' · cerrada'}</div></div></div></td>
       <td><span class="tj-ctas">${(t.cuentas || []).map(c => `<span>${esc(c)}</span>`).join('')}</span></td><td class="small muted" style="white-space:nowrap">corte ${t.dia_corte} · pago ${t.dia_pago}</td>
       <td class="num">${act ? L(act.gL) + (act.gU ? `<div class="cat">${tjU(act.gU)}</div>` : '') : '—'}</td>
       <td class="num">${L(sL)}${sU ? `<div class="cat">${tjU(sU)}</div>` : ''}</td>
@@ -3485,7 +3488,6 @@ function vTarjetas() {
       <td style="white-space:nowrap">${ult ? `<span class="chip ${ult.est[1]}">${ult.est[0]}</span> <span class="num small">${fFecha(ult.corte)}</span>` : '—'}</td>
       <td style="white-space:nowrap">${pp ? `<span class="num small ${pp.fpago < hoy() ? 'neg' : ''}">${fFecha(pp.fpago)}</span>` : '<span class="muted small">al día</span>'}</td>
       <td class="acc"><div class="acc-row">${S.confirmTj === t.id ? `<button class="btn sm danger" data-act="tjBorrar">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="tjBorrarNo">No</button>` : icoBtn('editar', 'Editar tarjeta', 'tjForm') + icoBtn('borrar', 'Eliminar tarjeta', 'tjBorrar', '', 'danger')}</div></td></tr>`; }).join('');
-  const t = tjById(S.tjSel);
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>
     <div class="tj-tasa"><span class="eyebrow">Tasa del día</span> <b class="num">${tasa ? 'L ' + tasa.toFixed(4) + ' por $' : 'sin tasa'}</b> <span class="note">${S.tasa ? (S.tasa.fuente === 'manual' ? 'escrita a mano' : 'automática') + ' · ' + fFecha(S.tasa.fecha) : 'no se pudo obtener; escríbela'}</span>
@@ -3499,17 +3501,28 @@ function vTarjetas() {
     <div class="panel"><div class="hd"><h2 style="margin-right:auto">Tarjetas</h2></div>
       ${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Tarjeta</th><th>Cuentas en la app</th><th>Días</th><th class="num">Gasto período actual</th><th class="num">Saldo pendiente</th><th>Uso del límite</th><th>Último corte</th><th>Pago pendiente</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`
         : '<div class="bd note">Todavía no hay tarjetas. Agrega la primera con “+ Nueva tarjeta” y elige las cuentas de la app que le pertenecen.</div>'}</div>
-    ${t ? vTjFicha(t) : ''}
   </div>`;
 }
 const tjU = v => (v < 0 ? '−' : '') + '$ ' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+/* El detalle de una tarjeta se abre como ventana emergente sobre el listado. Al cerrar un corte o el formulario se vuelve a esta ventana. */
+function pintarTjFicha() {
+  const t = tjById(S.tjFicha); if (!t) { S.tjFicha = null; $('#modalRoot').innerHTML = ''; return; }
+  const w0 = document.querySelector('.tj-fmodal .cr-plan-wrap'); const top = w0 && w0.dataset.c === 'tj-' + t.id ? w0.scrollTop : 0;
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal tj-fmodal" role="dialog" aria-modal="true" aria-label="Detalle de la tarjeta">${vTjFicha(t)}</div></div>`;
+  const w = document.querySelector('.tj-fmodal .cr-plan-wrap'); if (w) w.scrollTop = top;
+}
+// cerrarCapa: cierra la ventana de arriba. Si era un corte o el formulario de una tarjeta abierta, vuelve al detalle de esa tarjeta.
+function cerrarCapa() {
+  const enFicha = !!document.querySelector('.tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
+  if (enFicha || S.view !== 'tarjetas') S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
+}
 function vTjFicha(t) {
   const ps = tjPeriodos(t).reverse(); const act = ps.find(p => p.abierto); const usd = (t.cuentas || []).some(tjEsUSD); const tasa = tasaUSD();
   const pend = ps.filter(p => !p.abierto && !(p.reg && p.reg.pagado) && p.est[0] !== 'Sin cargos');
   const deudaL = crR2(pend.reduce((s, p) => s + p.sL, 0) + (act ? act.gL : 0)), deudaU = crR2(pend.reduce((s, p) => s + p.sU, 0) + (act ? act.gU : 0));
   const usadoU = tasa ? crR2(deudaU + deudaL / tasa) : null; const lim = +t.limite_usd || 0;
   return `<div class="panel"><div class="hd"><div class="row" style="gap:12px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><div style="min-width:0"><h2>${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2><span class="tj-ctas">${(t.cuentas || []).map(c => `<span>${esc(c)}</span>`).join('')}</span></div></div>
-      ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}</div>
+      ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Corte · pago</div><div class="v">día ${t.dia_corte} · ${t.dia_pago}</div><div class="note">${act ? 'período actual ' + fFecha(act.desde).slice(0, 5) + ' – ' + fFecha(act.corte).slice(0, 5) : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Límite</div><div class="v">${lim ? tjU(lim) : '—'}</div><div class="note">${lim && tasa ? '≈ ' + L(lim * tasa) + ' a tasa del día' : ''}</div></div>
@@ -3636,7 +3649,7 @@ async function guardarTj() {
   try {
     if (id) { const d = await q(sb.from('tarjetas').update(row).eq('id', id).select(), 'Tarjeta actualizada'); Object.assign(tjById(id), d && d[0] ? d[0] : row); }
     else { const nueva = Object.assign({id: crUid()}, row); const d = await q(sb.from('tarjetas').insert(nueva).select(), 'Tarjeta creada'); const r = d && d[0] ? d[0] : nueva; S.tj.push(r); S.tjSel = r.id; }
-    $('#modalRoot').innerHTML = '';
+    $('#modalRoot').innerHTML = ''; if (S.tjFicha) pintarTjFicha();
   } catch (e) {}
   render();
 }
@@ -3648,7 +3661,7 @@ document.addEventListener('click', async e => {
   const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
-  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') { $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null; } return; }
+  if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') cerrarCapa(); return; }
   if (act === 'recargar') return location.reload();
   if (act === 'salir') { await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
   if (act === 'guardarSetup') { const u = $('#sbUrl').value.trim().replace(/\/$/, ''), k = $('#sbKey').value.trim(); if (!/^https:\/\/.+/.test(u) || k.length < 20) return toast('Revisa la URL y la clave.'); lsSet('cg-sb-url', u); lsSet('cg-sb-key', k); return location.reload(); }
@@ -3689,13 +3702,13 @@ document.addEventListener('click', async e => {
   // Análisis de créditos: pestaña, agrupación, conceptos visibles, filtros y navegación al detalle.
   if (act === 'tema') { const t = TEMAS[(TEMAS.indexOf(temaActual()) + 1) % 3]; lsSet('tema', t); aplicarTema(); toast('Tema: ' + NOM_TEMA[t]); return render(); }
   /* --- tarjetas de crédito --- */
-  if (act === 'tjSel') { S.tjSel = b.dataset.id; S.confirmTj = null; return render(); }
+  if (act === 'tjSel') { S.tjSel = S.tjFicha = b.dataset.id; S.confirmTj = null; return pintarTjFicha(); }
   if (act === 'tjNueva') return abrirTjForm(null);
   if (act === 'tjForm') { const r = b.closest('[data-id]'); return abrirTjForm(r ? r.dataset.id : S.tjSel); }
   if (act === 'tjGuardar') return guardarTj();
   if (act === 'tjBorrarNo') { S.confirmTj = null; return render(); }
   if (act === 'tjBorrar') { const r = b.closest('[data-id]'); const id = r ? r.dataset.id : S.tjSel; if (S.confirmTj !== id) { S.confirmTj = id; return render(); }
-    S.confirmTj = null; try { await q(sb.from('tarjetas').delete().eq('id', id), 'Tarjeta eliminada'); S.tj = S.tj.filter(x => x.id !== id); const ps = new Set(S.tjp.filter(x => x.tarjeta === id).map(x => x.id)); S.tjp = S.tjp.filter(x => x.tarjeta !== id); S.tjpg = S.tjpg.filter(x => !ps.has(x.periodo) && x.tarjeta !== id); } catch (er) {} return render(); }
+    S.confirmTj = null; try { await q(sb.from('tarjetas').delete().eq('id', id), 'Tarjeta eliminada'); if (S.tjFicha === id) { S.tjFicha = null; $('#modalRoot').innerHTML = ''; } S.tj = S.tj.filter(x => x.id !== id); const ps = new Set(S.tjp.filter(x => x.tarjeta === id).map(x => x.id)); S.tjp = S.tjp.filter(x => x.tarjeta !== id); S.tjpg = S.tjpg.filter(x => !ps.has(x.periodo) && x.tarjeta !== id); } catch (er) {} return render(); }
   if (act === 'tjPer') return abrirTjPer(b.dataset.t, b.dataset.c);
   if (act === 'tjNav') { const {t} = tjPerActual(); const ps = tjPeriodos(t); const i = ps.findIndex(x => x.corte === S.tjPer.c) + (+b.dataset.d); if (ps[i]) abrirTjPer(t.id, ps[i].corte); return; }
   if (act === 'tjVinc') { const {t, p} = tjPerActual(); if (!p) return; const ids = [...(S.tjSelP || [])]; if (!ids.length) return;
@@ -3968,7 +3981,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
-  if (e.key === 'Escape' && $('#modalRoot').innerHTML) $('#modalRoot').innerHTML = '';
+  if (e.key === 'Escape' && $('#modalRoot').innerHTML) cerrarCapa();
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('.addrow') && e.target.matches('input')) { e.preventDefault(); const bb = e.target.closest('tr').querySelector('[data-act=agregar]'); bb && bb.click(); }
