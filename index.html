@@ -336,7 +336,16 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-cmp b{font-family:var(--f-num);font-size:16px}
 @media (max-width:760px){.tj-cmp{grid-template-columns:1fr 1fr}.tj-cmp .row{flex-wrap:wrap}.tj-cmp input{width:100%!important;min-width:0}}
 .modal.tj-fmodal{padding:0;overflow:hidden}.tj-fmodal>.panel{border:0;border-radius:inherit;margin:0;box-shadow:none}
-.tj-fmodal .cr-plan-wrap{max-height:calc(100vh - 330px)}
+/* Ventanas de tarjetas a pantalla completa (computadora): el detalle y el corte usan todo el espacio disponible. */
+@media (min-width:761px){
+  .modal-bg:has(.tj-fmodal),.modal-bg:has(.tj-modal){padding:10px}
+  .modal.tj-fmodal,.modal.tj-modal{width:100%!important;max-width:none!important;height:calc(100vh - 20px);display:flex;flex-direction:column}
+  .tj-fmodal>.panel{flex:1;display:flex;flex-direction:column;min-height:0}
+  .tj-fmodal .cr-plan-wrap{flex:1;max-height:none;min-height:0}
+  .tj-modal>.bd{flex:1;min-height:0;overflow:hidden}
+  .tj-modal .cr-conc{flex:1;min-height:0}
+  .tj-modal .cr-conc>div{max-height:none!important;height:100%;overflow:auto}
+}
 .tj-fmodal .cr-plan .cat{white-space:nowrap}
 .tj-glob{background:var(--sunk)}
 /* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
