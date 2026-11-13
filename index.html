@@ -357,6 +357,7 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-tab{border:0;background:none;border-radius:7px;padding:6px 8px;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
 .tj-tab.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .tj-tab .tj-tc{font-size:11px;padding:0 6px;border-radius:99px;background:var(--line);color:var(--fg)}.tj-tab b{font-size:12.5px}
+.tj-aviso{padding:10px 14px;border:1px solid var(--warn);background:var(--warn-soft);color:var(--fg);border-radius:10px;font-size:13px;line-height:1.5}.tj-aviso .btn{margin-left:8px}
 .tj-glob{background:var(--sunk)}
 /* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
 .tj-it{display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}
@@ -3446,11 +3447,21 @@ function tjRuta(t, set) { if (!tjEsTras(t)) return esc(t.cuenta) + (t.code === 0
    3) el monto en lempiras ÷ la tasa del registro en dólares más cercano en fecha que tenga moneda importada;
    4) el monto en lempiras ÷ la tasa del día.  Los casos 3 y 4 son aproximados y se marcan con "≈". */
 let _tjTasas = null, _tjTasasD = null;
-function tjTasaEn(fecha) {
-  if (_tjTasasD !== D.txs) { _tjTasas = D.txs.filter(t => t.moneda === 'USD' && t.tasa > 1).map(t => [t.fecha, t.tasa]).sort((a, b) => a[0].localeCompare(b[0])); _tjTasasD = D.txs; }
-  if (!_tjTasas.length) return 0; let best = _tjTasas[0], bd = Infinity; const f0 = Date.parse(fecha);
-  for (const r of _tjTasas) { const d = Math.abs(Date.parse(r[0]) - f0); if (d < bd) { bd = d; best = r; } else if (r[0] > fecha) break; }
-  return bd <= 45 * 864e5 ? best[1] : 0;   // solo si hay una tasa importada de hasta 45 días de distancia
+// tjTasaEn: tasa aproximada para una fecha. Primero la de un registro de la MISMA cuenta con moneda importada (la app suele usar la misma
+// tasa en la cuenta por un tiempo), luego la de cualquier registro en dólares importado a menos de 45 días.
+function tjTasaEn(fecha, cuenta) {
+  if (_tjTasasD !== D.txs) { _tjTasas = D.txs.filter(t => t.moneda === 'USD' && t.tasa > 1).map(t => [t.fecha, t.tasa, tjCta(t.cuenta)]).sort((a, b) => a[0].localeCompare(b[0])); _tjTasasD = D.txs; }
+  const f0 = Date.parse(fecha); const cerca = (lista, max) => { let best = null, bd = Infinity; for (const r of lista) { const d = Math.abs(Date.parse(r[0]) - f0); if (d < bd) { bd = d; best = r; } } return best && bd <= max ? best[1] : 0; };
+  const c = cuenta ? tjCta(cuenta) : ''; return (c && cerca(_tjTasas.filter(r => r[2] === c), 120 * 864e5)) || cerca(_tjTasas, 45 * 864e5);
+}
+// tjUSDExacto: monto en dólares tal como lo registró la app, si se tiene: del Excel de monedas importado o de un dato del portal
+// (un monto en dólares o la tasa del registro). null si no hay dato exacto.
+function tjUSDExacto(t, hnl) {
+  if (t.moneda === 'USD' && +t.original) return {usd: +t.original, tasa: t.tasa, fuente: 'Excel de monedas'};
+  const x = t.x; if (!x || !hnl) return null;
+  for (const k in x) { const v = parseFloat(String(x[k]).replace(/,/g, '')); if (/rate|exchange|cambio|tasa/i.test(k) && v > 10 && v < 40) return {usd: crR2(hnl / v), tasa: v, fuente: 'portal'}; }
+  for (const k in x) { if (/id$|date|fecha|time|code|type|uid|num|order|sort|seq|idx|index|count|year|month|day/i.test(k)) continue; const v = parseFloat(String(x[k]).replace(/,/g, '')); if (v > 0 && hnl / v > 10 && hnl / v < 40) return {usd: crR2(v), tasa: hnl / v, fuente: 'portal'}; }
+  return null;
 }
 // tjPagoMonto: cuánto abona un registro usado como PAGO. Caso especial: un traslado que SALE de una cuenta de la tarjeta (por ejemplo
 // "Compra de dólares" de BANRURAL TC 4381 L a BANRURAL TC 4381 $) es cargo en esa cuenta y pago en la otra moneda de la tarjeta:
@@ -3459,18 +3470,17 @@ function tjPagoMonto(t, set) {
   if (!(set && tjEsTras(t) && set.has(tjCta(t.cuenta)) && tjDir(t, set) === 'gasto')) return tjMonto(t);
   if (tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0, cruce: true};
   const hnl = +t.monto || 0;
-  // Dato exacto primero: el Excel de monedas trae el traslado con su monto en dólares (ej. US$ 0.50 por L 13.05).
-  if (t.moneda === 'USD' && +t.original) return {usd: +t.original, l: 0, hnl, tasa: t.tasa, cruce: true};
-  if (t.x) for (const k in t.x) { const v = parseFloat(t.x[k]); if (v > 0 && /money|amount|cash|monto|usd|org/i.test(k) && hnl / v > 15 && hnl / v < 40) return {usd: crR2(v), l: 0, hnl, tasa: hnl / v, cruce: true}; }
+  // Dato exacto primero: el Excel de monedas (o el portal) trae el traslado con su monto en dólares (ej. US$ 0.50 por L 13.05).
+  const ex = tjUSDExacto(t, hnl); if (ex) return {usd: ex.usd, l: 0, hnl, tasa: ex.tasa, fuente: ex.fuente, cruce: true};
   const ts = tjTasaEn(t.fecha) || tasaUSD();
   return ts ? {usd: crR2(hnl / ts), l: 0, hnl, est: true, tasa: ts, cruce: true} : {usd: 0, l: 0, hnl, sinTasa: true, cruce: true};
 }
 function tjMonto(t) {
   if (!tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0};
   const hnl = +t.monto || 0;
-  if (t.moneda) return {usd: +t.original || 0, l: 0, hnl};
-  if (t.x) for (const k in t.x) { const v = parseFloat(t.x[k]); if (v > 0 && /money|amount|cash|monto|usd|org/i.test(k) && hnl / v > 15 && hnl / v < 40) return {usd: crR2(v), l: 0, hnl, tasa: hnl / v}; }
-  const ts = tjTasaEn(t.fecha) || tasaUSD();
+  if (t.moneda && t.moneda !== 'USD') return {usd: +t.original || 0, l: 0, hnl};
+  const ex = tjUSDExacto(t, hnl); if (ex) return {usd: ex.usd, l: 0, hnl, tasa: ex.tasa, fuente: ex.fuente};
+  const ts = tjTasaEn(t.fecha, t.cuenta) || tasaUSD();
   return ts ? {usd: crR2(hnl / ts), l: 0, hnl, est: true, tasa: ts} : {usd: 0, l: 0, hnl, sinTasa: true};
 }
 const tjSet = tar => new Set((tar.cuentas || []).map(tjCta));
@@ -3555,6 +3565,11 @@ function vTarjetas() {
       <td class="acc"><div class="acc-row">${S.confirmTj === t.id ? `<button class="btn sm danger" data-act="tjBorrar">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="tjBorrarNo">No</button>` : icoBtn('editar', 'Editar tarjeta', 'tjForm') + icoBtn('borrar', 'Eliminar tarjeta', 'tjBorrar', '', 'danger')}</div></td></tr>`; }).join('');
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>
+    ${(() => { const set = new Set(); lista.forEach(t => (t.cuentas || []).forEach(c => set.add(tjCta(c))));
+      const aprox = D.txs.filter(t => tjEsUSD(t.cuenta) && set.has(tjCta(t.cuenta)) && tjMonto(t).est);
+      return aprox.length ? `<div class="tj-aviso"><b>${aprox.length} montos en dólares son aproximados (≈).</b> El portal solo manda el valor en lempiras de las cuentas en dólares; el monto exacto en US$ viene en el Excel que exporta Registro Contable.
+        Exporta el Excel de la app con <b>todo el rango de fechas</b> (desde ${fFecha(aprox.reduce((m, t) => t.fecha < m ? t.fecha : m, '9999'))}) y súbelo en Sincronizar: los montos quedarán iguales a la app.
+        <button class="btn sm pri" data-act="sync">Subir Excel de monedas</button></div>` : ''; })()}
     <div class="tj-tasa"><span class="eyebrow">Tasa del día</span> <b class="num">${tasa ? 'L ' + tasa.toFixed(4) + ' por $' : 'sin tasa'}</b> <span class="note">${S.tasa ? (S.tasa.fuente === 'manual' ? 'escrita a mano' : 'automática') + ' · ' + fFecha(S.tasa.fecha) : 'no se pudo obtener; escríbela'}</span>
       <input class="in num" id="tasaMan" inputmode="decimal" placeholder="escribir tasa" style="width:120px" aria-label="Tasa manual"><button class="btn sm ghost" data-act="tasaAuto">Actualizar automática</button></div>
     <div class="kpis">
@@ -3653,7 +3668,7 @@ function pintarTjPer(foco) {
   const PA = tjPest('tjMonA', cand, pagoEnUSD, valPago);
   // monP: monto como pago (en la moneda en la que abona); para un cruce entre monedas de la tarjeta muestra también el monto original.
   const monP = x => { const m = tjPagoMonto(x, set); if (!m.cruce) return mon(x); return m.usd || m.sinTasa ? `<span title="Abona en dólares: ${L(m.hnl)} ÷ tasa ${m.tasa ? (+m.tasa).toFixed(4) : '—'}${m.est ? ' (aproximado)' : ' (dato de la app)'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)} · cambio de moneda</div>` : `${L(m.l)}<div class="cat" style="text-align:right">desde cuenta $ · cambio de moneda</div>`; };
-  const mon = x => { if (!tjEsUSD(x.cuenta)) return L(tjMonto(x).l); const m = tjMonto(x); return `<span title="${m.est ? 'Aproximado: ' + L(m.hnl) + ' ÷ tasa ' + m.tasa.toFixed(4) : m.sinTasa ? 'Falta la tasa de cambio' : ''}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)}</div>`; };
+  const mon = x => { if (!tjEsUSD(x.cuenta)) return L(tjMonto(x).l); const m = tjMonto(x); return `<span title="${m.est ? 'Aproximado: ' + L(m.hnl) + ' ÷ tasa ' + m.tasa.toFixed(4) + ' — sube el Excel de monedas para el monto exacto' : m.sinTasa ? 'Falta la tasa de cambio' : 'Exacto (' + (m.fuente || 'Excel de monedas') + ')'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)}</div>`; };
   const prev = [...document.querySelectorAll('.tj-modal .lst')].map(d => d.scrollTop);
   const nav = (largo) => { const a = ps[i - 1], b = ps[i + 1]; return largo
     ? `<button class="btn" data-act="tjNav" data-d="-1" ${a ? '' : 'disabled'}>‹ ${a ? 'Corte ' + fFecha(a.corte) + ` <span class="chip ${a.est[1]}">${a.est[0]}</span>` : 'No hay anterior'}</button><span class="note">también con las teclas ← →</span><button class="btn" data-act="tjNav" data-d="1" ${b ? '' : 'disabled'}>${b ? `<span class="chip ${b.est[1]}">${b.est[0]}</span> Corte ` + fFecha(b.corte) : 'No hay siguiente'} ›</button>`
