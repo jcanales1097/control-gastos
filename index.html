@@ -3466,8 +3466,22 @@ function tjUSDExacto(t, hnl) {
 // tjPagoMonto: cuánto abona un registro usado como PAGO. Caso especial: un traslado que SALE de una cuenta de la tarjeta (por ejemplo
 // "Compra de dólares" de BANRURAL TC 4381 L a BANRURAL TC 4381 $) es cargo en esa cuenta y pago en la otra moneda de la tarjeta:
 // si sale de la cuenta L abona en dólares (lempiras ÷ tasa) y si sale de la cuenta $ abona en lempiras.
+// Otro caso: un traslado desde una cuenta en lempiras (banco, efectivo) que la app registró EN DÓLARES hacia la cuenta $ de la tarjeta
+// (ej. BP-AH → BanPais TC 8064 $, US$ 57.56 = L 1,556.36): abona en dólares. Se reconoce por el Excel de monedas (exacto) o, si no está
+// importado, porque su destino es la cuenta $ o su texto dice "Dólares"/"$" (aproximado ≈).
 function tjPagoMonto(t, set) {
-  if (!(set && tjEsTras(t) && set.has(tjCta(t.cuenta)) && tjDir(t, set) === 'gasto')) return tjMonto(t);
+  if (!(set && tjEsTras(t) && set.has(tjCta(t.cuenta)) && tjDir(t, set) === 'gasto')) {
+    if (set && tjEsTras(t) && !set.has(tjCta(t.cuenta)) && !tjEsUSD(t.cuenta) && [...set].some(tjEsUSD)) {
+      const hnl = +t.monto || 0;
+      if (t.moneda === 'USD' && +t.original) return {usd: +t.original, l: 0, hnl, tasa: t.tasa, fuente: 'Excel de monedas', aUSD: true};
+      const dest = tjDestino(t);
+      if ((dest && set.has(dest) && tjEsUSD(dest)) || /d[oó]lar|\$/i.test([t.nota, t.det, t.sub, t.cat].join(' '))) {
+        const ex = tjUSDExacto(t, hnl); if (ex) return {usd: ex.usd, l: 0, hnl, tasa: ex.tasa, fuente: ex.fuente, aUSD: true};
+        const ts = tjTasaEn(t.fecha) || tasaUSD(); return ts ? {usd: crR2(hnl / ts), l: 0, hnl, est: true, tasa: ts, aUSD: true} : {usd: 0, l: 0, hnl, sinTasa: true, aUSD: true};
+      }
+    }
+    return tjMonto(t);
+  }
   if (tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0, cruce: true};
   const hnl = +t.monto || 0;
   // Dato exacto primero: el Excel de monedas (o el portal) trae el traslado con su monto en dólares (ej. US$ 0.50 por L 13.05).
@@ -3475,6 +3489,8 @@ function tjPagoMonto(t, set) {
   const ts = tjTasaEn(t.fecha) || tasaUSD();
   return ts ? {usd: crR2(hnl / ts), l: 0, hnl, est: true, tasa: ts, cruce: true} : {usd: 0, l: 0, hnl, sinTasa: true, cruce: true};
 }
+// tjPagoEnUSD: el pago abona en dólares (cuenta $, cambio de moneda desde la cuenta L, o traslado registrado en US$).
+const tjPagoEnUSD = (x, m) => !!m.aUSD || (tjEsUSD(x.cuenta) !== !!m.cruce);
 function tjMonto(t) {
   if (!tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0};
   const hnl = +t.monto || 0;
@@ -3663,11 +3679,11 @@ function pintarTjPer(foco) {
     const b = (v, n, t, txt) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="tjMon" data-k="${clave}" data-v="${v}" aria-pressed="${k === v}">${txt} <span class="tj-tc">${n}</span> <b class="num">${t}</b></button>`;
     return {k, items: k === 'U' ? gu : gl, html: `<div class="tj-tabs" role="group">${b('L', gl.length, L(tl), 'Lempiras')}${b('U', gu.length, tjU(tu), 'Dólares')}</div>`};
   };
-  const pagoEnUSD = x => tjEsUSD(x.cuenta) !== !!tjPagoMonto(x, set).cruce;
+  const pagoEnUSD = x => tjPagoEnUSD(x, tjPagoMonto(x, set));
   const valPago = x => { const m = tjPagoMonto(x, set); return pagoEnUSD(x) ? m.usd : m.l; };
   const PA = tjPest('tjMonA', cand, pagoEnUSD, valPago);
   // monP: monto como pago (en la moneda en la que abona); para un cruce entre monedas de la tarjeta muestra también el monto original.
-  const monP = x => { const m = tjPagoMonto(x, set); if (!m.cruce) return mon(x); return m.usd || m.sinTasa ? `<span title="Abona en dólares: ${L(m.hnl)} ÷ tasa ${m.tasa ? (+m.tasa).toFixed(4) : '—'}${m.est ? ' (aproximado)' : ' (dato de la app)'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)} · cambio de moneda</div>` : `${L(m.l)}<div class="cat" style="text-align:right">desde cuenta $ · cambio de moneda</div>`; };
+  const monP = x => { const m = tjPagoMonto(x, set); if (m.aUSD) return `<span title="${m.est ? 'Aproximado: ' + L(m.hnl) + ' ÷ tasa ' + (+m.tasa).toFixed(4) + ' — sube el Excel de monedas para el monto exacto' : 'Exacto (' + (m.fuente || 'Excel de monedas') + ')'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)} · pago en dólares</div>`; if (!m.cruce) return mon(x); return m.usd || m.sinTasa ? `<span title="Abona en dólares: ${L(m.hnl)} ÷ tasa ${m.tasa ? (+m.tasa).toFixed(4) : '—'}${m.est ? ' (aproximado)' : ' (dato de la app)'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)} · cambio de moneda</div>` : `${L(m.l)}<div class="cat" style="text-align:right">desde cuenta $ · cambio de moneda</div>`; };
   const mon = x => { if (!tjEsUSD(x.cuenta)) return L(tjMonto(x).l); const m = tjMonto(x); return `<span title="${m.est ? 'Aproximado: ' + L(m.hnl) + ' ÷ tasa ' + m.tasa.toFixed(4) + ' — sube el Excel de monedas para el monto exacto' : m.sinTasa ? 'Falta la tasa de cambio' : 'Exacto (' + (m.fuente || 'Excel de monedas') + ')'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)}</div>`; };
   const prev = [...document.querySelectorAll('.tj-modal .lst')].map(d => d.scrollTop);
   const nav = (largo) => { const a = ps[i - 1], b = ps[i + 1]; return largo
@@ -3828,7 +3844,7 @@ document.addEventListener('click', async e => {
   if (act === 'tjPer') return abrirTjPer(b.dataset.t, b.dataset.c);
   if (act === 'tjNav') { const {t} = tjPerActual(); const ps = tjPeriodos(t); const i = ps.findIndex(x => x.corte === S.tjPer.c) + (+b.dataset.d); if (ps[i]) abrirTjPer(t.id, ps[i].corte); return; }
   if (act === 'tjVinc') { const {t, p} = tjPerActual(); if (!p) return; const ids = [...(S.tjSelP || [])]; if (!ids.length) return;
-    try { const reg = await tjRegPeriodo(t, p); const rows = ids.map(id => D.byId.get(id)).filter(Boolean).map(x => { const m = tjPagoMonto(x, tjSet(t)); const usd = tjEsUSD(x.cuenta) !== !!m.cruce; return {id: crUid(), periodo: reg.id, tarjeta: t.id, tx_id: x.id, usd, monto: usd ? m.usd : m.l}; });
+    try { const reg = await tjRegPeriodo(t, p); const rows = ids.map(id => D.byId.get(id)).filter(Boolean).map(x => { const m = tjPagoMonto(x, tjSet(t)); const usd = tjPagoEnUSD(x, m); return {id: crUid(), periodo: reg.id, tarjeta: t.id, tx_id: x.id, usd, monto: usd ? m.usd : m.l}; });
       const d = await q(sb.from('tarjeta_pagos').insert(rows).select(), rows.length === 1 ? 'Pago vinculado' : rows.length + ' pagos vinculados'); S.tjpg.push(...(d && d.length ? d : rows)); S.tjSelP = new Set(); } catch (er) {}
     pintarTjPer(); return render(); }
   if (act === 'tjDesv') { const id = b.closest('[data-pid]').dataset.pid; try { await q(sb.from('tarjeta_pagos').delete().eq('id', id), 'Pago desvinculado'); S.tjpg = S.tjpg.filter(x => x.id !== id); } catch (er) {} pintarTjPer(); return render(); }
