@@ -335,6 +335,7 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-cmp>div{display:grid;gap:3px;align-content:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
 .tj-cmp b{font-family:var(--f-num);font-size:16px}
 @media (max-width:760px){.tj-cmp{grid-template-columns:1fr 1fr}.tj-cmp .row{flex-wrap:wrap}.tj-cmp input{width:100%!important;min-width:0}}
+.tj-glob{background:var(--sunk)}
 .tj-it{display:flex;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)}.tj-it b{font-size:12.5px;font-weight:600}
 .tj-ctasel{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px;max-height:260px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
 /* ================= TELÉFONO =================
@@ -3371,7 +3372,7 @@ document.addEventListener('toggle', e => { const d = e.target; if (d.classList &
 // tjs: tarjetas ordenadas (activas primero).
 const tjs = () => (S.tj || []).slice().sort((a, b) => (a.estado === 'cerrada') - (b.estado === 'cerrada') || (a.banco || '').localeCompare(b.banco || '') || (a.nombre || '').localeCompare(b.nombre || ''));
 const tjById = id => (S.tj || []).find(t => t.id === id);
-const tjCta = c => String(c || '').trim();
+const tjCta = c => String(c || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 // tjEsUSD: una cuenta es en dólares si su nombre termina en "$".
 const tjEsUSD = c => /\$\s*$/.test(String(c || ''));
 /* Pagos y cargos por TRASLADO: en Registro Contable los pagos a la tarjeta son traslados entre cuentas (no ingresos) y también puede salir
@@ -3392,6 +3393,14 @@ function tjDestino(t) {
   for (const k in x) { if (/asset|pay/i.test(k) && !/^(assetId|payTypeId|assetUid)$/.test(k) && a.has(x[k]) && a.get(x[k]) !== tjCta(t.cuenta)) return a.get(x[k]); }
   return '';
 }
+// tjToca: el traslado tiene, en cualquiera de sus dos cuentas, una cuenta de la tarjeta. Revisa la cuenta del registro, la cuenta destino
+// (categoría o dato del portal) y, por si la app la guarda en otro campo, la subcategoría, la nota y el detalle.
+function tjToca(t, set) {
+  if (set.has(tjCta(t.cuenta))) return true; const d = tjDestino(t); if (d && set.has(d)) return true;
+  const campos = [t.cat, t.sub, t.nota, t.det, ...(t.x ? Object.values(t.x) : [])].map(tjCta);
+  for (const c of set) { const re = new RegExp('(^|[^A-Z0-9])' + c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^A-Z0-9])'); if (campos.some(v => v === c || re.test(v))) return true; }
+  return false;
+}
 // tjIdx: índice de traslados por fecha|monto|cuenta|contraparte para encontrar la "fila espejo" del otro lado.
 let _tjIdx = null, _tjIdxD = null;
 const tjKey = (f, m, a, b) => f + '|' + (+m).toFixed(2) + '|' + tjCta(a) + '|' + tjCta(b);
@@ -3408,13 +3417,13 @@ function tjDir(t, set) {
 }
 // tjRuta: texto "de cuenta → a cuenta" para un traslado.
 function tjRuta(t, set) { if (!tjEsTras(t)) return esc(t.cuenta) + (t.code === 0 ? ' · ingreso o devolución' : ''); const mia = set.has(tjCta(t.cuenta)); const dir = tjDir(t, set);
-  const otra = tjDestino(t); if (!otra && !mia) return 'traslado desde ' + esc(tjCta(t.cuenta)) + ' · la app no indica a qué cuenta';
-  const [de, a] = (mia ? dir === 'abono' : dir === 'gasto') ? [otra || t.cat, t.cuenta] : [t.cuenta, otra || t.cat]; return 'traslado de ' + esc(tjCta(de) || '¿?') + ' → ' + esc(tjCta(a) || '¿?'); }
+  const otra = tjDestino(t); if (!otra && !mia) return 'traslado desde ' + esc(t.cuenta) + (t.cat ? ' · ' + esc(t.cat) : '');
+  const [de, a] = (mia ? dir === 'abono' : dir === 'gasto') ? [otra || t.cat, t.cuenta] : [t.cuenta, otra || t.cat]; return 'traslado de ' + esc(String(de || '¿?').trim()) + ' → ' + esc(String(a || '¿?').trim()) + (dir === 'gasto' ? ' · sale de la tarjeta' : ''); }
 // tjMonto: monto en lempiras o en dólares según la cuenta del registro (en $ usa el monto original en dólares si se importó la moneda).
 const tjMonto = t => tjEsUSD(t.cuenta) ? {usd: t.moneda ? (+t.original || 0) : (+t.monto || 0), l: 0} : {l: +t.monto || 0, usd: 0};
 const tjSet = tar => new Set((tar.cuentas || []).map(tjCta));
 // tjTxs: registros de las cuentas de la tarjeta, más los traslados hechos desde otra cuenta hacia la tarjeta (o desde la tarjeta) que no tengan su fila espejo.
-function tjTxs(tar) { const set = tjSet(tar); return D.txs.filter(t => set.has(tjCta(t.cuenta)) || (tjEsTras(t) && set.has(tjDestino(t)) && !tjEspejo(t))); }
+function tjTxs(tar) { const set = tjSet(tar); return D.txs.filter(t => set.has(tjCta(t.cuenta)) || (tjEsTras(t) && tjToca(t, set) && !(tjEspejo(t) && set.has(tjCta(tjEspejo(t).cuenta))))); }
 // tjFechaDia: fecha con el día pedido ajustado al último día del mes.
 function tjFechaDia(y, m0, d) { const dt = new Date(Date.UTC(y, m0, 1)); const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate(); dt.setUTCDate(Math.min(d, last)); return dt.toISOString().slice(0, 10); }
 const tjMas1 = d => { const x = new Date(d + 'T12:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
@@ -3425,7 +3434,7 @@ function tjPeriodos(tar) {
   let y = +ini.slice(0, 4), m0 = +ini.slice(5, 7) - 1; if (+ini.slice(8, 10) > dc) m0++;
   const regs = new Map((S.tjp || []).filter(p => p.tarjeta === tar.id).map(p => [p.corte, p]));
   const pagosPor = new Map(); (S.tjpg || []).filter(x => x.tarjeta === tar.id).forEach(x => { if (!pagosPor.has(x.periodo)) pagosPor.set(x.periodo, []); pagosPor.get(x.periodo).push(x); });
-  const out = []; let guard = 0;
+  const out = []; let guard = 0, accL = 0, accU = 0;
   while (guard++ < 240) {
     const corte = tjFechaDia(y, m0, dc), prev = tjFechaDia(y, m0 - 1, dc); const desdeP = tjMas1(prev);
     if (desdeP > hoyD) break;
@@ -3439,7 +3448,9 @@ function tjPeriodos(tar) {
     const fpago = reg && reg.fecha_pago ? reg.fecha_pago : fp; const abierto = corte >= hoyD;
     const vacio = !g.length && !pg.length && !(reg && (reg.monto_estado || reg.monto_estado_usd));   // corte sin cargos ni pagos: no se cuenta como vencido
     const est = reg && reg.pagado ? ['Pagado', 'app'] : abierto ? ['En curso', ''] : vacio ? ['Sin cargos', ''] : fpago < hoyD ? ['Vencido', 'bad'] : ['Por pagar', 'warn'];
-    out.push({corte, desde: desdeP, fpago, g, gL, gU, pg, pL, pU, sL: crR2(baseL - pL), sU: crR2(baseU - pU), reg, abierto, est});
+    // Saldo global: se arrastra el saldo de los cortes anteriores (lo que quedó debiendo suma, lo pagado de más resta).
+    const sL = crR2(baseL - pL), sU = crR2(baseU - pU); accL = crR2(accL + sL); accU = crR2(accU + sU);
+    out.push({corte, desde: desdeP, fpago, g, gL, gU, pg, pL, pU, sL, sU, tL: accL, tU: accU, reg, abierto, est});
     m0++;
   }
   return out;
@@ -3508,11 +3519,11 @@ function vTjFicha(t) {
       <div class="kpi"><div class="eyebrow">Límite</div><div class="v">${lim ? tjU(lim) : '—'}</div><div class="note">${lim && tasa ? '≈ ' + L(lim * tasa) + ' a tasa del día' : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Usado</div><div class="v">${usadoU != null ? tjU(usadoU) : '—'}</div><div class="note">${L(deudaL)}${deudaU ? ' + ' + tjU(deudaU) : ''} sin pagar</div></div>
       <div class="kpi"><div class="eyebrow">Disponible aprox.</div><div class="v ${lim && usadoU != null && usadoU > lim * .8 ? 'neg' : ''}">${lim && usadoU != null ? tjU(crR2(lim - usadoU)) : '—'}</div><div class="note">${lim && usadoU != null ? Math.round(usadoU / lim * 100) + ' % del límite usado' : 'agrega el límite y la tasa'}</div></div></div>
-    <div class="tbl-wrap cr-plan-wrap" data-c="tj-${t.id}"><table class="cr-plan"><thead><tr><th>Período de corte</th><th>Fecha de pago</th><th class="num">Gastos</th><th class="num">Pagos vinculados</th><th class="num">Saldo</th>${usd ? '<th class="num">Gastos $</th><th class="num">Pagos $</th><th class="num">Saldo $</th>' : ''}<th>Estado</th></tr></thead><tbody>
+    <div class="tbl-wrap cr-plan-wrap" data-c="tj-${t.id}"><table class="cr-plan"><thead><tr><th>Período de corte</th><th>Fecha de pago</th><th class="num">Gastos</th><th class="num">Pagos vinculados</th><th class="num">Saldo</th><th class="num" title="Saldo del corte más lo que quedó de los cortes anteriores">Saldo global</th>${usd ? '<th class="num">Gastos $</th><th class="num">Pagos $</th><th class="num">Saldo $</th><th class="num" title="Saldo del corte más lo que quedó de los cortes anteriores">Saldo global $</th>' : ''}<th>Estado</th></tr></thead><tbody>
       ${ps.map(p => `<tr class="cr-row" data-act="tjPer" data-t="${t.id}" data-c="${p.corte}" tabindex="0"><td><b>Corte ${fFecha(p.corte)}</b><div class="cat">${fFecha(p.desde)} – ${fFecha(p.corte)} · ${p.g.length} cargos</div></td><td class="num" style="text-align:left">${fFecha(p.fpago)}</td>
-        <td class="num">${L(p.gL)}${p.reg && p.reg.monto_estado != null ? `<div class="cat">estado ${L(+p.reg.monto_estado)}</div>` : ''}</td><td class="num">${p.pL ? L(p.pL) : '<span class="muted">—</span>'}</td><td class="num ${p.sL > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${L(p.sL)}</td>
-        ${usd ? `<td class="num">${tjU(p.gU)}</td><td class="num">${p.pU ? tjU(p.pU) : '<span class="muted">—</span>'}</td><td class="num ${p.sU > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${tjU(p.sU)}</td>` : ''}
-        <td><span class="chip ${p.est[1]}">${p.est[0]}</span>${!p.reg?.pagado && (p.pL || p.pU) ? ' <span class="chip">con pagos</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="note">Sin períodos todavía.</td></tr>'}
+        <td class="num">${L(p.gL)}${p.reg && p.reg.monto_estado != null ? `<div class="cat">estado ${L(+p.reg.monto_estado)}</div>` : ''}</td><td class="num">${p.pL ? L(p.pL) : '<span class="muted">—</span>'}</td><td class="num ${p.sL > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${L(p.sL)}</td><td class="num tj-glob ${p.tL > 0.004 ? 'neg' : ''}"><b>${L(p.tL)}</b></td>
+        ${usd ? `<td class="num">${tjU(p.gU)}</td><td class="num">${p.pU ? tjU(p.pU) : '<span class="muted">—</span>'}</td><td class="num ${p.sU > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${tjU(p.sU)}</td><td class="num tj-glob ${p.tU > 0.004 ? 'neg' : ''}"><b>${tjU(p.tU)}</b></td>` : ''}
+        <td><span class="chip ${p.est[1]}">${p.est[0]}</span>${!p.reg?.pagado && (p.pL || p.pU) ? ' <span class="chip">con pagos</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="11" class="note">Sin períodos todavía.</td></tr>'}
     </tbody></table></div>
     <div class="bd note" style="border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px">${ps.length} períodos · toca uno para vincular sus pagos y marcarlo como pagado</div></div>`;
 }
@@ -3523,12 +3534,9 @@ function tjCandidatos(t, p) {
   const set = tjSet(t);
   // rel: orden de la lista: primero los traslados que van a la tarjeta, luego los que mencionan el banco o los últimos 4 dígitos, luego el resto.
   const pistas = [t.ultimos4, t.banco].map(v => String(v || '').trim().toUpperCase()).filter(v => v.length >= 3);
-  const rel = x => (set.has(tjDestino(x)) || set.has(tjCta(x.cuenta)) ? 4 : 0) + (pistas.some(v => [x.nota, x.det, x.sub].join(' ').toUpperCase().includes(v)) ? 2 : 0) + (tjEsTras(x) ? 1 : 0);
-  const base = tjTxs(t).filter(x => tjDir(x, set) === 'abono'); const ya = new Set(base.map(x => x.id));
-  // Traslados que salen de otra cuenta y la app no dice a dónde fueron: pueden ser pagos a la tarjeta, se muestran para que los elijas.
-  // Con "Todos los traslados" aparecen todos los traslados de las demás cuentas.
-  const extra = D.txs.filter(x => !ya.has(x.id) && tjEsTras(x) && !set.has(tjCta(x.cuenta)) && !set.has(tjDestino(x)) && (o.trasTodos || (!tjDestino(x) && tjSentido(x) !== 'entra')));
-  return base.concat(extra).filter(x => !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => rel(b) - rel(a) || a.fecha.localeCompare(b.fecha)).slice(0, 120);
+  const rel = x => (tjEsTras(x) && tjDir(x, set) === 'gasto' ? -8 : 0) + (pistas.some(v => [x.nota, x.det, x.sub].join(' ').toUpperCase().includes(v)) ? 2 : 0) + (tjEsTras(x) ? 1 : 0);
+  // Solo registros relacionados con las cuentas de la tarjeta: los de esas cuentas y los traslados cuyo origen o destino es una de ellas.
+  return tjTxs(t).filter(x => tjEsTras(x) || tjDir(x, set) === 'abono').filter(x => !usados.has(x.id) && (o.todas || (x.fecha >= R.d && x.fecha <= R.h)) && (!bus || [x.nota, x.det, x.cat, x.cuenta, String(x.monto)].join(' ').toUpperCase().includes(bus))).sort((a, b) => rel(b) - rel(a) || a.fecha.localeCompare(b.fecha)).slice(0, 120);
 }
 function abrirTjPer(tid, corte) {
   S.tjPer = {t: tid, c: corte}; S.tjSelP = new Set(); S.tjOpt = {}; const x = new Date(corte + 'T12:00Z'); x.setUTCMonth(x.getUTCMonth() + 1);
@@ -3556,7 +3564,8 @@ function pintarTjPer(foco) {
         <div><span class="eyebrow">Gastos del período</span><b>${L(p.gL)}</b>${usd ? `<span class="note">${tjU(p.gU)}</span>` : ''}</div>
         <div><span class="eyebrow">Monto del estado de cuenta</span><span class="row" style="gap:4px"><input class="in num" data-tjm="monto_estado" inputmode="decimal" placeholder="L opcional" value="${p.reg && p.reg.monto_estado != null ? (+p.reg.monto_estado).toFixed(2) : ''}" style="width:115px">${usd ? `<input class="in num" data-tjm="monto_estado_usd" inputmode="decimal" placeholder="$ opcional" value="${p.reg && p.reg.monto_estado_usd != null ? (+p.reg.monto_estado_usd).toFixed(2) : ''}" style="width:100px">` : ''}</span></div>
         <div><span class="eyebrow">Pagos vinculados</span><b>${L(p.pL)}</b>${usd ? `<span class="note">${tjU(p.pU)}</span>` : ''}</div>
-        <div><span class="eyebrow">Saldo</span><b class="${p.sL > 0.004 ? 'neg' : ''}">${L(p.sL)}</b>${usd ? `<span class="note ${p.sU > 0.004 ? 'neg' : ''}">${tjU(p.sU)}</span>` : ''}</div>
+        <div><span class="eyebrow">Saldo</span><b class="${p.sL > 0.004 ? 'neg' : ''}">${L(p.sL)}</b>${usd ? `<span class="note ${p.sU > 0.004 ? 'neg' : ''}">${tjU(p.sU)}</span>` : ''}
+          <span class="note" style="border-top:1px solid var(--line);padding-top:4px;margin-top:2px">Global: <b class="num ${p.tL > 0.004 ? 'neg' : ''}" style="font-size:13px">${L(p.tL)}</b>${usd ? ` · <b class="num ${p.tU > 0.004 ? 'neg' : ''}" style="font-size:13px">${tjU(p.tU)}</b>` : ''}</span></div>
       </div>
       ${smL || smU ? `<div class="note">Marcados: <b>${L(smL)}${smU ? ' + ' + tjU(smU) : ''}</b> · el saldo quedaría en <b>${L(crR2(p.sL - smL))}${usd ? ' / ' + tjU(crR2(p.sU - smU)) : ''}</b></div>` : ''}
       <div class="cr-conc">
@@ -3570,7 +3579,6 @@ function pintarTjPer(foco) {
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
           <div class="cr-cf"><input class="in" id="tjBus" placeholder="Buscar texto o monto" value="${esc((S.tjOpt || {}).q || '')}">
             <label class="cr-ck"><input type="checkbox" data-tjo="todas" ${(S.tjOpt || {}).todas ? 'checked' : ''}> Cualquier fecha</label>
-            <label class="cr-ck" title="Muestra los traslados de todas las cuentas, aunque vayan a otra cuenta"><input type="checkbox" data-tjo="trasTodos" ${(S.tjOpt || {}).trasTodos ? 'checked' : ''}> Todos los traslados</label>
             ${(S.tjOpt || {}).todas ? '' : `<span class="cr-ck">Del <input class="in" type="date" data-tjr="d" value="${S.tjRango.d}"> al <input class="in" type="date" data-tjr="h" value="${S.tjRango.h}"></span>`}</div>
           <div class="row" style="justify-content:space-between"><span class="note">${cand.length} sin vincular</span><button class="btn sm pri" data-act="tjVinc" ${sel.size ? '' : 'disabled'}>Vincular seleccionados${sel.size ? ' (' + sel.size + ')' : ''}</button></div>
           <div class="lst cr-cands">${cand.length ? cand.map(x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${fFecha(x.fecha)} · ${tjRuta(x, set)}${!tjEsTras(x) && x.cat ? ' · ' + esc(x.cat) : ''}</span></span><span class="num" style="font-weight:600">${mon(x)}</span></label>`).join('')
@@ -3593,7 +3601,7 @@ const tjPerActual = () => { const P = S.tjPer; if (!P) return {}; const t = tjBy
 function abrirTjForm(id) {
   const t = id ? tjById(id) : null; const v = (k, d = '') => esc(t && t[k] != null ? String(t[k]) : d);
   const usadas = new Map(); (S.tj || []).forEach(x => { if (x.id !== id) (x.cuentas || []).forEach(c => usadas.set(tjCta(c), x.banco + ' ' + x.nombre)); });
-  const cnt = new Map(); D.txs.forEach(x => { const c = tjCta(x.cuenta); if (c) cnt.set(c, (cnt.get(c) || 0) + 1); });
+  const cnt = new Map(), nom = new Map(); D.txs.forEach(x => { const c = tjCta(x.cuenta); if (c) { cnt.set(c, (cnt.get(c) || 0) + 1); if (!nom.has(c)) nom.set(c, String(x.cuenta).trim()); } });
   const todas = [...cnt.keys()].sort((a, b) => (/TC|TARJ|CRED|AMEX|VISA|MASTER/i.test(b) - /TC|TARJ|CRED|AMEX|VISA|MASTER/i.test(a)) || a.localeCompare(b));
   const mias = new Set((t && t.cuentas || []).map(tjCta));
   const seis = new Date(); seis.setMonth(seis.getMonth() - 6);
@@ -3612,7 +3620,7 @@ function abrirTjForm(id) {
         <label style="grid-column:1/-1">Notas<input id="tfNotas" value="${v('notas')}"></label>
       </div>
       <div><div class="eyebrow" style="margin-bottom:6px">Cuentas de la app que forman la tarjeta</div>
-        <div class="tj-ctasel">${todas.map(c => `<label class="cr-ck ${usadas.has(c) ? 'muted' : ''}"><input type="checkbox" data-tfc value="${esc(c)}" ${mias.has(c) ? 'checked' : ''}> ${esc(c)} <span class="note">· ${cnt.get(c)}${usadas.has(c) ? ' · en ' + esc(usadas.get(c)) : ''}</span></label>`).join('')}</div></div>
+        <div class="tj-ctasel">${todas.map(c => `<label class="cr-ck ${usadas.has(c) ? 'muted' : ''}"><input type="checkbox" data-tfc value="${esc(nom.get(c))}" ${mias.has(c) ? 'checked' : ''}> ${esc(nom.get(c))} <span class="note">· ${cnt.get(c)}${usadas.has(c) ? ' · en ' + esc(usadas.get(c)) : ''}</span></label>`).join('')}</div></div>
       <div class="note">El día de pago se toma del mismo mes si es después del corte, o del mes siguiente si es antes. Cada fecha de pago se puede corregir en su período.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="tjGuardar">${t ? 'Guardar cambios' : 'Crear tarjeta'}</button></div>
     </div></div></div>`;
