@@ -352,6 +352,7 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-ec th.tj-grp{text-align:center;border-bottom:1px solid var(--line)}
 .tj-ec thead tr:nth-child(2) th{top:31px}
 @media (max-width:760px){.tj-vista{min-width:0;width:100%;order:5}}
+.tj-mm{width:96px;padding:4px 6px!important;font-size:12px!important}
 .tj-glob{background:var(--sunk)}
 /* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
 .tj-it{display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}
@@ -3482,7 +3483,9 @@ function tjPeriodos(tar) {
   const depMap = new Map(); txs.forEach(t => { if (tjDir(t, set) === 'abono') depMap.set(t.id, t); });
   (S.tjpg || []).forEach(x => { if (x.tarjeta === tar.id && x.tx_id) { const tx = D.byId.get(x.tx_id); if (tx) depMap.set(tx.id, tx); } });
   const depos = [...depMap.values()], retAll = txs.filter(t => tjDir(t, set) === 'gasto');
-  const sumM = (l, k, f = tjMonto) => crR2(l.reduce((a, t) => a + f(t)[k], 0)); const fP = t => tjPagoMonto(t, set); let ecL = null, ecU = null;
+  const sumM = (l, k, f = tjMonto) => crR2(l.reduce((a, t) => a + f(t)[k], 0)); const manual = new Map(); (S.tjpg || []).forEach(x => { if (x.tarjeta === tar.id && x.tx_id && x.monto_manual != null) manual.set(x.tx_id, x.usd ? {usd: +x.monto_manual, l: 0} : {l: +x.monto_manual, usd: 0}); });
+  const fP = t => manual.get(t.id) || tjPagoMonto(t, set);   // monto como pago (respeta el monto exacto escrito a mano)
+  let ecL = null, ecU = null;
   const out = []; let guard = 0, accL = 0, accU = 0;
   while (guard++ < 240) {
     const corte = tjFechaDia(y, m0, dc), prev = tjFechaDia(y, m0 - 1, dc); const desdeP = tjMas1(prev);
@@ -3492,7 +3495,7 @@ function tjPeriodos(tar) {
     const g = txs.filter(t => t.fecha >= desdeP && t.fecha <= corte && tjDir(t, set) === 'gasto');
     const gL = crR2(g.reduce((s, t) => s + tjMonto(t).l, 0)), gU = crR2(g.reduce((s, t) => s + tjMonto(t).usd, 0));
     const pg = reg ? (pagosPor.get(reg.id) || []) : [];
-    const pm = x => { const tx = x.tx_id && D.byId.get(x.tx_id); return tx ? tjPagoMonto(tx, set) : (x.usd ? {usd: +x.monto || 0, l: 0} : {l: +x.monto || 0, usd: 0}); };   // monto del pago según el registro actual
+    const pm = x => { if (x.monto_manual != null) return x.usd ? {usd: +x.monto_manual, l: 0} : {l: +x.monto_manual, usd: 0}; const tx = x.tx_id && D.byId.get(x.tx_id); return tx ? tjPagoMonto(tx, set) : (x.usd ? {usd: +x.monto || 0, l: 0} : {l: +x.monto || 0, usd: 0}); };   // monto del pago según el registro actual
     const pL = crR2(pg.reduce((s, x) => s + pm(x).l, 0)), pU = crR2(pg.reduce((s, x) => s + pm(x).usd, 0));
     const baseL = reg && reg.monto_estado != null ? +reg.monto_estado : gL, baseU = reg && reg.monto_estado_usd != null ? +reg.monto_estado_usd : gU;
     const fpago = reg && reg.fecha_pago ? reg.fecha_pago : fp; const abierto = corte >= hoyD;
@@ -3652,7 +3655,8 @@ function pintarTjPer(foco) {
       <div class="cr-conc">
         <div class="stack" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos vinculados a este período</div>
-          <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
+          <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.monto_manual != null ? `${x.usd ? tjU(+x.monto_manual) : L(+x.monto_manual)}<div class="cat" style="text-align:right">exacto · escrito a mano</div>` : tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>
+            ${tx && (x.monto_manual != null || tjPagoMonto(tx, set).est) ? `<input class="in num tj-mm" data-tjmm="${x.id}" inputmode="decimal" placeholder="${x.usd ? '$' : 'L'} exacto" value="${x.monto_manual != null ? (+x.monto_manual).toFixed(2) : ''}" title="Escribe el monto exacto que muestra la app (por ejemplo US$ 0.50). Vacío = usar el aproximado.">` : ''}${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
           ${(() => { /* buscador de cargos: filtra por texto (descripción, categoría, cuenta) o por monto */
             const qc = ((S.tjOpt || {}).qc || '').trim().toUpperCase(); const n = parseFloat(qc.replace(/[^0-9.]/g, ''));
             const gs = qc ? p.g.filter(x => [x.nota, x.det, x.cat, x.sub, x.cuenta].join(' ').toUpperCase().includes(qc) || (isFinite(n) && n > 0 && String(x.monto).includes(String(n)))) : p.g;
@@ -3965,6 +3969,10 @@ document.addEventListener('change', async e => {
   if (t.id === 'tasaMan') { const v = parseFloat(String(t.value).replace(/[^0-9.]/g, '')); if (!(v > 1)) return toast('Escribe la tasa en lempiras por dólar, por ejemplo 26.45'); S.tasa = {valor: v, fecha: hoy(), fuente: 'manual'}; await guardarAjuste('tasaUSD', S.tasa).catch(() => {}); toast('Tasa guardada'); return render(); }
   if (t.dataset.tjm) { const {t: tar, p} = tjPerActual(); if (!p) return; const raw = String(t.value).trim(); const v = raw === '' ? null : parseFloat(raw.replace(/[^0-9.\-]/g, ''));
     try { const reg = await tjRegPeriodo(tar, p); await q(sb.from('tarjeta_periodos').update({[t.dataset.tjm]: v}).eq('id', reg.id), 'Monto del estado guardado'); reg[t.dataset.tjm] = v; } catch (er) {} pintarTjPer(); return render(); }
+  if (t.dataset.tjmm) { const x = (S.tjpg || []).find(z => z.id === t.dataset.tjmm); if (!x) return; const raw = String(t.value).trim(); const v = raw === '' ? null : parseFloat(raw.replace(/[^0-9.]/g, ''));
+    if (raw !== '' && !(v >= 0)) return toast('Escribe un monto válido.');
+    try { await q(sb.from('tarjeta_pagos').update({monto_manual: v}).eq('id', x.id), v == null ? 'Se usará el monto aproximado' : 'Monto exacto guardado'); x.monto_manual = v; } catch (er) { if (/monto_manual/.test(String(er && er.message || er))) toast('Falta correr en Supabase el SQL del monto exacto (tarjetas_monto_exacto.sql).'); }
+    pintarTjPer(); return render(); }
   if (t.dataset.tjo) { S.tjOpt = S.tjOpt || {}; S.tjOpt[t.dataset.tjo] = t.checked; return pintarTjPer(); }
   if (t.dataset.tjr) { if (t.value) S.tjRango[t.dataset.tjr] = t.value; return pintarTjPer(); }
   if (t.dataset.tjs != null) { S.tjSelP = S.tjSelP || new Set(); if (t.checked) S.tjSelP.add(t.dataset.tjs); else S.tjSelP.delete(t.dataset.tjs); return pintarTjPer(); }
