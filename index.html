@@ -347,6 +347,11 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   .tj-modal .cr-conc>div{max-height:none!important;height:100%;overflow:auto}
 }
 .tj-fmodal .cr-plan .cat{white-space:nowrap}
+.tj-vista{min-width:280px}.tj-vista span{padding:6px 10px;font-size:13px}
+.tj-ec .tj-dep{color:var(--azul)}.tj-ec .tj-ret{color:var(--bad)}.tj-ec .tj-bal{font-weight:600}
+.tj-ec th.tj-grp{text-align:center;border-bottom:1px solid var(--line)}
+.tj-ec thead tr:nth-child(2) th{top:31px}
+@media (max-width:760px){.tj-vista{min-width:0;width:100%;order:5}}
 .tj-glob{background:var(--sunk)}
 /* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
 .tj-it{display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}
@@ -3462,6 +3467,12 @@ function tjPeriodos(tar) {
   let y = +ini.slice(0, 4), m0 = +ini.slice(5, 7) - 1; if (+ini.slice(8, 10) > dc) m0++;
   const regs = new Map((S.tjp || []).filter(p => p.tarjeta === tar.id).map(p => [p.corte, p]));
   const pagosPor = new Map(); (S.tjpg || []).filter(x => x.tarjeta === tar.id).forEach(x => { if (!pagosPor.has(x.periodo)) pagosPor.set(x.periodo, []); pagosPor.get(x.periodo).push(x); });
+  // Para la vista "Estado de cuenta" (como la app): depósitos = lo que entró a la tarjeta (traslados hacia ella, ingresos y pagos vinculados),
+  // retiros = cargos; el saldo al corte arranca con todo lo anterior al primer período.
+  const depMap = new Map(); txs.forEach(t => { if (tjDir(t, set) === 'abono') depMap.set(t.id, t); });
+  (S.tjpg || []).forEach(x => { if (x.tarjeta === tar.id && x.tx_id) { const tx = D.byId.get(x.tx_id); if (tx) depMap.set(tx.id, tx); } });
+  const depos = [...depMap.values()], retAll = txs.filter(t => tjDir(t, set) === 'gasto');
+  const sumM = (l, k) => crR2(l.reduce((a, t) => a + tjMonto(t)[k], 0)); let ecL = null, ecU = null;
   const out = []; let guard = 0, accL = 0, accU = 0;
   while (guard++ < 240) {
     const corte = tjFechaDia(y, m0, dc), prev = tjFechaDia(y, m0 - 1, dc); const desdeP = tjMas1(prev);
@@ -3479,7 +3490,10 @@ function tjPeriodos(tar) {
     const est = reg && reg.pagado ? ['Pagado', 'app'] : abierto ? ['En curso', ''] : vacio ? ['Sin cargos', ''] : fpago < hoyD ? ['Vencido', 'bad'] : ['Por pagar', 'warn'];
     // Saldo global: se arrastra el saldo de los cortes anteriores (lo que quedó debiendo suma, lo pagado de más resta).
     const sL = crR2(baseL - pL), sU = crR2(baseU - pU); accL = crR2(accL + sL); accU = crR2(accU + sU);
-    out.push({corte, desde: desdeP, fpago, g, gL, gU, pg, pL, pU, sL, sU, tL: accL, tU: accU, reg, abierto, est});
+    if (ecL === null) { const dA = depos.filter(t => t.fecha < desdeP), rA = retAll.filter(t => t.fecha < desdeP); ecL = crR2(sumM(dA, 'l') - sumM(rA, 'l')); ecU = crR2(sumM(dA, 'usd') - sumM(rA, 'usd')); }
+    const dep = depos.filter(t => t.fecha >= desdeP && t.fecha <= corte); const dL = sumM(dep, 'l'), dU = sumM(dep, 'usd');
+    ecL = crR2(ecL + dL - gL); ecU = crR2(ecU + dU - gU);
+    out.push({corte, desde: desdeP, fpago, g, gL, gU, pg, pL, pU, sL, sU, tL: accL, tU: accU, dep, dL, dU, ecL, ecU, reg, abierto, est});
     m0++;
   }
   return out;
@@ -3546,24 +3560,37 @@ function cerrarCapa() {
   const enFicha = !!document.querySelector('.tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
   if (enFicha || S.view !== 'tarjetas') S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
 }
+// vTjEstado: vista como la de Registro Contable por período de corte: Depósito, Retiro, Balance (depósito − retiro) y Saldo al corte
+// (negativo = lo que se debe). No depende de marcar pagados: usa los movimientos de las cuentas de la tarjeta y los pagos vinculados.
+function vTjEstado(t, ps, usd) {
+  const n = (v, cls) => `<td class="num ${cls || ''}">${v}</td>`; const sg = (v, f) => (v < -0.004 ? 'neg' : '') ;
+  const blq = (dK, rK, sK, f) => ps.map(p => { const d = p[dK], r = p[rK], b = crR2(d - r), sa = p[sK]; return [d, r, b, sa]; });
+  const fila = (p, f, d, r, sa) => `${n(d ? `<span class="tj-dep">${f(d)}</span>` : '<span class="muted">—</span>')}${n(r ? `<span class="tj-ret">${f(r)}</span>` : '<span class="muted">—</span>')}${n(f(crR2(d - r)), 'tj-bal')}${n(`<b>${f(sa)}</b>`, 'tj-glob ' + sg(sa))}`;
+  return `<div class="tbl-wrap cr-plan-wrap" data-c="tje-${t.id}"><table class="cr-plan tj-ec"><thead>
+    <tr><th rowspan="${usd ? 2 : 1}">Período de corte</th>${usd ? '<th colspan="4" class="tj-grp">Lempiras</th><th colspan="4" class="tj-grp">Dólares</th></tr><tr>' : ''}<th class="num">Depósito</th><th class="num">Retiro</th><th class="num">Balance</th><th class="num">Saldo al corte</th>${usd ? '<th class="num">Depósito</th><th class="num">Retiro</th><th class="num">Balance</th><th class="num">Saldo al corte</th>' : ''}</tr></thead><tbody>
+    ${ps.map(p => `<tr class="cr-row" data-act="tjPer" data-t="${t.id}" data-c="${p.corte}" tabindex="0"><td><b>${fFecha(p.desde).slice(0, 5)} ~ ${fFecha(p.corte)}</b><div class="cat">${p.dep.length} depósitos · ${p.g.length} retiros · <span class="chip ${p.est[1]}" style="font-size:10px;padding:0 6px">${p.est[0]}</span></div></td>
+      ${fila(p, L, p.dL, p.gL, p.ecL)}${usd ? fila(p, tjU, p.dU, p.gU, p.ecU) : ''}</tr>`).join('')}
+  </tbody></table></div>`;
+}
 function vTjFicha(t) {
   const ps = tjPeriodos(t).reverse(); const act = ps.find(p => p.abierto); const usd = (t.cuentas || []).some(tjEsUSD); const tasa = tasaUSD();
   const pend = ps.filter(p => !p.abierto && !(p.reg && p.reg.pagado) && p.est[0] !== 'Sin cargos');
   const deudaL = crR2(pend.reduce((s, p) => s + p.sL, 0) + (act ? act.gL : 0)), deudaU = crR2(pend.reduce((s, p) => s + p.sU, 0) + (act ? act.gU : 0));
   const usadoU = tasa ? crR2(deudaU + deudaL / tasa) : null; const lim = +t.limite_usd || 0;
   return `<div class="panel"><div class="hd"><div class="row" style="gap:12px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><div style="min-width:0"><h2>${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2><span class="tj-ctas">${(t.cuentas || []).map(c => `<span>${esc(c)}</span>`).join('')}</span></div></div>
+      <div class="seg2 tj-vista" role="tablist">${[['cortes', 'Cortes y pagos'], ['estado', 'Estado de cuenta']].map(([k, l]) => `<label><input type="radio" name="tjVista" data-act="tjVista" data-v="${k}" ${(S.tjVista || 'cortes') === k ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
       ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Corte · pago</div><div class="v">día ${t.dia_corte} · ${t.dia_pago}</div><div class="note">${act ? 'período actual ' + fFecha(act.desde).slice(0, 5) + ' – ' + fFecha(act.corte).slice(0, 5) : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Límite</div><div class="v">${lim ? tjU(lim) : '—'}</div><div class="note">${lim && tasa ? '≈ ' + L(lim * tasa) + ' a tasa del día' : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Usado</div><div class="v">${usadoU != null ? tjU(usadoU) : '—'}</div><div class="note">${L(deudaL)}${deudaU ? ' + ' + tjU(deudaU) : ''} sin pagar</div></div>
       <div class="kpi"><div class="eyebrow">Disponible aprox.</div><div class="v ${lim && usadoU != null && usadoU > lim * .8 ? 'neg' : ''}">${lim && usadoU != null ? tjU(crR2(lim - usadoU)) : '—'}</div><div class="note">${lim && usadoU != null ? Math.round(usadoU / lim * 100) + ' % del límite usado' : 'agrega el límite y la tasa'}</div></div></div>
-    <div class="tbl-wrap cr-plan-wrap" data-c="tj-${t.id}"><table class="cr-plan"><thead><tr><th>Período de corte</th><th>Fecha de pago</th><th class="num">Gastos</th><th class="num">Pagos vinculados</th><th class="num">Saldo</th><th class="num" title="Saldo del corte más lo que quedó de los cortes anteriores">Saldo global</th>${usd ? '<th class="num">Gastos $</th><th class="num">Pagos $</th><th class="num">Saldo $</th><th class="num" title="Saldo del corte más lo que quedó de los cortes anteriores">Saldo global $</th>' : ''}<th>Estado</th></tr></thead><tbody>
+    ${S.tjVista === 'estado' ? vTjEstado(t, ps, usd) : `<div class="tbl-wrap cr-plan-wrap" data-c="tj-${t.id}"><table class="cr-plan"><thead><tr><th>Período de corte</th><th>Fecha de pago</th><th class="num">Gastos</th><th class="num">Pagos vinculados</th><th class="num">Saldo</th><th class="num" title="Saldo del corte más lo que quedó de los cortes anteriores">Saldo global</th>${usd ? '<th class="num">Gastos $</th><th class="num">Pagos $</th><th class="num">Saldo $</th><th class="num" title="Saldo del corte más lo que quedó de los cortes anteriores">Saldo global $</th>' : ''}<th>Estado</th></tr></thead><tbody>
       ${ps.map(p => `<tr class="cr-row" data-act="tjPer" data-t="${t.id}" data-c="${p.corte}" tabindex="0"><td><b>Corte ${fFecha(p.corte)}</b><div class="cat">${fFecha(p.desde)} – ${fFecha(p.corte)} · ${p.g.length} cargos</div></td><td class="num" style="text-align:left">${fFecha(p.fpago)}</td>
         <td class="num">${L(p.gL)}${p.reg && p.reg.monto_estado != null ? `<div class="cat">estado ${L(+p.reg.monto_estado)}</div>` : ''}</td><td class="num">${p.pL ? L(p.pL) : '<span class="muted">—</span>'}</td><td class="num ${p.sL > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${L(p.sL)}</td><td class="num tj-glob ${p.tL > 0.004 ? 'neg' : ''}"><b>${L(p.tL)}</b></td>
         ${usd ? `<td class="num">${tjU(p.gU)}</td><td class="num">${p.pU ? tjU(p.pU) : '<span class="muted">—</span>'}</td><td class="num ${p.sU > 0.004 && !(p.reg && p.reg.pagado) && !p.abierto ? 'neg' : ''}">${tjU(p.sU)}</td><td class="num tj-glob ${p.tU > 0.004 ? 'neg' : ''}"><b>${tjU(p.tU)}</b></td>` : ''}
         <td><span class="chip ${p.est[1]}">${p.est[0]}</span>${!p.reg?.pagado && (p.pL || p.pU) ? ' <span class="chip">con pagos</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="11" class="note">Sin períodos todavía.</td></tr>'}
-    </tbody></table></div>
+    </tbody></table></div>`}
     <div class="bd note" style="border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px">${ps.length} períodos · toca uno para vincular sus pagos y marcarlo como pagado</div></div>`;
 }
 /* --- ventana del período --- */
@@ -3737,6 +3764,7 @@ document.addEventListener('click', async e => {
   // Análisis de créditos: pestaña, agrupación, conceptos visibles, filtros y navegación al detalle.
   if (act === 'tema') { const t = TEMAS[(TEMAS.indexOf(temaActual()) + 1) % 3]; lsSet('tema', t); aplicarTema(); toast('Tema: ' + NOM_TEMA[t]); return render(); }
   /* --- tarjetas de crédito --- */
+  if (act === 'tjVista') { S.tjVista = b.dataset.v; return pintarTjFicha(); }
   if (act === 'tjSel') { S.tjSel = S.tjFicha = b.dataset.id; S.confirmTj = null; return pintarTjFicha(); }
   if (act === 'tjNueva') return abrirTjForm(null);
   if (act === 'tjForm') { const r = b.closest('[data-id]'); return abrirTjForm(r ? r.dataset.id : S.tjSel); }
