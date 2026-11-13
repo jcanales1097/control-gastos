@@ -3593,8 +3593,13 @@ function pintarTjPer(foco) {
         <div class="stack" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos vinculados a este período</div>
           <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.usd ? tjU(+x.monto) : L(+x.monto)}</span>${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
-          <div class="eyebrow" style="margin-top:6px">Cargos del período · ${p.g.length}</div>
-          <div class="lst tj-cargos">${p.g.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || '<div class="note">Sin cargos.</div>'}</div>
+          ${(() => { /* buscador de cargos: filtra por texto (descripción, categoría, cuenta) o por monto */
+            const qc = ((S.tjOpt || {}).qc || '').trim().toUpperCase(); const n = parseFloat(qc.replace(/[^0-9.]/g, ''));
+            const gs = qc ? p.g.filter(x => [x.nota, x.det, x.cat, x.sub, x.cuenta].join(' ').toUpperCase().includes(qc) || (isFinite(n) && n > 0 && String(x.monto).includes(String(n)))) : p.g;
+            const tot = gs.reduce((a, x) => { const m = tjMonto(x); a.l += m.l; a.u += m.usd; return a; }, {l: 0, u: 0});
+            S._tjGs = gs; return `<div class="row" style="justify-content:space-between;margin-top:6px;gap:8px"><span class="eyebrow">Cargos del período · ${qc ? gs.length + ' de ' + p.g.length : p.g.length}</span>${qc ? `<span class="note">Suman <b>${L(crR2(tot.l))}${tot.u ? ' + ' + tjU(crR2(tot.u)) : ''}</b></span>` : ''}</div>
+          <input class="in" id="tjBusC" placeholder="Buscar en los cargos (texto o monto)" value="${esc((S.tjOpt || {}).qc || '')}" style="max-width:none">`; })()}
+          <div class="lst tj-cargos">${S._tjGs.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || `<div class="note">${(S.tjOpt || {}).qc ? 'Ningún cargo coincide con la búsqueda.' : 'Sin cargos.'}</div>`}</div>
         </div>
         <div class="stack" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
@@ -3610,7 +3615,7 @@ function pintarTjPer(foco) {
     </div>
     <div class="cr-navft">${nav(true)}</div></div></div>`;
   document.querySelectorAll('.tj-modal .lst').forEach((d, k) => { d.scrollTop = prev[k] || 0; });
-  if (foco) { const el = $('#tjBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (foco) { const el = $(foco === 'c' ? '#tjBusC' : '#tjBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 // tjRegPeriodo: devuelve (y crea si no existe) el registro guardado de un período, necesario para marcar pagado o vincular pagos.
 async function tjRegPeriodo(t, p) {
@@ -3971,6 +3976,7 @@ document.addEventListener('change', async e => {
 let qT;
 /* Escritura en buscadores y campos que se actualizan mientras escribes. */
 document.addEventListener('input', e => {
+  if (e.target.id === 'tjBusC') { S.tjOpt = S.tjOpt || {}; S.tjOpt.qc = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer('c'), 250); return; }
   if (e.target.id === 'tjBus') { S.tjOpt = S.tjOpt || {}; S.tjOpt.q = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer(true), 250); return; }
   if (e.target.id === 'credBus') { S.concOpt = S.concOpt || {}; S.concOpt.q = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => pintarConc(true), 250); return; }
   if (e.target.id === 'pegTxt') return prevPegar();
