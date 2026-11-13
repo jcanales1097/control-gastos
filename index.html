@@ -336,7 +336,11 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-cmp b{font-family:var(--f-num);font-size:16px}
 @media (max-width:760px){.tj-cmp{grid-template-columns:1fr 1fr}.tj-cmp .row{flex-wrap:wrap}.tj-cmp input{width:100%!important;min-width:0}}
 .tj-glob{background:var(--sunk)}
-.tj-it{display:flex;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)}.tj-it b{font-size:12.5px;font-weight:600}
+/* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
+.tj-it{display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}
+.tj-it b{font-size:12px;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.tj-it .note{font-size:11px}.tj-it .num{font-size:12.5px;white-space:nowrap}
+.tj-it:hover b{-webkit-line-clamp:unset}
 .tj-ctasel{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px;max-height:260px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
 /* ================= TELÉFONO =================
    Barra superior compacta (marca + botones en una línea, pestañas deslizables), campos de 16px para que el iPhone no haga zoom,
@@ -3568,7 +3572,7 @@ function pintarTjPer(foco) {
           <div class="eyebrow">Pagos vinculados a este período</div>
           <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.usd ? tjU(+x.monto) : L(+x.monto)}</span>${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
           <div class="eyebrow" style="margin-top:6px">Cargos del período · ${p.g.length}</div>
-          <div class="lst" style="max-height:240px">${p.g.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || '<div class="note">Sin cargos.</div>'}</div>
+          <div class="lst tj-cargos">${p.g.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || '<div class="note">Sin cargos.</div>'}</div>
         </div>
         <div class="stack" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
