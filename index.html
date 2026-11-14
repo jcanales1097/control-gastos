@@ -405,9 +405,22 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
-.solo-tel{display:none}.solo-tel-il{display:none}.dia-h{display:none}
+.solo-tel{display:none}.solo-tel-il{display:none}.dia-h{display:none}.ctl-tabs{display:none}.ctl-secs{display:contents}.ctl-secs>div{display:contents}
 @media (max-width:760px){
-  .solo-pc{display:none!important}.solo-tel{display:flex}.solo-tel-il{display:contents}
+  .solo-pc{display:none!important}.solo-pc-il{display:none!important}.solo-tel{display:flex}.solo-tel-il{display:contents}
+  /* Controles en el teléfono: indicadores y participantes en una sola fila, y Egresos / Ingresos / Proyectos como pestañas. */
+  .kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .kpis.k4 .kpi{padding:5px 6px;min-width:0}.kpis.k4 .kpi .eyebrow{font-size:8px;white-space:nowrap}
+  .kpis.k4 .kpi .v{font-size:10.5px;white-space:nowrap;letter-spacing:-.02em}
+  .ctl-part{flex-wrap:nowrap!important;gap:5px!important;overflow-x:auto;scrollbar-width:none;white-space:nowrap}.ctl-part::-webkit-scrollbar{display:none}
+  .ctl-part .eyebrow{flex:none}.ctl-part .chip{font-size:9.5px;padding:1px 7px;flex:none}.ctl-part .btn{margin-left:auto;flex:none;padding:3px 8px;font-size:11px}
+  .ctl-tabs{display:grid}.ctl-tabs.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ctl-tabs .tj-tab{font-size:11.5px;padding:5px 4px;gap:3px 5px}.ctl-tabs .tj-tab b{font-size:10.5px;width:100%}
+  .ctl-secs{display:block}.ctl-secs>div{display:none}
+  .ctl-eg>.ctl-s-eg,.ctl-in>.ctl-s-in,.ctl-mp>.ctl-s-mp{display:block}
+  .ctl-s-eg>.panel>.hd,.ctl-s-in>.panel>.hd{display:none}
+  .filters.f-una{display:grid!important;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;padding:6px 8px}
+  .filters.f-una>*{grid-column:auto!important;min-width:0;width:100%;font-size:12px!important;padding:5px 6px!important}
   /* Detalle de egresos/ingresos al estilo de Registro Contable: encabezado por día con su total y cada registro en dos líneas
      (categoría a la izquierda, descripción + persona/estado al centro, valor a la derecha). Tocar la fila muestra sus acciones. */
   .tbl-wrap:has(> table.tdet){overflow:visible;max-height:none!important}
@@ -1325,15 +1338,18 @@ function vControl(c) {
     <div class="ctl-barra solo-tel">${c.porMes ? vSelMes(c, mes, meses) : ''}<div class="ctl-ico">${accionesCtl(c, mes, R, a)}</div></div>
     ${c.porMes ? `<div class="solo-pc">${vSelMes(c, mes, meses)}</div>
     ${vParticipantes(c, mes)}` : ''}
-    <div class="kpis">
+    <div class="kpis k4">
       <div class="kpi"><div class="eyebrow">Ingreso</div><div class="v">${L(R.ingreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Egreso</div><div class="v">${L(-R.egreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Saldo</div><div class="v ${R.ingreso - R.egreso < 0 ? 'neg' : ''}">${L(R.ingreso - R.egreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Por validar</div><div class="v ${R.pendientes ? 'warn-t' : ''}">${R.pendientes}</div></div>
     </div>
     ${c.porMes ? vDistribucion(c, R) : vResumenProy(c, R, h)}
-    ${tablaFilas(c, h, 'egreso')}${tablaFilas(c, h, 'ingreso')}
-    ${c.porMes ? vMicros(c, mes) : ''}
+    ${(() => { /* Teléfono: Egresos / Ingresos / Proyectos como pestañas (una sección a la vez); en computadora se ven todas. */
+      const mp = c.porMes ? vMicros(c, mes) : ''; const k = S.ctlSec === 'mp' && !mp ? 'eg' : (S.ctlSec || 'eg');
+      const bt = (v, txt, n, tot) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="ctlSec" data-v="${v}">${txt} <span class="tj-tc">${n}</span>${tot != null ? ` <b class="num">${L(tot)}</b>` : ''}</button>`;
+      return `<div class="tj-tabs ctl-tabs ${mp ? 'c3' : ''}">${bt('eg', 'Egresos', h.egresos.length, R.egreso)}${bt('in', 'Ingresos', h.ingresos.length, R.ingreso)}${mp ? bt('mp', 'Proyectos', microsDe(c.id).length) : ''}</div>
+      <div class="ctl-secs ctl-${k}"><div class="ctl-s-eg">${tablaFilas(c, h, 'egreso')}</div><div class="ctl-s-in">${tablaFilas(c, h, 'ingreso')}</div>${mp ? `<div class="ctl-s-mp">${mp}</div>` : ''}</div>`; })()}
     ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
 }
 // porMesProy: Totales por mes de un proyecto.
@@ -1502,7 +1518,7 @@ function tablaFilas(c, h, lado) {
   const fechaDef = c.porMes && h.mes !== 'general' ? (hoy().slice(0, 7) === h.mes ? hoy() : h.mes + '-01') : hoy();
   const cols = 6 + (eg && fam ? 1 : 0);
   return `<div class="panel"><div class="hd"><h2>${eg ? 'Detalle egreso' : 'Detalle ingreso'}</h2><span class="muted small">${filtrado ? `${rows.length} de ${todas.length} filas` : `${rows.length} filas`} · ${L(total)} validado</span></div>
-  ${todas.length ? `<div class="filters">
+  ${todas.length ? `<div class="filters f-una">
     <input type="search" data-ftab="q" data-k="${esc(fk)}" value="${esc(F.q || '')}" placeholder="Buscar en ${eg ? 'egresos' : 'ingresos'}" aria-label="Buscar en ${eg ? 'egresos' : 'ingresos'}">
     ${fam ? '' : `<select data-ftab="mes" data-k="${esc(fk)}" aria-label="Mes"><option value="">Todos los meses</option>${mesesT.map(m => `<option value="${m}" ${F.mes === m ? 'selected' : ''}>${mesLargo(m)}</option>`).join('')}</select>`}
     <select data-ftab="sub" data-k="${esc(fk)}" aria-label="Subcategoría"><option value="">Todas las subcategorías</option>${subs.map(x => `<option value="${esc(x)}" ${F.sub === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
@@ -1553,7 +1569,7 @@ function todasPersonas(c) {
 // vParticipantes: Línea "Participan en …" con el botón Cambiar.
 function vParticipantes(c, mes) {
   const a = esAdmin(); const act = personasDe(c, mes); const propio = Array.isArray((c.personasMes || {})[mes]);
-  if (!(a && S.editPart === c.id + '|' + mes)) return `<div class="row small" style="gap:8px"><span class="eyebrow">Participan en ${esc(mesLargo(mes))}</span>${act.map(p => `<span class="chip">${esc(p)}</span>`).join('') || '<span class="muted">Nadie todavía</span>'}<span class="note">${propio ? 'lista propia de este mes' : 'los de siempre'}</span>${a && !cerrado(c) ? `<button class="btn sm ghost" data-act="editPart" data-c="${c.id}" data-m="${mes}">Cambiar</button>` : ''}</div>`;
+  if (!(a && S.editPart === c.id + '|' + mes)) return `<div class="row small ctl-part" style="gap:8px"><span class="eyebrow">Participan<span class="solo-pc-il"> en ${esc(mesLargo(mes))}</span></span>${act.map(p => `<span class="chip">${esc(p)}</span>`).join('') || '<span class="muted">Nadie todavía</span>'}<span class="note solo-pc-il">${propio ? 'lista propia de este mes' : 'los de siempre'}</span>${a && !cerrado(c) ? `<button class="btn sm ghost" data-act="editPart" data-c="${c.id}" data-m="${mes}">Cambiar</button>` : ''}</div>`;
   const sel = S.partTmp || act;
   return `<div class="panel"><div class="hd"><h2>Participantes de ${esc(mesLargo(mes))}</h2><span class="note">Solo ellos aparecen en TIPO y en la distribución de este mes.</span></div><div class="bd stack">
     <div class="row" style="gap:6px 18px">${todasPersonas(c).map(p => `<label class="small row" style="gap:6px"><input type="checkbox" data-part value="${esc(p)}" ${sel.includes(p) ? 'checked' : ''}>${esc(p)}</label>`).join('')}</div>
@@ -4169,6 +4185,7 @@ document.addEventListener('click', async e => {
   if (act === 'tjDashCerrar') { S.tjDashFull = null; return render(); }
   if (act === 'tjTab') { S.tjTab = b.dataset.v; return render(); }
   if (act === 'tjDashReset') { S.tjDash = Object.assign(S.tjDash || {}, {desde: '', hasta: ''}); return render(); }
+  if (act === 'ctlSec') { S.ctlSec = b.dataset.v; return render(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjSel') { S.tjSel = S.tjFicha = b.dataset.id; S.confirmTj = null; return pintarTjFicha(); }
