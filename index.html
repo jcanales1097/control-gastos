@@ -405,6 +405,21 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
+.solo-tel{display:none}
+@media (max-width:760px){
+  .solo-pc{display:none!important}.solo-tel{display:flex}
+  .ctl-barra{align-items:center;gap:6px;flex-wrap:nowrap}
+  .ctl-barra .mes-pick{flex:1;min-width:0;flex-wrap:nowrap;gap:4px;margin:0}
+  .ctl-barra .mes-pick .note,.ctl-barra .mes-pick [data-act=mesHoy]{display:none}
+  .ctl-barra .mes-pick select{min-width:0;flex:1 1 auto;font-size:13px!important;padding:5px 6px!important}
+  .ctl-barra .mes-pick select[data-selmes=y]{flex:0 0 70px}
+  .ctl-barra .mes-pick .btn{width:30px;height:32px;padding:0!important;flex:none}
+  .ctl-ico{display:flex;gap:4px;flex:none}.ctl-ico .htx{display:none}
+  .ctl-ico .btn,.ctl-ico summary.btn{width:34px;height:32px;padding:0!important;display:inline-flex!important;align-items:center;justify-content:center}
+  .ctl-ico .hico{display:block;width:17px;height:17px}
+  .ctl-ico .menu-pop{right:0;left:auto}
+  .ctl-ico button[data-act=cerrarProy].pri{width:auto;padding:0 8px!important;font-size:11px}
+}
 .tjs-tabs{display:none}
 @media (max-width:760px){
   .tjs-tabs{display:grid}
@@ -1097,6 +1112,21 @@ function resumen(c, h) {
   return {mes: h.mes, comp, per, n, ingreso: sum(ing, () => true), egreso: sum(eg, () => true), filas: todas.length, ligados: todas.filter(r => r.tx_id).length,
     pendientes: todas.filter(r => r.estado === 'pendiente').length, pendienteValor: h.egresos.filter(r => r.estado === 'pendiente').reduce((s, r) => s + r.valor, 0)};
 }
+// accionesCtl: botones de un control (nuevo registro, reporte PDF, Excel, cerrar/reabrir proyecto). En el teléfono se muestran
+// como iconos en una sola fila junto al selector de mes (cada uno conserva su nombre al mantenerlo presionado).
+const ICTL = {
+  nuevo: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  pdf: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M8.5 16v-4h1.2a1.2 1.2 0 0 1 0 2.4H8.5M13 12v4h.8a1.6 1.6 0 0 0 1.6-1.6v-.8A1.6 1.6 0 0 0 13.8 12Z"/></svg>',
+  xls: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 9v11"/></svg>',
+  cerrar: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  abrir: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>'};
+function accionesCtl(c, mes, R, a) {
+  return `${cerrado(c) ? '' : `<button class="btn pri" data-act="nuevoReg" data-c="${c.id}" data-m="${esc(mes)}" title="Nuevo registro" aria-label="Nuevo registro">${ICTL.nuevo}<span class="htx">+ Nuevo registro</span></button>`}<details class="menu"><summary class="btn" title="Reporte PDF" aria-label="Reporte PDF">${ICTL.pdf}<span class="htx">Reporte PDF ▾</span></summary><div class="menu-pop">
+        <button data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte completo</button>
+        ${(() => { const ps = [...new Set([...personasDe(c, mes), ...R.per.map(x => x.p)])].filter(Boolean); return ps.length ? `<div class="sep"></div><div class="eyebrow">Solo para una persona</div>${ps.map(p => `<button data-act="pdf" data-c="${c.id}" data-m="${mes}" data-p="${esc(p)}">${esc(p)} <span class="muted small">· sus gastos y los compartidos</span></button>`).join('')}` : ''; })()}
+      </div></details><button class="btn" data-act="export" data-c="${c.id}" title="Exportar a Excel" aria-label="Exportar a Excel">${ICTL.xls}<span class="htx">Exportar a Excel</span></button>
+      ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}" title="Reabrir proyecto" aria-label="Reabrir proyecto">${ICTL.abrir}<span class="htx">Reabrir proyecto</span></button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}" title="Cerrar proyecto">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : `${ICTL.cerrar}<span class="htx">Cerrar proyecto</span>`}</button>`) : ''}`;
+}
 // vSelMes: Selector de mes y año (con flechas) de un control.
 function vSelMes(c, mes, meses) {
   const [y, mm] = mes.split('-').map(Number); const anioHoy = +hoy().slice(0, 4);
@@ -1254,14 +1284,11 @@ function vControl(c) {
       <div><div class="eyebrow">${esProy(c) ? '<a href="#proyectos" class="muted small" style="text-decoration:none">← Proyectos</a> ' : ''}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(esProy(c) ? 'Proyecto' : c.nombre)}</span> ${esProy(c) ? `<span class="chip ${cerrado(c) ? '' : 'app'}">${cerrado(c) ? 'Cerrado el ' + fFecha(c.cerradoEl) : 'Abierto'}</span>` : ''}</div>
       <h1>${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>
       ${pend ? `<div class="note"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</a></div>` : ''}</div>
-      <div class="row">${cerrado(c) ? '' : `<button class="btn pri" data-act="nuevoReg" data-c="${c.id}" data-m="${esc(mes)}">+ Nuevo registro</button>`}<details class="menu"><summary class="btn">Reporte PDF ▾</summary><div class="menu-pop">
-        <button data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte completo</button>
-        ${(() => { const ps = [...new Set([...personasDe(c, mes), ...R.per.map(x => x.p)])].filter(Boolean); return ps.length ? `<div class="sep"></div><div class="eyebrow">Solo para una persona</div>${ps.map(p => `<button data-act="pdf" data-c="${c.id}" data-m="${mes}" data-p="${esc(p)}">${esc(p)} <span class="muted small">· sus gastos y los compartidos</span></button>`).join('')}` : ''; })()}
-      </div></details><button class="btn" data-act="export" data-c="${c.id}">Exportar a Excel</button>
-      ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}">Reabrir proyecto</button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : 'Cerrar proyecto'}</button>`) : ''}</div>
+      <div class="row solo-pc">${accionesCtl(c, mes, R, a)}</div>
     </div>
     ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
-    ${c.porMes ? `${vSelMes(c, mes, meses)}
+    <div class="ctl-barra solo-tel">${c.porMes ? vSelMes(c, mes, meses) : ''}<div class="ctl-ico">${accionesCtl(c, mes, R, a)}</div></div>
+    ${c.porMes ? `<div class="solo-pc">${vSelMes(c, mes, meses)}</div>
     ${vParticipantes(c, mes)}` : ''}
     <div class="kpis">
       <div class="kpi"><div class="eyebrow">Ingreso</div><div class="v">${L(R.ingreso)}</div></div>
