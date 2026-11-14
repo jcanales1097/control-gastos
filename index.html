@@ -405,9 +405,44 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
-.solo-tel{display:none}
+.solo-tel{display:none}.solo-tel-il{display:none}.dia-h{display:none}
 @media (max-width:760px){
-  .solo-pc{display:none!important}.solo-tel{display:flex}
+  .solo-pc{display:none!important}.solo-tel{display:flex}.solo-tel-il{display:contents}
+  /* Detalle de egresos/ingresos al estilo de Registro Contable: encabezado por día con su total y cada registro en dos líneas
+     (categoría a la izquierda, descripción + persona/estado al centro, valor a la derecha). Tocar la fila muestra sus acciones. */
+  .tbl-wrap:has(> table.tdet){overflow:visible;max-height:none!important}
+  table.tdet,table.tdet tbody{display:block;width:100%}table.tdet thead{display:none}
+  table.tdet tr[data-mov]{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-areas:"desc desc desc val" "tipo est fec val" "acc acc acc acc";column-gap:6px;row-gap:1px;align-items:center;padding:5px 10px;border-bottom:1px solid var(--line)}
+  table.tdet.tdet-cat tr[data-mov]{grid-template-columns:76px auto auto minmax(0,1fr) auto;grid-template-areas:"cat desc desc desc val" "cat tipo est fec val" "acc acc acc acc acc"}
+  table.tdet tr[data-mov]>td{display:block;padding:0;border:0;min-width:0;background:none}
+  table.tdet .td-cat{grid-area:cat;font-size:9.5px;line-height:1.25;color:var(--muted);overflow:hidden}
+  table.tdet .td-cat div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9.5px}
+  table.tdet .td-desc{grid-area:desc;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.tdet .td-desc .linkish{display:block;max-width:100%;font-weight:600;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.tdet tr.td-open .td-desc .linkish{white-space:normal}
+  table.tdet .td-desc .cat{font-weight:400;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.tdet .td-tipo{grid-area:tipo;font-size:10px;color:var(--muted);white-space:nowrap;max-width:42vw;overflow:hidden;text-overflow:ellipsis}
+  table.tdet .td-est{grid-area:est}table.tdet .td-est .chip{font-size:8.5px;padding:0 5px}
+  table.tdet .td-fec{grid-area:fec;font-size:9.5px;color:var(--muted)}
+  table.tdet.tdet-dia tr[data-mov]:not(.en-grupo) .td-fec{visibility:hidden}
+  table.tdet .td-val{grid-area:val;font-size:12px;text-align:right;align-self:center}
+  table.tdet .td-val .cat,table.tdet .td-val small{font-size:9px;display:block}
+  table.tdet td.acc{grid-area:acc;display:none!important}
+  table.tdet tr.td-open{background:var(--sunk)}
+  table.tdet tr.td-open td.acc{display:block!important;padding-top:4px;width:auto}
+  table.tdet tr.td-open .td-desc{white-space:normal}
+  table.tdet .acc-row{justify-content:flex-end;gap:6px}
+  table.tdet tr.dia-h{display:block;background:var(--sunk);border-bottom:1px solid var(--line)}
+  table.tdet tr.dia-h td{display:flex;align-items:center;gap:6px;padding:3px 10px;border:0}
+  table.tdet tr.dia-h b{font-size:15px;font-family:var(--f-num)}
+  .dia-s{font-size:9px;padding:0 5px;border-radius:4px;background:var(--muted);color:var(--panel);font-weight:600}
+  .dia-m{font-size:9.5px;color:var(--muted)}.dia-t{margin-left:auto;font-size:11px;font-weight:600}
+  table.tdet tr.grp,table.tdet tr.grp-sub{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line)}
+  table.tdet tr.grp td,table.tdet tr.grp-sub td{display:block;padding:0;border:0;font-size:11.5px}
+  table.tdet tr.grp td:first-child{flex:1;min-width:0}table.tdet tr.grp td:empty,table.tdet tr.grp-sub td:empty{display:none}
+  table.tdet tr.grp-sub{padding-left:24px;font-size:11px}table.tdet tr.grp-sub td.num{margin-left:auto}
+  table.tdet tr:not([data-mov]):not(.dia-h):not(.grp):not(.grp-sub){display:block}
+  table.tdet tr:not([data-mov]):not(.dia-h):not(.grp):not(.grp-sub)>td{display:block}
   .ctl-barra{align-items:center;gap:6px;flex-wrap:nowrap}
   .ctl-barra .mes-pick{flex:1;min-width:0;flex-wrap:nowrap;gap:4px;margin:0}
   .ctl-barra .mes-pick .note,.ctl-barra .mes-pick [data-act=mesHoy]{display:none}
@@ -1474,19 +1509,23 @@ function tablaFilas(c, h, lado) {
     <select data-ftab="cuenta" data-k="${esc(fk)}" aria-label="Cuenta"><option value="">Todas las cuentas</option>${ctas.map(x => `<option value="${esc(x)}" ${F.cuenta === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
     ${filtrado ? `<button class="btn sm ghost" data-act="limpiarFtab" data-k="${esc(fk)}">Quitar filtros</button>` : ''}
   </div>` : ''}
-  <div class="tbl-wrap"><table><thead><tr>${thOrd(okey, 'fecha', 'Fecha', odef)}${thOrd(okey, 'tipo', eg ? 'Tipo' : 'Persona', odef)}${eg && fam ? thOrd(okey, 'cat', 'Categoría', odef) : ''}${thOrd(okey, 'desc', 'Descripción', odef)}${thOrd(okey, 'valor', 'Valor', odef, 'num')}${thOrd(okey, 'estado', 'Estado', odef)}<th></th></tr></thead><tbody>
-  ${(() => { const filaH = r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}${r.grupo && microById(r.grupo) ? ' en-grupo' : ''}">
-    <td class="mono small" style="white-space:nowrap">${fFecha(r.fecha)}</td>
-    <td class="small"><span class="tipo-txt">${esc(r.tipo || '—')}</span></td>
-    ${eg && fam ? `<td class="small"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
-    <td class="desc small"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
-    <td class="num" style="white-space:nowrap">${L(+r.valor || 0)}${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
-    <td style="white-space:nowrap">${origenChip(r)}</td>
-    <td class="acc"><div class="acc-row">${a && r.estado === 'pendiente' ? icoBtn('validar', 'Validar', '', '#validar') : ''}${puedeEditar(r) ? icoBtn('editar', 'Editar', 'editarMov') : ''}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? icoBtn('dividir', 'Dividir en partes', 'dividirMov') : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? icoBtn('asociar', 'Asociar a un registro de la app', 'asociar') : ''}${puedeBorrar(r) ? (S.confirmK === r.id ? `<button class="btn sm danger" data-act="quitar">${r.tx_id ? '¿Quitar?' : '¿Borrar?'} Sí</button>` : icoBtn(r.tx_id ? 'quitar' : 'borrar', r.tx_id ? 'Quitar (vuelve a la bandeja)' : 'Borrar', 'quitar', '', 'danger')) : ''}</div></td></tr>`;
+  <div class="tbl-wrap"><table class="tdet ${eg && fam ? 'tdet-cat' : ''} ${ordDe(okey, odef).k === 'fecha' ? 'tdet-dia' : ''}"><thead><tr>${thOrd(okey, 'fecha', 'Fecha', odef)}${thOrd(okey, 'tipo', eg ? 'Tipo' : 'Persona', odef)}${eg && fam ? thOrd(okey, 'cat', 'Categoría', odef) : ''}${thOrd(okey, 'desc', 'Descripción', odef)}${thOrd(okey, 'valor', 'Valor', odef, 'num')}${thOrd(okey, 'estado', 'Estado', odef)}<th></th></tr></thead><tbody>
+  ${(() => { const filaH = r => `<tr data-mov="${esc(r.id)}" class="${r.estado !== 'valido' ? 'st-' + r.estado : ''}${r.grupo && microById(r.grupo) ? ' en-grupo' : ''}${S.filaAbierta === r.id ? ' td-open' : ''}">
+    <td class="mono small td-fec" style="white-space:nowrap">${fFecha(r.fecha)}</td>
+    <td class="small td-tipo"><span class="tipo-txt">${esc(r.tipo || '—')}</span></td>
+    ${eg && fam ? `<td class="small td-cat"><div>${esc(r.cat)}</div><div class="cat">${esc(r.sub)}</div></td>` : ''}
+    <td class="desc small td-desc"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
+    <td class="num td-val" style="white-space:nowrap">${L(+r.valor || 0)}${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
+    <td class="td-est" style="white-space:nowrap">${origenChip(r)}</td>
+    <td class="acc"><div class="acc-row"><span class="solo-tel-il">${icoBtn('ver', 'Ver todos los datos', 'detalle')}</span>${a && r.estado === 'pendiente' ? icoBtn('validar', 'Validar', '', '#validar') : ''}${puedeEditar(r) ? icoBtn('editar', 'Editar', 'editarMov') : ''}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? icoBtn('dividir', 'Dividir en partes', 'dividirMov') : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? icoBtn('asociar', 'Asociar a un registro de la app', 'asociar') : ''}${puedeBorrar(r) ? (S.confirmK === r.id ? `<button class="btn sm danger" data-act="quitar">${r.tx_id ? '¿Quitar?' : '¿Borrar?'} Sí</button>` : icoBtn(r.tx_id ? 'quitar' : 'borrar', r.tx_id ? 'Quitar (vuelve a la bandeja)' : 'Borrar', 'quitar', '', 'danger')) : ''}</div></td></tr>`;
     const hechos = new Set(); const nc = cols; const ivalor = 3 + (eg && fam ? 1 : 0);
     const sueltas = rowsO.filter(r => !(r.grupo && microById(r.grupo)));
     const grupos = [...new Set(rowsO.filter(r => r.grupo && microById(r.grupo)).map(r => r.grupo))].sort((x, y) => microById(x).nombre.localeCompare(microById(y).nombre, 'es'));
-    return sueltas.map(filaH).join('') + grupos.map(g => {
+    const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; const porDia = ordDe(okey, odef).k === 'fecha'; let fAnt = null;
+    const totDia = {}; if (porDia) sueltas.forEach(r => { totDia[r.fecha] = (totDia[r.fecha] || 0) + (+r.valor || 0); });
+    const conDia = r => { let hd = ''; if (porDia && r.fecha !== fAnt) { fAnt = r.fecha; const d = new Date((r.fecha || hoy()) + 'T12:00');
+      hd = `<tr class="dia-h"><td colspan="${nc}"><b>${(r.fecha || '').slice(8, 10)}</b><span class="dia-s">${DIAS[d.getDay()]}</span><span class="dia-m">${(r.fecha || '').slice(5, 7)}/${(r.fecha || '').slice(0, 4)}</span><span class="dia-t num">${L(totDia[r.fecha] || 0)}</span></td></tr>`; } return hd + filaH(r); };
+    return sueltas.map(conDia).join('') + grupos.map(g => {
       const mp = microById(g); if (hechos.has(mp.id)) return ''; hechos.add(mp.id);
       const del = rowsO.filter(x => x.grupo === mp.id); const val = del.filter(x => x.estado === 'valido');
       const sub = {}; val.forEach(x => sub[x.tipo] = (sub[x.tipo] || 0) + x.valor);
@@ -2578,6 +2617,7 @@ const ICO = {
   editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   borrar: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
   quitar: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  ver: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
   dividir: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.2-2.9L3 3"/><path d="m15 9 6-6"/>',
   asociar: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
   validar: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'
@@ -4076,6 +4116,10 @@ async function guardarTj() {
    más cercano al clic y ejecuta la acción con ese nombre. */
 document.addEventListener('click', async e => {
   const au = e.target.closest('[data-auth]'); if (au) { e.preventDefault(); S.authView = au.dataset.auth; return renderAuth(); }
+  { // Teléfono: tocar una fila del detalle de egresos/ingresos muestra u oculta sus acciones (ver, editar, dividir, quitar…).
+    const fila = esTelefono() && e.target.closest('table.tdet tr[data-mov]');
+    if (fila && !e.target.closest('td.acc, input, select, a')) { const id = fila.dataset.mov; S.filaAbierta = S.filaAbierta === id ? null : id;
+      document.querySelectorAll('table.tdet tr.td-open').forEach(x => x.classList.remove('td-open')); if (S.filaAbierta) fila.classList.add('td-open'); return; } }
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
   if (act === 'filtrosTel') { _filtrosAbiertos = !_filtrosAbiertos; filtrosTelefono(document.getElementById('app')); filtrosTelefono(document.getElementById('modalRoot')); return; }
@@ -4518,7 +4562,7 @@ function tablasTelefono(root) {
   filtrosTelefono(root);
   if (!esTelefono()) { root.querySelectorAll('table.tcards').forEach(t => t.classList.remove('tcards')); return; }
   root.querySelectorAll('table').forEach(t => {
-    if (t.closest('.no-tcards')) return; const w = t.closest('.tbl-wrap') || t.parentElement;
+    if (t.closest('.no-tcards') || t.classList.contains('tdet')) return; const w = t.closest('.tbl-wrap') || t.parentElement;
     if (t.classList.contains('tcards')) return;
     if (t.scrollWidth > w.clientWidth + 4) { etiquetarTabla(t); t.classList.add('tcards'); }
   });
