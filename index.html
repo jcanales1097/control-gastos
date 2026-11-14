@@ -405,6 +405,11 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
+/* Gráfico del proyecto a pantalla completa */
+.panel.graf-full{position:fixed;inset:0;z-index:30;margin:0;border:0;border-radius:0;display:flex;flex-direction:column;overflow:auto;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+.graf-full .chart-box{flex:1;min-height:240px}.graf-full .graf-x{order:9;font-size:16px;padding:4px 10px!important;margin-left:auto}
+body:has(.graf-full){overflow:hidden}
+.graf-exp{padding:5px 7px!important}
 .solo-tel{display:none}.solo-tel-b{display:none}.solo-tel-il{display:none}.dia-h{display:none}.ctl-tabs{display:none}.ctl-secs{display:contents}.ctl-secs>div{display:contents}
 @media (max-width:760px){
   .solo-pc{display:none!important}.solo-pc-il{display:none!important}.solo-tel{display:flex}.solo-tel-il{display:contents}
@@ -1385,7 +1390,9 @@ function vResumenProy(c, R, h) {
   const ult = puntos.find(x => x.mes === sel) || puntos[puntos.length - 1];
   const tabla = `<div class="tbl-wrap"><table><thead><tr><th>Mes</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo${modo === 'acum' ? ' acumulado' : ' del mes'}</th></tr></thead><tbody>
     ${puntos.map(x => `<tr><td><button class="linkish" data-act="proyMes" data-c="${c.id}" data-m="${x.mes}">${esc(mesLargo(x.mes))}</button></td><td class="num">${L(x.i)}</td><td class="num">${L(-x.e)}</td><td class="num ${x.s < 0 ? 'neg' : 'pos'}">${L(x.s)}</td></tr>`).join('')}</tbody></table></div>`;
-  return `<div class="panel"><div class="hd" style="flex-wrap:wrap;gap:10px"><h2>Evolución del proyecto</h2>
+  const full = S.grafFull === c.id && !verTabla;   // gráfico a pantalla completa (botón de ampliar, pensado para el teléfono)
+  const AMP = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+  return `<div class="panel ${full ? 'graf-full' : ''}"><div class="hd" style="flex-wrap:wrap;gap:10px"><h2>Evolución del proyecto</h2>${verTabla ? '' : full ? `<button class="btn sm ghost graf-x" data-act="grafFull" data-c="" title="Cerrar (Esc)" aria-label="Cerrar pantalla completa">✕</button>` : `<span class="solo-tel-il"><button class="btn sm ghost graf-exp" data-act="grafFull" data-c="${c.id}" title="Pantalla completa" aria-label="Ver el gráfico a pantalla completa">${AMP}</button></span>`}
       <div class="seg" role="group" aria-label="Tipo de gráfico"><button data-act="grafModo" data-c="${c.id}" data-v="acum" aria-pressed="${modo === 'acum'}">Acumulado</button><button data-act="grafModo" data-c="${c.id}" data-v="mes" aria-pressed="${modo === 'mes'}">Por mes</button></div>
       ${sel && !verTabla ? (() => { const k = puntos.findIndex(x => x.mes === sel); const ant = puntos[k - 1], sig = puntos[k + 1]; return `<span class="row small" style="gap:6px;margin-left:auto"><button class="btn sm" data-act="proyMes" data-c="${c.id}" data-m="${ant ? ant.mes : ''}" ${ant ? '' : 'disabled'} aria-label="Mes anterior">‹</button><b>${esc(mesLargo(sel))}</b><button class="btn sm" data-act="proyMes" data-c="${c.id}" data-m="${sig ? sig.mes : ''}" ${sig ? '' : 'disabled'} aria-label="Mes siguiente">›</button><button class="btn sm ghost" data-act="proyMes" data-c="${c.id}" data-m="${sel}">Ver todos los meses</button></span>`; })() : ''}
       <button class="btn sm ghost" data-act="grafTabla" data-c="${c.id}" style="${sel && !verTabla ? '' : 'margin-left:auto'}">${verTabla ? 'Ver gráfico' : 'Ver tabla'}</button></div>
@@ -1415,7 +1422,7 @@ function dibujarGraficos() {
     const c = ctrlById(box.dataset.chart); if (!c) return; const {puntos: TODO, modo} = serieProy(c, hoja(c.id, 'general'));
     const s0 = TODO.findIndex(x => x.mes === box.dataset.sel); const zoom = s0 >= 0 && TODO.length > 3;
     const P = zoom ? TODO.slice(Math.max(0, s0 - 1), s0 + 2) : TODO;
-    const W = Math.max(300, box.clientWidth - 28), H = W < 560 ? 236 : 296, ml = 52, mr = 14, mt = 12, mb = 44;
+    const W = Math.max(300, box.clientWidth - 28), H = box.closest('.graf-full') ? Math.max(236, box.clientHeight - 16) : W < 560 ? 236 : 296, ml = 52, mr = 14, mt = 12, mb = 44;
     const vals = P.flatMap(x => [x.i, x.e, x.s]); let lo = zoom ? Math.min(...vals) : Math.min(0, ...vals), hi = zoom ? Math.max(...vals) : Math.max(0, ...vals);
     if (zoom) { const pad = Math.max((hi - lo) * 0.12, Math.abs(hi) * 0.02, 1); lo -= pad; hi += pad; } if (hi === lo) hi = lo + 1;
     const paso = (() => { const raw = (hi - lo) / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; })();
@@ -4206,6 +4213,7 @@ document.addEventListener('click', async e => {
   if (act === 'tjTab') { S.tjTab = b.dataset.v; return render(); }
   if (act === 'tjDashReset') { S.tjDash = Object.assign(S.tjDash || {}, {desde: '', hasta: ''}); return render(); }
   if (act === 'editProy') { S.editProy = S.editProy === b.dataset.c ? null : b.dataset.c; return render(); }
+  if (act === 'grafFull') { S.grafFull = b.dataset.c || null; return render(); }
   if (act === 'ctlSec') { S.ctlSec = b.dataset.v; return render(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
@@ -4494,6 +4502,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
+  if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.grafFull) { S.grafFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.tjDashFull) { S.tjDashFull = null; return render(); }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) cerrarCapa();
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
@@ -4612,6 +4621,7 @@ function tablasTelefono(root) {
   matchMedia('(max-width:760px)').addEventListener('change', correr);
 })();
 
+{ let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (document.querySelector('.graf-full')) dibujarGraficos(); }, 150); }); }
 aplicarTema();
 init().catch(e => fatal(e && e.message || String(e)));
 })();
