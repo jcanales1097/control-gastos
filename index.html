@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><!-- maximum-scale=1: el iPhone no hace zoom al tocar un campo (se puede seguir ampliando con dos dedos) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#052659" id="metaTheme">
 <title>Control de Gastos Familiares</title>
@@ -366,7 +366,7 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-it:hover b{-webkit-line-clamp:unset}
 .tj-ctasel{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px;max-height:260px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
 /* ================= TELÉFONO =================
-   Barra superior compacta (marca + botones en una línea, pestañas deslizables), campos de 16px para que el iPhone no haga zoom,
+   Barra superior compacta (marca + botones en una línea, pestañas deslizables), letras compactas (el iPhone no hace zoom gracias a maximum-scale=1),
    ventanas emergentes como hoja desde abajo, filtros en dos columnas y botones más fáciles de tocar. */
 @media (max-width:760px){
   .top .wrap{gap:6px 8px;padding-block:8px 0}
@@ -382,7 +382,6 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   #btnSync{padding:6px 10px;font-size:12.5px}
   main{padding-block:14px 80px}
   h1{font-size:19px}
-  input,select,textarea,select.in,input.in{font-size:16px!important}
   select.in,input.in{max-width:100%}
   .btn.ico{width:38px;height:38px}
   .btn.sm{padding:7px 10px}
@@ -397,6 +396,42 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   .kpis .kpi .v{font-size:18px}
   .tbl-wrap{-webkit-overflow-scrolling:touch}
   .panel>.hd{padding:10px 12px}.panel>.bd{padding:12px}
+  /* --- Compacto (teléfono): letras más pequeñas y menos relleno para que quepa más información --- */
+  body{font-size:13px;line-height:1.4}
+  h1{font-size:17px!important}h2{font-size:14px}
+  .eyebrow{font-size:9.5px;letter-spacing:.06em}
+  .note{font-size:11px}.cat{font-size:10.5px}.small{font-size:11.5px}
+  .btn{font-size:12px;padding:6px 10px}.btn.sm{font-size:11.5px;padding:6px 9px}
+  input,select,textarea,select.in,input.in{font-size:14px!important;padding:6px 8px}
+  .kpis .kpi{padding:8px 10px}.kpis .kpi .v{font-size:15px}
+  th{font-size:9.5px;padding:6px 6px}td{padding:6px 6px;font-size:12px}
+  .panel>.hd{padding:8px 10px}.panel>.bd{padding:10px}
+  .stack{gap:10px}
+  nav.tabs a{font-size:12.5px;padding:6px 9px}
+  .chip{font-size:10.5px}
+  /* --- Tablas anchas como tarjetas: sin barra horizontal. Cada fila es una tarjeta: el dato principal arriba a lo ancho
+         y los demás como "etiqueta: valor" en dos columnas (las etiquetas salen de los encabezados de la tabla). --- */
+  table.tcards,table.tcards tbody,table.tcards tfoot{display:block;width:100%}
+  table.tcards thead{display:none}
+  .tbl-wrap:has(> table.tcards){overflow:visible;max-height:none!important}
+  table.tcards tr{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;padding:8px 10px;border-bottom:1px solid var(--line);position:relative}
+  table.tcards tr.tc-con-chk{padding-left:38px}
+  table.tcards td{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:0;border:0;font-size:12px;text-align:right;min-width:0;white-space:normal;background:none}
+  table.tcards td::before{content:attr(data-label);color:var(--muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;text-align:left;flex:none;font-family:var(--f-ui);font-weight:600}
+  table.tcards td[data-label=""]::before{content:none}
+  table.tcards td.tc-main{grid-column:1/-1;display:block;text-align:left;font-size:12.5px}
+  table.tcards td.tc-main::before{content:none}
+  table.tcards td.tc-chk{position:absolute;left:10px;top:8px}
+  table.tcards td.tc-chk::before{content:none}
+  table.tcards td.tc-full,table.tcards td.acc{grid-column:1/-1}
+  table.tcards td.acc{justify-content:flex-end}table.tcards td.acc::before{content:none}
+  table.tcards td.tc-vacia{display:none}
+  table.tcards td{flex-wrap:wrap;width:auto!important;max-width:none!important}table.tcards td>*{min-width:0;max-width:100%}
+  table.tcards td>select,table.tcards td>input:not([type=checkbox]){flex:1 1 110px;width:auto}
+  table.tcards td:has(button~button),table.tcards td:has(.btn~.btn){grid-column:1/-1;justify-content:flex-start}
+  table.tcards td .tj-ctas{justify-content:flex-end}
+  table.tcards tr.cr-row{cursor:pointer}
+  table.tcards tfoot tr,table.tcards tr.tot,table.tcards tr.cr-tot{background:var(--sunk);font-weight:600}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
@@ -815,7 +850,7 @@ function renderAuth() {
     </div></form></div>
     <p class="small" style="text-align:center;margin-top:14px"><a href="guia.html" target="_blank" rel="noopener">¿Cómo funciona? Ver la guía de uso</a></p>
     ${v === 'registro' ? '<p class="note" style="text-align:center">Después de confirmar tu correo, el administrador te da acceso a los controles que te corresponden.</p>' : ''}</div>`;
-  const f = $('#aEmail') || $('#aPass'); f && f.focus();
+  const f = $('#aEmail') || $('#aPass'); f && f.focus({preventScroll: true});
 }
 // enviarAuth: Envía el formulario de entrada / registro / recuperar contraseña a Supabase.
 async function enviarAuth(form) {
@@ -901,8 +936,8 @@ function render() {
   if (pw) { if (planPos && planPos.c === pw.dataset.c) pw.scrollTop = planPos.top; else { const tr = pw.querySelector('tr.cr-sel'); if (tr) pw.scrollTop = Math.max(0, tr.offsetTop - pw.clientHeight / 2); } }
   window.scrollTo(0, keep);
   dibujarGraficos(); dibujarVeh();
-  if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
-  const qi = $('#fq'); if (qi && S._focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
+  if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus({preventScroll: true}); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
+  const qi = $('#fq'); if (qi && S._focusQ) { qi.focus({preventScroll: true}); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
 // renderEspera: Pantalla para cuentas creadas que el administrador aún no activa.
 function renderEspera() {
@@ -1781,7 +1816,7 @@ function abrirRegModal(tipo, id) {
     <div class="hd"><h2 id="vrmT" style="margin-right:auto">${titulo}</h2><span class="note">${esc(v.nombre)}</span><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
     <div class="bd">${cuerpo}</div></div></div>`;
   montarFormReg(); montarRecorrido(v); cargarMiniaturas();
-  const f1 = $('#modalRoot input:not([disabled]):not([type=file])'); if (f1 && tipo === 'recorrido') $('#vrOdo').focus();
+  const f1 = $('#modalRoot input:not([disabled]):not([type=file])'); if (f1 && tipo === 'recorrido') $('#vrOdo').focus({preventScroll: true});
 }
 // montarRecorrido: Activa el formulario de recorridos.
 function montarRecorrido(v) {
@@ -2102,7 +2137,7 @@ function pintarConc(foco) {
   const cols = [...document.querySelectorAll('.cr-modal .cr-conc > div')].map(d => d.scrollTop);
   $('#modalRoot').innerHTML = vConciliar(c, qq);
   document.querySelectorAll('.cr-modal .cr-conc > div').forEach((d, i) => { d.scrollTop = cols[i] || 0; });
-  if (foco) { const el = $('#credBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (foco) { const el = $('#credBus'); if (el) { el.focus({preventScroll: true}); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 // crVincularVarios: vincula todos los registros marcados a la cuota, cada uno con su desglose sugerido.
 async function crVincularVarios(qid, refs) {
@@ -2332,7 +2367,7 @@ function abrirCredForm(id) {
       ${c ? '<div class="note">Al guardar, las cuotas que no corregiste a mano se recalculan con los datos nuevos. Las cuotas corregidas o pegadas del banco se conservan.</div>' : '<div class="note">Al guardar se proyecta el plan de pago con cuota fija. Después puedes corregir cuotas o pegar el plan del banco.</div>'}
       <div class="row" style="justify-content:space-between">${c ? `<button class="btn ghost danger" data-act="credBorrar" data-id="${c.id}">${S.confirmCred === c.id ? '¿Eliminar con su plan y enlaces? Sí' : 'Eliminar crédito'}</button>` : '<span></span>'}<span class="row"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="credGuardar">${c ? 'Guardar cambios' : 'Crear y proyectar'}</button></span></div>
     </div></div></div>`;
-  $('#crNombre').focus();
+  $('#crNombre').focus({preventScroll: true});
 }
 // guardarCred: Guarda el crédito y proyecta (o recalcula) su plan.
 async function guardarCred() {
@@ -2394,7 +2429,7 @@ function abrirPegar(cid) {
       <textarea id="pegTxt" rows="10" style="width:100%;font-family:var(--f-num);font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel);color:var(--fg)" placeholder="1	15/07/2025	655.10	11479.17	652.50	0.00"></textarea>
       <div id="pegPrev" class="note">Pega las filas para ver la vista previa.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="pegGuardar" disabled>Reemplazar plan</button></div></div></div></div>`;
-  $('#pegTxt').focus();
+  $('#pegTxt').focus({preventScroll: true});
 }
 // prevPegar: Vista previa de las cuotas reconocidas al pegar.
 function prevPegar() {
@@ -2455,7 +2490,7 @@ function abrirRegistro(cid, mes, movId) {
       ${!a && nuevo ? '<div class="note">Tu registro queda “Por validar” hasta que el administrador lo revise.</div>' : ''}
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="guardarReg">${nuevo ? (a ? 'Agregar' : 'Registrar') : 'Guardar cambios'}</button></div>
     </div></div></div>`;
-  const f = $('#nrValor'); f && (nuevo ? $('#nrDesc').focus() : f.focus());
+  const f = $('#nrValor'); f && (nuevo ? $('#nrDesc').focus({preventScroll: true}) : f.focus({preventScroll: true}));
 }
 // guardarRegistro: Guarda el registro: si es nuevo lo inserta (válido si es admin, por validar si es usuario); si existe lo actualiza.
 async function guardarRegistro() {
@@ -2675,7 +2710,7 @@ function pintarAsoc() {
         ${lista.map(x => `<tr><td class="mono small">${fFecha(x.fecha)}${m.fecha && x.fecha !== m.fecha ? `<div class="cat">${dias(x.fecha, m.fecha)} d de diferencia</div>` : ''}</td><td class="small">${esc(x.det)}<div class="cat">${esc([x.cat, x.sub, x.nota].filter(Boolean).join(' › '))}</div></td><td class="small muted">${esc(x.cuenta)}</td><td class="num ${cents(restante(x)) === cents(m.valor) ? 'pos' : ''}">${L(restante(x))}${fxTxt(x)}</td><td><button class="btn sm" data-act="asocElegir" data-tx="${esc(x.id)}">Elegir</button></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty">No hay registros disponibles que coincidan.</div>'}`}
     </div></div></div>`;
-  if (!t && S._focusAsoc) { const i = $('#asocQ'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } S._focusAsoc = false; }
+  if (!t && S._focusAsoc) { const i = $('#asocQ'); if (i) { i.focus({preventScroll: true}); i.setSelectionRange(i.value.length, i.value.length); } S._focusAsoc = false; }
 }
 // guardarAsoc: Guarda la asociación.
 async function guardarAsoc() {
@@ -3007,7 +3042,7 @@ function vAjustes() {
 
 /* ================= sincronización (admin) ================= */
 // BM: Código del marcador (bookmarklet) que lee el portal de Registro Contable.
-const BM = `javascript:(async()=>{if(window.__cgRun)return;window.__cgRun=1;var y=new Date().getFullYear(),s=(y-1)+'-01-01',e=y+'-12-31';var fs=[].slice.call(document.querySelectorAll('input')).map(function(i){return(i.value||'').trim()}).filter(function(v){return/^\\d{4}-\\d{2}-\\d{2}$/.test(v)});if(fs.length>=2){fs.sort();s=fs[0];e=fs[fs.length-1]}var o=document.createElement('div');o.style.cssText='position:fixed;inset:0;z-index:999999;background:rgba(10,16,13,.6);display:flex;align-items:center;justify-content:center;font:15px -apple-system,Helvetica,sans-serif';o.innerHTML='<div style="background:#fff;color:#18211D;padding:26px;border-radius:12px;max-width:440px;text-align:center"><div id="cg-h" style="font-size:19px;font-weight:700">Leyendo…</div><p style="color:#5D6B64;margin:8px 0">Periodo: <input id="cg-d" type="date" style="font-size:14px"> a <input id="cg-e" type="date" style="font-size:14px"> <button id="cg-r" style="font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer">Leer</button></p><p style="color:#5D6B64;margin:6px 0">Cópialos y pégalos en Control de Gastos.</p><button id="cg-c" style="font-size:16px;padding:11px 20px;background:#1E6A50;color:#fff;border:0;border-radius:8px;cursor:pointer;font-weight:700">Copiar datos</button> <button id="cg-f" style="font-size:14px;padding:10px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer">Descargar archivo</button><p id="cg-m" style="color:#1E6A50;font-weight:600;min-height:20px"></p><button id="cg-x" style="font-size:13px;border:0;background:none;color:#5D6B64;cursor:pointer">Cerrar</button><textarea id="cg-t" style="position:fixed;left:-9999px;top:0"></textarea></div>';document.body.appendChild(o);var Q=function(x){return o.querySelector(x)},p='',ta=Q('#cg-t');Q('#cg-d').value=s;Q('#cg-e').value=e;var leer=async function(){var a=Q('#cg-d').value,b=Q('#cg-e').value;if(!a||!b||a>b){Q('#cg-m').textContent='Revisa las fechas.';return}Q('#cg-h').textContent='Leyendo…';Q('#cg-m').textContent='';p='';try{var t=await(await fetch('/moneyBook/getDataByPeriod?startDate='+a+'&endDate='+b+'&mbid=1&assetId=')).text();var d=new DOMParser().parseFromString(t,'text/xml');var g=function(r,n){var x=r.getElementsByTagName(n)[0];return x?x.textContent:''};var X=function(r){var x={},k=0;[].slice.call(r.children).forEach(function(c){var v=(c.textContent||'').trim();if(v&&!/^(id|mbDate|inOutCode|payType|inOutType|mbCategory|subCategory|mbContent|mbDetailContent|mbCash)$/.test(c.tagName)){x[c.tagName]=v;k++}});return k?x:0};var rows=[].slice.call(d.getElementsByTagName('row')).map(function(r){var a=[g(r,'id'),g(r,'mbDate'),+g(r,'inOutCode'),g(r,'payType'),g(r,'inOutType'),g(r,'mbCategory'),g(r,'subCategory'),g(r,'mbContent'),g(r,'mbDetailContent'),+g(r,'mbCash')],x=X(r);if(x)a.push(x);return a});p=JSON.stringify({v:1,src:'registro-contable',at:new Date().toISOString(),desde:a,hasta:b,rows:rows});ta.value=p;Q('#cg-h').textContent=rows.length+' movimientos listos'}catch(err){Q('#cg-h').textContent='No se pudo leer';Q('#cg-m').textContent='Abre esto en el portal de la app con el servicio Wi-Fi activo. '+err}};Q('#cg-r').onclick=leer;Q('#cg-x').onclick=function(){o.remove();window.__cgRun=0};Q('#cg-c').onclick=function(){if(!p)return;ta.focus();ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(_){}Q('#cg-m').textContent=ok?'Copiado. Vuelve a Control de Gastos y pega (Cmd+V).':'No se pudo copiar. Usa Descargar archivo.'};Q('#cg-f').onclick=function(){if(!p)return;var l=document.createElement('a');l.href=URL.createObjectURL(new Blob([p],{type:'application/json'}));l.download='registro-contable-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(l);l.click();l.remove();Q('#cg-m').textContent='Archivo descargado. Súbelo en Control de Gastos.'};leer()})();`;
+const BM = `javascript:(async()=>{if(window.__cgRun)return;window.__cgRun=1;var y=new Date().getFullYear(),s=(y-1)+'-01-01',e=y+'-12-31';var fs=[].slice.call(document.querySelectorAll('input')).map(function(i){return(i.value||'').trim()}).filter(function(v){return/^\\d{4}-\\d{2}-\\d{2}$/.test(v)});if(fs.length>=2){fs.sort();s=fs[0];e=fs[fs.length-1]}var o=document.createElement('div');o.style.cssText='position:fixed;inset:0;z-index:999999;background:rgba(10,16,13,.6);display:flex;align-items:center;justify-content:center;font:15px -apple-system,Helvetica,sans-serif';o.innerHTML='<div style="background:#fff;color:#18211D;padding:26px;border-radius:12px;max-width:440px;text-align:center"><div id="cg-h" style="font-size:19px;font-weight:700">Leyendo…</div><p style="color:#5D6B64;margin:8px 0">Periodo: <input id="cg-d" type="date" style="font-size:14px"> a <input id="cg-e" type="date" style="font-size:14px"> <button id="cg-r" style="font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer">Leer</button></p><p style="color:#5D6B64;margin:6px 0">Cópialos y pégalos en Control de Gastos.</p><button id="cg-c" style="font-size:16px;padding:11px 20px;background:#1E6A50;color:#fff;border:0;border-radius:8px;cursor:pointer;font-weight:700">Copiar datos</button> <button id="cg-f" style="font-size:14px;padding:10px 14px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer">Descargar archivo</button><p id="cg-m" style="color:#1E6A50;font-weight:600;min-height:20px"></p><button id="cg-x" style="font-size:13px;border:0;background:none;color:#5D6B64;cursor:pointer">Cerrar</button><textarea id="cg-t" style="position:fixed;left:-9999px;top:0"></textarea></div>';document.body.appendChild(o);var Q=function(x){return o.querySelector(x)},p='',ta=Q('#cg-t');Q('#cg-d').value=s;Q('#cg-e').value=e;var leer=async function(){var a=Q('#cg-d').value,b=Q('#cg-e').value;if(!a||!b||a>b){Q('#cg-m').textContent='Revisa las fechas.';return}Q('#cg-h').textContent='Leyendo…';Q('#cg-m').textContent='';p='';try{var t=await(await fetch('/moneyBook/getDataByPeriod?startDate='+a+'&endDate='+b+'&mbid=1&assetId=')).text();var d=new DOMParser().parseFromString(t,'text/xml');var g=function(r,n){var x=r.getElementsByTagName(n)[0];return x?x.textContent:''};var X=function(r){var x={},k=0;[].slice.call(r.children).forEach(function(c){var v=(c.textContent||'').trim();if(v&&!/^(id|mbDate|inOutCode|payType|inOutType|mbCategory|subCategory|mbContent|mbDetailContent|mbCash)$/.test(c.tagName)){x[c.tagName]=v;k++}});return k?x:0};var rows=[].slice.call(d.getElementsByTagName('row')).map(function(r){var a=[g(r,'id'),g(r,'mbDate'),+g(r,'inOutCode'),g(r,'payType'),g(r,'inOutType'),g(r,'mbCategory'),g(r,'subCategory'),g(r,'mbContent'),g(r,'mbDetailContent'),+g(r,'mbCash')],x=X(r);if(x)a.push(x);return a});p=JSON.stringify({v:1,src:'registro-contable',at:new Date().toISOString(),desde:a,hasta:b,rows:rows});ta.value=p;Q('#cg-h').textContent=rows.length+' movimientos listos'}catch(err){Q('#cg-h').textContent='No se pudo leer';Q('#cg-m').textContent='Abre esto en el portal de la app con el servicio Wi-Fi activo. '+err}};Q('#cg-r').onclick=leer;Q('#cg-x').onclick=function(){o.remove();window.__cgRun=0};Q('#cg-c').onclick=function(){if(!p)return;ta.focus({preventScroll: true});ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(_){}Q('#cg-m').textContent=ok?'Copiado. Vuelve a Control de Gastos y pega (Cmd+V).':'No se pudo copiar. Usa Descargar archivo.'};Q('#cg-f').onclick=function(){if(!p)return;var l=document.createElement('a');l.href=URL.createObjectURL(new Blob([p],{type:'application/json'}));l.download='registro-contable-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(l);l.click();l.remove();Q('#cg-m').textContent='Archivo descargado. Súbelo en Control de Gastos.'};leer()})();`;
 // vBookmarklet: Instrucciones y botón del marcador.
 function vBookmarklet() {
   return `<p class="small" style="margin:0">Se configura una sola vez. Arrastra este botón a tu barra de favoritos de Safari o Chrome:</p>
@@ -3061,7 +3096,7 @@ function abrirSync(auto) {
         <p class="small" style="margin:0"><b>Sin favorito:</b> abre <a id="lnkDatos" target="_blank" rel="noopener" href="#">los datos del portal</a>, guárdalos con Cmd+S y súbelos con "Subir archivo", o selecciona todo, copia y pega aquí.</p>${vBookmarklet()}</div></details>`}
     </div></div></div>`;
   pintarEnlaces();
-  if (directo && auto && base) syncDirecto(); else setTimeout(() => { const i = directo || !base ? $('#portalIn') : $('#pasteBox'); i && i.focus(); }, 50);
+  if (directo && auto && base) syncDirecto(); else setTimeout(() => { const i = directo || !base ? $('#portalIn') : $('#pasteBox'); i && i.focus({preventScroll: true}); }, 50);
 }
 // xmlAPayload: Convierte el XML del portal en el paquete de datos de la plataforma.
 function xmlAPayload(txt) {
@@ -3080,7 +3115,7 @@ function xmlAPayload(txt) {
 // syncDirecto: Sincroniza leyendo el portal directamente (con el servidor auxiliar).
 async function syncDirecto() {
   const msg = $('#syncMsg'); const base = portalActual(); const btn = $('#btnSyncDirecto');
-  if (!base) { msg.innerHTML = '<span class="neg">Pega primero la dirección que muestra la app.</span>'; $('#portalIn').focus(); return; }
+  if (!base) { msg.innerHTML = '<span class="neg">Pega primero la dirección que muestra la app.</span>'; $('#portalIn').focus({preventScroll: true}); return; }
   const y = new Date().getFullYear(); const desde = `${y - 1}-01-01`, hasta = `${y}-12-31`;
   if (btn) btn.disabled = true; msg.textContent = 'Leyendo el portal del iPhone…';
   try {
@@ -3731,7 +3766,7 @@ function pintarTjPer(foco) {
     </div>
     <div class="cr-navft">${nav(true)}</div></div></div>`;
   document.querySelectorAll('.tj-modal .lst').forEach((d, k) => { d.scrollTop = prev[k] || 0; });
-  if (foco) { const el = $(foco === 'c' ? '#tjBusC' : '#tjBus'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (foco) { const el = $(foco === 'c' ? '#tjBusC' : '#tjBus'); if (el) { el.focus({preventScroll: true}); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 // tjRegPeriodo: devuelve (y crea si no existe) el registro guardado de un período, necesario para marcar pagado o vincular pagos.
 async function tjRegPeriodo(t, p) {
@@ -3767,7 +3802,7 @@ function abrirTjForm(id) {
       <div class="note">El día de pago se toma del mismo mes si es después del corte, o del mes siguiente si es antes. Cada fecha de pago se puede corregir en su período.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="tjGuardar">${t ? 'Guardar cambios' : 'Crear tarjeta'}</button></div>
     </div></div></div>`;
-  $('#tfBanco').focus();
+  $('#tfBanco').focus({preventScroll: true});
 }
 async function guardarTj() {
   const F = $('#tjF'); const id = F.dataset.id; const n = s => parseFloat(String($(s).value).replace(/[^0-9.]/g, ''));
@@ -3986,7 +4021,7 @@ document.addEventListener('click', async e => {
     ligarAdjuntos(m.id, t.id).catch(() => {});
     return actualizarMov(m.id, {estado: 'valido', tx_id: t.id, ...snapApp(t), cat: m.cat || (m.lado === 'egreso' ? t.sub : ''), sub: m.sub || (m.lado === 'egreso' ? t.nota : ''), validado_por: S.me.id, validado_el: new Date().toISOString(), nota: ''}, 'Validado y ligado a la app').catch(() => {});
   }
-  if (act === 'rechazar') { const m = movDe(b); S.rechazoAbierto = S.rechazoAbierto === m.id ? null : m.id; S.ligarAbierto = null; render(); const i = $('#notaRechazo'); i && i.focus(); return; }
+  if (act === 'rechazar') { const m = movDe(b); S.rechazoAbierto = S.rechazoAbierto === m.id ? null : m.id; S.ligarAbierto = null; render(); const i = $('#notaRechazo'); i && i.focus({preventScroll: true}); return; }
   if (act === 'confirmarRechazo') { const m = S.movs.get(S.rechazoAbierto); if (!m) return; S.rechazoAbierto = null; return actualizarMov(m.id, {estado: 'rechazado', nota: $('#notaRechazo').value.trim(), validado_por: S.me.id, validado_el: new Date().toISOString()}, 'Rechazado').catch(() => {}); }
   if (act === 'nuevoProy') {
     const nom = $('#npNombre').value.trim(); if (!nom) return toast('Escribe el nombre del proyecto.');
@@ -4128,6 +4163,77 @@ document.addEventListener('drop', async e => { const d = e.target.closest && e.t
 $('#btnSync').addEventListener('click', () => abrirSync(true));
 new MutationObserver(() => { if (document.querySelector('#modalRoot [data-thumb]:empty')) cargarMiniaturas(); }).observe($('#modalRoot'), {childList: true});
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(dibujarGraficos, 150); });
+/* ================= TELÉFONO: comodidad al escribir y tablas sin barra horizontal =================
+   1) Las ventanas emergentes se vuelven a dibujar al buscar o marcar algo; antes la ventana volvía al encabezado.
+      Ahora #modalRoot conserva dónde estabas (desplazamiento de la ventana y de sus listas) y el campo donde escribías.
+   2) Con una ventana abierta en el teléfono, la página de fondo queda fija para que el teclado no la mueva.
+   3) Las tablas que no caben a lo ancho del teléfono se muestran como tarjetas (ver CSS "Tablas anchas como tarjetas"). */
+const esTelefono = () => matchMedia('(max-width:760px)').matches;
+// claveCampo: forma de volver a encontrar el campo activo después de redibujar (id o su primer atributo data-*).
+function claveCampo(el) {
+  if (!el || !el.matches || !el.matches('input, textarea, select')) return null;
+  if (el.id) return '#' + CSS.escape(el.id);
+  const a = [...el.attributes].find(x => x.name.startsWith('data-')); if (!a) return null;
+  return `${el.tagName.toLowerCase()}[${a.name}="${CSS.escape(a.value)}"]`;
+}
+function fotoVista(root) {
+  const m = root.querySelector('.modal'); const sig = m ? m.className + '|' + (m.getAttribute('aria-labelledby') || m.getAttribute('aria-label') || '') : '';
+  const zonas = [...root.querySelectorAll('.modal, .modal .lst, .modal .cr-plan-wrap, .modal .tbl-wrap, .modal .bd')].map(e => e.scrollTop);
+  const a = document.activeElement; const k = root.contains(a) ? claveCampo(a) : null;
+  return {sig, zonas, k, s: k && a.selectionStart != null ? [a.selectionStart, a.selectionEnd] : null};
+}
+function volverVista(root, f) {
+  const m = root.querySelector('.modal'); if (!m || !f) return;
+  const sig = m.className + '|' + (m.getAttribute('aria-labelledby') || m.getAttribute('aria-label') || ''); if (sig !== f.sig) return;
+  [...root.querySelectorAll('.modal, .modal .lst, .modal .cr-plan-wrap, .modal .tbl-wrap, .modal .bd')].forEach((e, i) => { if (f.zonas[i]) e.scrollTop = f.zonas[i]; });
+  if (f.k) { const el = root.querySelector(f.k); if (el && document.activeElement !== el) { el.focus({preventScroll: true}); if (f.s && el.setSelectionRange) try { el.setSelectionRange(f.s[0], f.s[1]); } catch (e) {} } }
+}
+// Fondo fijo mientras hay una ventana abierta (solo teléfono): guarda la posición y la devuelve al cerrar.
+let _fondoY = null;
+function fijarFondo(abierta) {
+  const b = document.body;
+  if (abierta && esTelefono() && _fondoY === null) { _fondoY = window.scrollY; Object.assign(b.style, {position: 'fixed', top: -_fondoY + 'px', left: '0', right: '0', width: '100%'}); }
+  else if (!abierta && _fondoY !== null) { const y = _fondoY; _fondoY = null; Object.assign(b.style, {position: '', top: '', left: '', right: '', width: ''}); window.scrollTo(0, y); }
+}
+(function () {
+  const mr = document.getElementById('modalRoot'); const d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  Object.defineProperty(mr, 'innerHTML', {configurable: true, get() { return d.get.call(this); },
+    set(v) { const f = fotoVista(this); d.set.call(this, v); if (v) { volverVista(this, f); requestAnimationFrame(() => volverVista(this, f)); } fijarFondo(!!v); }});
+})();
+// etiquetarTabla: copia los encabezados a cada celda (data-label) respetando colspan/rowspan, y marca la celda principal,
+// la casilla de selección y las filas de una sola celda. Si la tabla no cabe a lo ancho, la pasa a modo tarjetas.
+function etiquetarTabla(t) {
+  const thead = t.tHead; if (!thead) return;
+  const cols = []; const ocup = [];
+  [...thead.rows].forEach((tr, r) => { let c = 0; [...tr.cells].forEach(th => { while (ocup[r] && ocup[r][c]) c++; const cs = th.colSpan || 1, rs = th.rowSpan || 1; const txt = th.textContent.replace(/[▲▼↑↓]/g, '').trim();
+    for (let i = 0; i < cs; i++) { cols[c + i] = cols[c + i] ? cols[c + i] + ' ' + txt : txt; for (let j = 0; j < rs; j++) { ocup[r + j] = ocup[r + j] || []; ocup[r + j][c + i] = 1; } } c += cs; }); });
+  const lbl = cols.map(x => (x || '').replace(/\s+/g, ' ').trim());
+  const iMain = Math.max(0, lbl.findIndex(x => /detalle|descrip|tarjeta|per[ií]odo|persona|nombre|concepto|registro|cr[eé]dito|veh[ií]culo|movimiento|usuario|cuota|control|proyecto/i.test(x)));
+  [...t.querySelectorAll(':scope > tbody > tr, :scope > tfoot > tr')].forEach(tr => {
+    const cells = [...tr.cells]; if (cells.length === 1 || cells.some(td => td.colSpan >= 3)) { cells.forEach(td => td.classList.add('tc-full')); return; }
+    let c = 0; let main = null;
+    cells.forEach(td => { const l = lbl[c] || ''; td.setAttribute('data-label', l); td.classList.remove('tc-main', 'tc-chk');
+      if (td.querySelector('input[type=checkbox]') && td.textContent.trim() === '' && td.children.length <= 2 && c <= 1) { td.classList.add('tc-chk'); tr.classList.add('tc-con-chk'); }
+      else if (c === iMain || (main === null && c > iMain)) { if (!main) { td.classList.add('tc-main'); main = td; } }
+      td.classList.toggle('tc-vacia', !td.textContent.trim() && !td.querySelector('input,select,button,svg,img'));
+      c += td.colSpan || 1; });
+  });
+}
+function tablasTelefono(root) {
+  if (!esTelefono()) { root.querySelectorAll('table.tcards').forEach(t => t.classList.remove('tcards')); return; }
+  root.querySelectorAll('table').forEach(t => {
+    if (t.closest('.no-tcards')) return; const w = t.closest('.tbl-wrap') || t.parentElement;
+    if (t.classList.contains('tcards')) return;
+    if (t.scrollWidth > w.clientWidth + 4) { etiquetarTabla(t); t.classList.add('tcards'); }
+  });
+}
+(function () {
+  let pend = false; const correr = () => { pend = false; tablasTelefono(document.getElementById('app')); tablasTelefono(document.getElementById('modalRoot')); };
+  const obs = new MutationObserver(() => { if (!pend) { pend = true; queueMicrotask(correr); } });
+  ['app', 'modalRoot'].forEach(id => { const e = document.getElementById(id); if (e) obs.observe(e, {childList: true, subtree: true}); });
+  matchMedia('(max-width:760px)').addEventListener('change', correr);
+})();
+
 aplicarTema();
 init().catch(e => fatal(e && e.message || String(e)));
 })();
