@@ -397,6 +397,14 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   .tjg-ult{font-size:13px}
 }
 @media (max-width:760px){.tj-vista.tj-tabsmain{order:0;max-width:none!important}}
+/* Gráfico a pantalla completa */
+.tjg-tit{cursor:pointer;min-width:0}.tjg-exp{order:3;padding:5px 7px!important}
+.tjg-full{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;gap:8px;padding:max(10px,env(safe-area-inset-top,0px)) 16px max(10px,env(safe-area-inset-bottom,0px));overflow:auto}
+body:has(.tjg-full){overflow:hidden}
+.tjg-fhd{display:flex;gap:8px;align-items:center;justify-content:space-between}.tjg-fsel{flex:1;max-width:560px;grid-template-columns:repeat(3,minmax(0,1fr))!important}.tjg-cerrar{font-size:16px;padding:4px 10px!important}
+.tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
+.tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
+@media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
 .tjs-tabs{display:none}
 @media (max-width:760px){
   .tjs-tabs{display:grid}
@@ -3719,7 +3727,7 @@ function tjCurva(P) {
 }
 const tjNice = v => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; };
 // tjGraf: un gráfico de línea suavizada con eje en cero, 4 líneas guía, etiquetas de mes y capa para el cursor (tooltip).
-function tjGraf(id, titulo, nota, filas, k, fmt) {
+function tjGraf(id, titulo, nota, filas, k, fmt, grande) {
   const W = 640, H = 210, pl = 58, pr = 12, pt = 12, pb = 26; const vs = filas.map(f => f[k]);
   let lo = Math.min(0, ...vs), hi = Math.max(0, ...vs); if (lo === hi) hi = lo + 1;
   const paso = tjNice((hi - lo) / 4); lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso;
@@ -3729,7 +3737,8 @@ function tjGraf(id, titulo, nota, filas, k, fmt) {
   const cada = Math.max(1, Math.ceil(filas.length / 7)); const ult = filas.length - 1;
   const area = P.length > 1 ? `${tjCurva(P)} L${P[ult][0].toFixed(1)},${Y(Math.max(lo, 0)).toFixed(1)} L${P[0][0].toFixed(1)},${Y(Math.max(lo, 0)).toFixed(1)} Z` : '';
   const datos = filas.map((f, i) => ({x: +(P[i][0] / W * 100).toFixed(2), y: +(P[i][1] / H * 100).toFixed(2), t: tjMesCorto(f.m), v: fmt(f[k])}));
-  return `<div class="panel tjg"><div class="hd"><div><h2>${titulo}</h2><div class="note">${nota}</div></div><div class="tjg-ult num">${filas.length ? fmt(filas[ult][k]) : ''}<div class="note" style="text-align:right">${filas.length ? tjMesCorto(filas[ult].m) : ''}</div></div></div>
+  const AMP = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+  return `<div class="panel tjg ${grande ? 'tjg-big' : ''}"><div class="hd"><div ${grande ? '' : `class="tjg-tit" data-act="tjDashFull" data-v="${id}" title="Ver a pantalla completa"`}><h2>${titulo}</h2><div class="note">${nota}</div></div>${grande ? '' : `<button class="btn sm ghost tjg-exp" data-act="tjDashFull" data-v="${id}" title="Pantalla completa" aria-label="Ver ${esc(titulo)} a pantalla completa">${AMP}</button>`}<div class="tjg-ult num">${filas.length ? fmt(filas[ult][k]) : ''}<div class="note" style="text-align:right">${filas.length ? tjMesCorto(filas[ult].m) : ''}</div></div></div>
     <div class="bd tjg-plot" data-g='${JSON.stringify(datos).replace(/'/g, '&#39;')}'>
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(titulo)}">
         ${ticks.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="${Math.abs(v) < 1e-9 ? 'tjg-cero' : 'tjg-guia'}"/>`).join('')}
@@ -3747,7 +3756,7 @@ function vTjDash(lista) {
   const fmt = c.mon === 'U' ? tjU : L; const monTxt = c.mon === 'L' ? 'solo cuentas en lempiras' : c.mon === 'U' ? 'solo cuentas en dólares' : `lempiras + dólares a tasa del día (L ${(tasaUSD() || 0).toFixed(2)})`;
   const conCorte = filas.filter(f => f.n); const gTot = crR2(filas.reduce((a, f) => a + f.g, 0)); const prom = conCorte.length ? crR2(gTot / conCorte.length) : 0;
   const mayor = filas.reduce((m, f) => f.g > (m ? m.g : -Infinity) ? f : m, null); const ult = filas[filas.length - 1];
-  return `<div class="filters tj-dfil">
+  const filHTML = `<div class="filters tj-dfil">
       <select data-tjd="banco" aria-label="Banco"><option value="">Todos los bancos</option>${bancos.map(b => `<option ${c.banco === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
       <select data-tjd="tarjeta" aria-label="Tarjeta"><option value="">${c.banco ? 'Todas las de ' + esc(c.banco) : 'Todas las tarjetas'}</option>${deBanco.map(t => `<option value="${t.id}" ${c.tarjeta === t.id ? 'selected' : ''}>${esc(t.banco + ' ' + t.nombre + (t.ultimos4 ? ' ••' + t.ultimos4 : ''))}</option>`).join('')}</select>
       ${(() => { /* meses para elegir: desde la tarjeta más antigua (o 36 meses atrás) hasta el mes actual; listas para que funcione igual en Safari */
@@ -3757,8 +3766,20 @@ function vTjDash(lista) {
         return sel('desde') + sel('hasta'); })()}
       <select data-tjd="mon" data-nocuenta aria-label="Moneda"><option value="T" ${c.mon === 'T' ? 'selected' : ''}>Total en lempiras</option><option value="L" ${c.mon === 'L' ? 'selected' : ''}>Solo lempiras</option><option value="U" ${c.mon === 'U' ? 'selected' : ''}>Solo dólares</option></select>
       <button class="btn sm ghost" data-act="tjDashReset">Últimos 12 meses</button>
-    </div>
-    <div class="note">${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'} · ${tjMesCorto(c.desde)} – ${tjMesCorto(c.hasta)} · ${monTxt}. Los cortes de varias tarjetas se suman por el mes del corte.</div>
+    </div>`;
+  const notaRango = `${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'} · ${tjMesCorto(c.desde)} – ${tjMesCorto(c.hasta)} · ${monTxt}`;
+  // Gráficos disponibles (id, título, nota, campo).
+  const GR = [['g', 'Gasto por corte', 'Cargos de cada período de corte'], ['s', 'Saldo por corte', 'Gastos menos pagos vinculados de cada corte'], ['a', 'Saldo acumulado por corte', 'Saldo global: arrastra lo que quedó de los cortes anteriores']];
+  // Pantalla completa: un solo gráfico grande, con los filtros a mano y botones para pasar a los otros dos.
+  if (S.tjDashFull && cards.length) { const g = GR.find(x => x[0] === S.tjDashFull) || GR[0];
+    return `<div class="tjg-full" role="dialog" aria-label="${esc(g[1])}">
+      <div class="tjg-fhd"><div class="tj-tabs tjg-fsel">${GR.map(x => `<button class="tj-tab ${x[0] === g[0] ? 'on' : ''}" data-act="tjDashFull" data-v="${x[0]}">${x[1].replace(' por corte', '')}</button>`).join('')}</div>
+        <button class="btn sm ghost tjg-cerrar" data-act="tjDashCerrar" title="Cerrar (Esc)" aria-label="Cerrar">✕</button></div>
+      ${filHTML}<div class="note">${notaRango}</div>
+      ${tjGraf(g[0], g[1], g[2], filas, g[0], fmt, true)}
+    </div>`; }
+  return filHTML + `
+    <div class="note">${notaRango}. Los cortes de varias tarjetas se suman por el mes del corte.</div>
     ${cards.length ? `<div class="kpis">
       <div class="kpi"><div class="eyebrow">Gasto en el rango</div><div class="v">${fmt(gTot)}</div><div class="note">${filas.reduce((a, f) => a + f.n, 0)} cortes en ${conCorte.length} meses</div></div>
       <div class="kpi"><div class="eyebrow">Promedio por corte</div><div class="v">${fmt(prom)}</div><div class="note">${mayor && mayor.g ? 'mayor: ' + tjMesCorto(mayor.m) + ' · ' + fmt(mayor.g) : ''}</div></div>
@@ -3766,9 +3787,7 @@ function vTjDash(lista) {
       <div class="kpi"><div class="eyebrow">Saldo acumulado</div><div class="v ${ult && ult.a > 0.004 ? 'neg' : ''}">${ult ? fmt(ult.a) : '—'}</div><div class="note">al último corte del rango</div></div>
     </div>
     <div class="tjg-grid">
-      ${tjGraf('g', 'Gasto por corte', 'Cargos de cada período de corte', filas, 'g', fmt)}
-      ${tjGraf('s', 'Saldo por corte', 'Gastos menos pagos vinculados de cada corte', filas, 's', fmt)}
-      ${tjGraf('a', 'Saldo acumulado por corte', 'Saldo global: arrastra lo que quedó de los cortes anteriores', filas, 'a', fmt)}
+      ${GR.map(x => tjGraf(x[0], x[1], x[2], filas, x[0], fmt)).join('')}
     </div>
     <details class="panel tjg-tabla"><summary class="hd"><h2>Ver los datos en tabla</h2></summary><div class="tbl-wrap"><table><thead><tr><th>Mes del corte</th><th class="num">Gasto</th><th class="num">Saldo del corte</th><th class="num">Saldo acumulado</th></tr></thead><tbody>
       ${filas.slice().reverse().map(f => `<tr><td>${mesLargo(f.m)}${f.n ? '' : ' <span class="note">· sin corte</span>'}</td><td class="num">${fmt(f.g)}</td><td class="num">${fmt(f.s)}</td><td class="num">${fmt(f.a)}</td></tr>`).join('')}</tbody></table></div></details>`
@@ -4075,6 +4094,8 @@ document.addEventListener('click', async e => {
   if (act === 'tema') { const t = TEMAS[(TEMAS.indexOf(temaActual()) + 1) % 3]; lsSet('tema', t); aplicarTema(); toast('Tema: ' + NOM_TEMA[t]); return render(); }
   /* --- tarjetas de crédito --- */
   if (act === 'tjVista') { S.tjVista = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjDashFull') { S.tjDashFull = b.dataset.v; return render(); }
+  if (act === 'tjDashCerrar') { S.tjDashFull = null; return render(); }
   if (act === 'tjTab') { S.tjTab = b.dataset.v; return render(); }
   if (act === 'tjDashReset') { S.tjDash = Object.assign(S.tjDash || {}, {desde: '', hasta: ''}); return render(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
@@ -4364,6 +4385,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
+  if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.tjDashFull) { S.tjDashFull = null; return render(); }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) cerrarCapa();
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
