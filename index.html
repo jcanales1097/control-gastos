@@ -489,8 +489,23 @@ body:has(.graf-full){overflow:hidden}
   .ctl-ico .menu-pop{right:0;left:auto}
   .ctl-ico button[data-act=cerrarProy].pri{width:auto;padding:0 8px!important;font-size:11px}
 }
+.tc-s1{display:grid;gap:3px}
+.tc-s2{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;border-top:1px solid var(--line);padding-top:4px;margin-top:2px;font-size:12px;color:var(--muted)}
+.tc-s2 b{font-size:13px}.tc-s2 .tc-gt::after{content:":"}
 .tjs-tabs{display:none}
 @media (max-width:760px){
+  /* Resumen del corte en el teléfono: una sola franja con Saldo y Global (los gastos y pagos ya van en las pestañas);
+     el monto del estado de cuenta se abre con su botón. */
+  .tj-cmp{display:flex!important;flex-direction:column;gap:5px!important}
+  .tj-cmp .tc-g,.tj-cmp .tc-p{display:none!important}
+  .tj-cmp .tc-e{display:none!important;order:2;padding:5px 8px!important}.tj-cmp .tc-e.open{display:grid!important}
+  .tj-cmp .tc-s{display:flex!important;align-items:center;gap:12px;padding:5px 8px 5px 10px!important;order:1}
+  .tj-cmp .tc-s1,.tj-cmp .tc-s2{display:flex;flex-direction:column;gap:0;border:0;margin:0;padding:0;flex:1;min-width:0;align-items:flex-start}
+  .tj-cmp .tc-s1 .eyebrow,.tj-cmp .tc-gt{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--muted)}
+  .tj-cmp .tc-gt::after{content:""!important}
+  .tj-cmp .tc-s b{font-size:13px!important;font-family:var(--f-num);white-space:nowrap}
+  .tj-cmp .tc-s .note,.tj-cmp .tc-s .tc-u{font-size:10.5px!important;font-weight:400;font-family:var(--f-num)}
+  .tj-cmp .tc-eb{flex:none;width:32px;height:32px}
   .tjs-tabs{display:grid}
   .tjs-pagos .tjs-car,.tjs-cargos .tjs-pv,.tjs-cargos .tjs-cand{display:none!important}
 }
@@ -4076,11 +4091,12 @@ function pintarTjPer(foco) {
       ${p.abierto ? '' : `<button class="btn sm ${p.reg && p.reg.pagado ? '' : 'pri'}" data-act="tjPagado">${p.reg && p.reg.pagado ? 'Quitar pagado' : 'Marcar pagado'}</button>`}<button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="bd" style="gap:12px">
       <div class="tj-cmp">
-        <div><span class="eyebrow">Gastos del período</span><b>${L(p.gL)}</b>${usd ? `<span class="note">${tjU(p.gU)}</span>` : ''}</div>
-        <div><span class="eyebrow">Monto del estado de cuenta</span><span class="row" style="gap:4px"><input class="in num" data-tjm="monto_estado" inputmode="decimal" placeholder="L opcional" value="${p.reg && p.reg.monto_estado != null ? (+p.reg.monto_estado).toFixed(2) : ''}" style="width:115px">${usd ? `<input class="in num" data-tjm="monto_estado_usd" inputmode="decimal" placeholder="$ opcional" value="${p.reg && p.reg.monto_estado_usd != null ? (+p.reg.monto_estado_usd).toFixed(2) : ''}" style="width:100px">` : ''}</span></div>
-        <div><span class="eyebrow">Pagos vinculados</span><b>${L(p.pL)}</b>${usd ? `<span class="note">${tjU(p.pU)}</span>` : ''}</div>
-        <div><span class="eyebrow">Saldo</span><b class="${p.sL > 0.004 ? 'neg' : ''}">${L(p.sL)}</b>${usd ? `<span class="note ${p.sU > 0.004 ? 'neg' : ''}">${tjU(p.sU)}</span>` : ''}
-          <span class="note" style="border-top:1px solid var(--line);padding-top:4px;margin-top:2px">Global: <b class="num ${p.tL > 0.004 ? 'neg' : ''}" style="font-size:13px">${L(p.tL)}</b>${usd ? ` · <b class="num ${p.tU > 0.004 ? 'neg' : ''}" style="font-size:13px">${tjU(p.tU)}</b>` : ''}</span></div>
+        <div class="tc-g"><span class="eyebrow">Gastos del período</span><b>${L(p.gL)}</b>${usd ? `<span class="note">${tjU(p.gU)}</span>` : ''}</div>
+        <div class="tc-e ${S.tjEstOpen || (p.reg && (p.reg.monto_estado != null || p.reg.monto_estado_usd != null)) ? 'open' : ''}"><span class="eyebrow">Monto del estado de cuenta</span><span class="row" style="gap:4px"><input class="in num" data-tjm="monto_estado" inputmode="decimal" placeholder="L opcional" value="${p.reg && p.reg.monto_estado != null ? (+p.reg.monto_estado).toFixed(2) : ''}" style="width:115px">${usd ? `<input class="in num" data-tjm="monto_estado_usd" inputmode="decimal" placeholder="$ opcional" value="${p.reg && p.reg.monto_estado_usd != null ? (+p.reg.monto_estado_usd).toFixed(2) : ''}" style="width:100px">` : ''}</span></div>
+        <div class="tc-p"><span class="eyebrow">Pagos vinculados</span><b>${L(p.pL)}</b>${usd ? `<span class="note">${tjU(p.pU)}</span>` : ''}</div>
+        <div class="tc-s"><div class="tc-s1"><span class="eyebrow">Saldo</span><b class="${p.sL > 0.004 ? 'neg' : ''}">${L(p.sL)}</b>${usd ? `<span class="note ${p.sU > 0.004 ? 'neg' : ''}">${tjU(p.sU)}</span>` : ''}</div>
+          <div class="tc-s2"><span class="tc-gt">Global</span><b class="num ${p.tL > 0.004 ? 'neg' : ''}">${L(p.tL)}</b>${usd ? `<b class="num tc-u ${p.tU > 0.004 ? 'neg' : ''}">${tjU(p.tU)}</b>` : ''}</div>
+          <span class="solo-tel-il"><button class="btn sm ghost ico tc-eb" data-act="tjEst" title="Monto del estado de cuenta (opcional)" aria-label="Escribir el monto del estado de cuenta" aria-expanded="${!!S.tjEstOpen}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></button></span></div>
       </div>
       ${smL || smU ? `<div class="note">Marcados: <b>${L(smL)}${smU ? ' + ' + tjU(smU) : ''}</b> · el saldo quedaría en <b>${L(crR2(p.sL - smL))}${usd ? ' / ' + tjU(crR2(p.sU - smU)) : ''}</b></div>` : ''}
       ${(() => { /* Teléfono: pestañas Pagos (por defecto, lo que se vincula a mano) / Cargos; en computadora se ven las dos columnas. */
@@ -4232,6 +4248,7 @@ document.addEventListener('click', async e => {
   if (act === 'npToggle') { S.npOpen = !S.npOpen; render(); const el = $('#npNombre'); if (el) el.focus({preventScroll: true}); return; }
   if (act === 'proyTab') { S.proyTab = b.dataset.v; return render(); }
   if (act === 'ctlSec') { S.ctlSec = b.dataset.v; return render(); }
+  if (act === 'tjEst') { S.tjEstOpen = !S.tjEstOpen; return pintarTjPer(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjSel') { S.tjSel = S.tjFicha = b.dataset.id; S.confirmTj = null; return pintarTjFicha(); }
