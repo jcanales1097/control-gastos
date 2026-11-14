@@ -372,6 +372,31 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-tab .tj-tc{font-size:11px;padding:0 6px;border-radius:99px;background:var(--line);color:var(--fg)}.tj-tab b{font-size:12.5px}
 .tj-aviso{padding:10px 14px;border:1px solid var(--warn);background:var(--warn-soft);color:var(--fg);border-radius:10px;font-size:13px;line-height:1.5}.tj-aviso .btn{margin-left:8px}
 .tj-glob{background:var(--sunk)}
+/* ===== Tarjetas · Análisis ===== */
+.tjg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;align-items:start}
+.tjg .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:nowrap}.tjg .hd>div:first-child{min-width:0}
+.tjg-ult{font-size:15px;font-weight:600;white-space:nowrap}
+.tjg-plot{position:relative;height:240px;box-sizing:border-box;touch-action:pan-y;margin:0 10px 6px}
+.tjg-plot svg{position:absolute;left:0;top:0;width:100%;height:calc(100% - 0px);overflow:visible}
+.tjg-guia{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+.tjg-cero{stroke:var(--muted);stroke-width:1;vector-effect:non-scaling-stroke}
+.tjg-linea{fill:none;stroke:var(--azul);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tjg-area{fill:var(--azul);opacity:.1}
+.tjg-ejey span{position:absolute;left:4px;width:48px;text-align:right;transform:translateY(-50%);font-family:var(--f-num);font-size:10.5px;color:var(--muted)}
+.tjg-ejex span{position:absolute;bottom:4px;transform:translateX(-50%);font-size:10.5px;color:var(--muted);white-space:nowrap}
+.tjg-cruz{position:absolute;top:5.7%;bottom:12.4%;width:0;border-left:1px dashed var(--muted);pointer-events:none}
+.tjg-pto{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--azul);box-shadow:0 0 0 2px var(--panel);transform:translate(-50%,-50%);pointer-events:none}
+.tjg-tip{position:absolute;top:4px;background:var(--fg);color:var(--bg);border-radius:6px;padding:4px 8px;font-size:11.5px;pointer-events:none;white-space:nowrap;display:flex;gap:8px;z-index:2}
+.tjg-tip b{font-family:var(--f-num)}
+.tjg-tabla summary{cursor:pointer;list-style:none}.tjg-tabla summary::-webkit-details-marker{display:none}
+.tjg-tabla summary h2::after{content:" ▾";color:var(--muted)}
+@media (max-width:760px){
+  .tjg-grid{grid-template-columns:1fr;gap:10px}
+  .tjg-plot{height:180px;margin:0 4px 4px}
+  .tjg-ejey span{width:36px;font-size:9px}.tjg-ejex span{font-size:9px}
+  .tjg-ult{font-size:13px}
+}
+@media (max-width:760px){.tj-vista.tj-tabsmain{order:0;max-width:none!important}}
 .tjs-tabs{display:none}
 @media (max-width:760px){
   .tjs-tabs{display:grid}
@@ -3660,6 +3685,108 @@ async function obtenerTasa(forzar) {
   S._tasaPidiendo = false;
 }
 /* --- vista --- */
+/* ===== Tarjetas · Análisis (dashboard) =====
+   Filtros: banco (todas sus tarjetas), tarjeta, rango de meses (por defecto los últimos 12) y moneda.
+   Tres gráficos de línea suavizada, uno por medida (escalas distintas → gráficos separados): gasto por corte,
+   saldo por corte y saldo acumulado (global) por corte. Los cortes de varias tarjetas se suman por mes del corte. */
+const tjMesAdd = (m, n) => { const d = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+const tjMesCorto = m => MES[+m.slice(5, 7) - 1].slice(0, 3).toLowerCase() + ' ' + m.slice(2, 4);
+const tjTabs = () => `<div class="seg2 tj-vista tj-tabsmain" role="tablist" style="max-width:360px">${[['lista', 'Tarjetas'], ['analisis', 'Análisis']].map(([k, l]) => `<label><input type="radio" name="tjTab" data-act="tjTab" data-v="${k}" ${(S.tjTab || 'lista') === k ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+function tjDashCfg() {
+  const h = hoy().slice(0, 7); const c = S.tjDash = S.tjDash || {}; if (!c.hasta) c.hasta = h; if (!c.desde) c.desde = tjMesAdd(h, -11); if (!c.mon) c.mon = 'T'; return c;
+}
+// tjDashDatos: serie mensual {m, g, s, a} en la moneda elegida para las tarjetas seleccionadas.
+function tjDashDatos(cards, c) {
+  const tasa = tasaUSD() || 0; const val = (l, u) => c.mon === 'L' ? l : c.mon === 'U' ? u : crR2(l + u * tasa);
+  const meses = []; for (let m = c.desde; m <= c.hasta && meses.length < 120; m = tjMesAdd(m, 1)) meses.push(m);
+  const filas = meses.map(m => ({m, g: 0, s: 0, a: 0, n: 0}));
+  cards.forEach(t => { const ps = tjPeriodos(t); const porMes = new Map(ps.map(p => [p.corte.slice(0, 7), p])); let ult = null;
+    ps.filter(p => p.corte.slice(0, 7) < c.desde).forEach(p => { ult = p; });
+    filas.forEach(f => { const p = porMes.get(f.m); if (p) { f.g += val(p.gL, p.gU); f.s += val(p.sL, p.sU); f.n++; ult = p; } if (ult) f.a += val(ult.tL, ult.tU); }); });
+  filas.forEach(f => { f.g = crR2(f.g); f.s = crR2(f.s); f.a = crR2(f.a); });
+  return filas;
+}
+// tjCurva: trazado suave que no se pasa de los puntos (interpolación monótona, Fritsch–Carlson).
+function tjCurva(P) {
+  const n = P.length; if (!n) return ''; if (n === 1) return `M${P[0][0]},${P[0][1]}`;
+  const dx = [], dy = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = P[i + 1][0] - P[i][0]; dy[i] = P[i + 1][1] - P[i][1]; m[i] = dy[i] / dx[i]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2]; for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+  for (let i = 0; i < n - 1; i++) { if (m[i] === 0) { t[i] = t[i + 1] = 0; continue; } const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b; if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; } }
+  let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3; d += ` C${(P[i][0] + h).toFixed(1)},${(P[i][1] + h * t[i]).toFixed(1)} ${(P[i + 1][0] - h).toFixed(1)},${(P[i + 1][1] - h * t[i + 1]).toFixed(1)} ${P[i + 1][0].toFixed(1)},${P[i + 1][1].toFixed(1)}`; }
+  return d;
+}
+const tjNice = v => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; };
+// tjGraf: un gráfico de línea suavizada con eje en cero, 4 líneas guía, etiquetas de mes y capa para el cursor (tooltip).
+function tjGraf(id, titulo, nota, filas, k, fmt) {
+  const W = 640, H = 210, pl = 58, pr = 12, pt = 12, pb = 26; const vs = filas.map(f => f[k]);
+  let lo = Math.min(0, ...vs), hi = Math.max(0, ...vs); if (lo === hi) hi = lo + 1;
+  const paso = tjNice((hi - lo) / 4); lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso) * paso;
+  const X = i => pl + (filas.length < 2 ? (W - pl - pr) / 2 : i * (W - pl - pr) / (filas.length - 1)), Y = v => pt + (hi - v) / (hi - lo) * (H - pt - pb);
+  const P = filas.map((f, i) => [X(i), Y(f[k])]); const ticks = []; for (let v = lo; v <= hi + paso / 2; v += paso) ticks.push(v);
+  const corto = v => { const a = Math.abs(v); return (v < 0 ? '−' : '') + (a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : a >= 1e3 ? (a / 1e3).toFixed(a >= 1e4 ? 0 : 1) + 'k' : a.toFixed(0)); };
+  const cada = Math.max(1, Math.ceil(filas.length / 7)); const ult = filas.length - 1;
+  const area = P.length > 1 ? `${tjCurva(P)} L${P[ult][0].toFixed(1)},${Y(Math.max(lo, 0)).toFixed(1)} L${P[0][0].toFixed(1)},${Y(Math.max(lo, 0)).toFixed(1)} Z` : '';
+  const datos = filas.map((f, i) => ({x: +(P[i][0] / W * 100).toFixed(2), y: +(P[i][1] / H * 100).toFixed(2), t: tjMesCorto(f.m), v: fmt(f[k])}));
+  return `<div class="panel tjg"><div class="hd"><div><h2>${titulo}</h2><div class="note">${nota}</div></div><div class="tjg-ult num">${filas.length ? fmt(filas[ult][k]) : ''}<div class="note" style="text-align:right">${filas.length ? tjMesCorto(filas[ult].m) : ''}</div></div></div>
+    <div class="bd tjg-plot" data-g='${JSON.stringify(datos).replace(/'/g, '&#39;')}'>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(titulo)}">
+        ${ticks.map(v => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="${Math.abs(v) < 1e-9 ? 'tjg-cero' : 'tjg-guia'}"/>`).join('')}
+        ${area ? `<path d="${area}" class="tjg-area"/>` : ''}<path d="${tjCurva(P)}" class="tjg-linea" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <div class="tjg-ejey">${ticks.map(v => `<span style="top:${(Y(v) / H * 100).toFixed(2)}%">${corto(v)}</span>`).join('')}</div>
+      <div class="tjg-ejex">${filas.map((f, i) => (i % cada === 0 || i === ult) && !(i !== ult && ult - i < cada) ? `<span style="left:${(P[i][0] / W * 100).toFixed(2)}%;${i === ult && i ? 'transform:translateX(-100%)' : i === 0 ? 'transform:translateX(-20%)' : ''}">${tjMesCorto(f.m)}</span>` : '').join('')}</div>
+      <div class="tjg-cruz" hidden></div><div class="tjg-pto" hidden></div><div class="tjg-tip" hidden></div>
+    </div></div>`;
+}
+function vTjDash(lista) {
+  const c = tjDashCfg(); const bancos = [...new Set(lista.map(t => (t.banco || '').trim()).filter(Boolean))].sort();
+  const deBanco = lista.filter(t => !c.banco || (t.banco || '').trim() === c.banco); if (c.tarjeta && !deBanco.some(t => t.id === c.tarjeta)) c.tarjeta = '';
+  const cards = deBanco.filter(t => !c.tarjeta || t.id === c.tarjeta); const filas = tjDashDatos(cards, c);
+  const fmt = c.mon === 'U' ? tjU : L; const monTxt = c.mon === 'L' ? 'solo cuentas en lempiras' : c.mon === 'U' ? 'solo cuentas en dólares' : `lempiras + dólares a tasa del día (L ${(tasaUSD() || 0).toFixed(2)})`;
+  const conCorte = filas.filter(f => f.n); const gTot = crR2(filas.reduce((a, f) => a + f.g, 0)); const prom = conCorte.length ? crR2(gTot / conCorte.length) : 0;
+  const mayor = filas.reduce((m, f) => f.g > (m ? m.g : -Infinity) ? f : m, null); const ult = filas[filas.length - 1];
+  return `<div class="filters tj-dfil">
+      <select data-tjd="banco" aria-label="Banco"><option value="">Todos los bancos</option>${bancos.map(b => `<option ${c.banco === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
+      <select data-tjd="tarjeta" aria-label="Tarjeta"><option value="">${c.banco ? 'Todas las de ' + esc(c.banco) : 'Todas las tarjetas'}</option>${deBanco.map(t => `<option value="${t.id}" ${c.tarjeta === t.id ? 'selected' : ''}>${esc(t.banco + ' ' + t.nombre + (t.ultimos4 ? ' ••' + t.ultimos4 : ''))}</option>`).join('')}</select>
+      ${(() => { /* meses para elegir: desde la tarjeta más antigua (o 36 meses atrás) hasta el mes actual; listas para que funcione igual en Safari */
+        const ini = lista.reduce((m, t) => t.desde && t.desde.slice(0, 7) < m ? t.desde.slice(0, 7) : m, tjMesAdd(hoy().slice(0, 7), -36)); const ms = []; for (let m = hoy().slice(0, 7); m >= ini && ms.length < 120; m = tjMesAdd(m, -1)) ms.push(m);
+        [c.desde, c.hasta].forEach(x => { if (!ms.includes(x)) ms.push(x); }); ms.sort().reverse();
+        const sel = k => `<select data-tjd="${k}" data-nocuenta aria-label="${k === 'desde' ? 'Desde' : 'Hasta'}">${ms.map(m => `<option value="${m}" ${c[k] === m ? 'selected' : ''}>${(k === 'desde' ? 'Desde ' : 'Hasta ') + tjMesCorto(m)}</option>`).join('')}</select>`;
+        return sel('desde') + sel('hasta'); })()}
+      <select data-tjd="mon" data-nocuenta aria-label="Moneda"><option value="T" ${c.mon === 'T' ? 'selected' : ''}>Total en lempiras</option><option value="L" ${c.mon === 'L' ? 'selected' : ''}>Solo lempiras</option><option value="U" ${c.mon === 'U' ? 'selected' : ''}>Solo dólares</option></select>
+      <button class="btn sm ghost" data-act="tjDashReset">Últimos 12 meses</button>
+    </div>
+    <div class="note">${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'} · ${tjMesCorto(c.desde)} – ${tjMesCorto(c.hasta)} · ${monTxt}. Los cortes de varias tarjetas se suman por el mes del corte.</div>
+    ${cards.length ? `<div class="kpis">
+      <div class="kpi"><div class="eyebrow">Gasto en el rango</div><div class="v">${fmt(gTot)}</div><div class="note">${filas.reduce((a, f) => a + f.n, 0)} cortes en ${conCorte.length} meses</div></div>
+      <div class="kpi"><div class="eyebrow">Promedio por corte</div><div class="v">${fmt(prom)}</div><div class="note">${mayor && mayor.g ? 'mayor: ' + tjMesCorto(mayor.m) + ' · ' + fmt(mayor.g) : ''}</div></div>
+      <div class="kpi"><div class="eyebrow">Saldo del último corte</div><div class="v ${ult && ult.s > 0.004 ? 'neg' : ''}">${ult ? fmt(ult.s) : '—'}</div><div class="note">${ult ? tjMesCorto(ult.m) : ''}</div></div>
+      <div class="kpi"><div class="eyebrow">Saldo acumulado</div><div class="v ${ult && ult.a > 0.004 ? 'neg' : ''}">${ult ? fmt(ult.a) : '—'}</div><div class="note">al último corte del rango</div></div>
+    </div>
+    <div class="tjg-grid">
+      ${tjGraf('g', 'Gasto por corte', 'Cargos de cada período de corte', filas, 'g', fmt)}
+      ${tjGraf('s', 'Saldo por corte', 'Gastos menos pagos vinculados de cada corte', filas, 's', fmt)}
+      ${tjGraf('a', 'Saldo acumulado por corte', 'Saldo global: arrastra lo que quedó de los cortes anteriores', filas, 'a', fmt)}
+    </div>
+    <details class="panel tjg-tabla"><summary class="hd"><h2>Ver los datos en tabla</h2></summary><div class="tbl-wrap"><table><thead><tr><th>Mes del corte</th><th class="num">Gasto</th><th class="num">Saldo del corte</th><th class="num">Saldo acumulado</th></tr></thead><tbody>
+      ${filas.slice().reverse().map(f => `<tr><td>${mesLargo(f.m)}${f.n ? '' : ' <span class="note">· sin corte</span>'}</td><td class="num">${fmt(f.g)}</td><td class="num">${fmt(f.s)}</td><td class="num">${fmt(f.a)}</td></tr>`).join('')}</tbody></table></div></details>`
+    : '<div class="panel"><div class="bd note">No hay tarjetas con esos filtros.</div></div>'}`;
+}
+// Cursor sobre los gráficos: línea vertical, punto y recuadro con el mes y el valor del punto más cercano (mouse o dedo).
+(function () {
+  const mover = e => {
+    const plot = e.target.closest && e.target.closest('.tjg-plot'); if (!plot) return; const d = JSON.parse(plot.dataset.g || '[]'); if (!d.length) return;
+    const r = plot.getBoundingClientRect(); const px = ((e.touches ? e.touches[0].clientX : e.clientX) - r.left) / r.width * 100;
+    let i = 0, best = Infinity; d.forEach((p, k) => { const dd = Math.abs(p.x - px); if (dd < best) { best = dd; i = k; } }); const p = d[i];
+    const cruz = plot.querySelector('.tjg-cruz'), pto = plot.querySelector('.tjg-pto'), tip = plot.querySelector('.tjg-tip');
+    cruz.hidden = pto.hidden = tip.hidden = false; cruz.style.left = p.x + '%'; pto.style.left = p.x + '%'; pto.style.top = p.y + '%';
+    tip.innerHTML = `<span>${p.t}</span><b>${p.v}</b>`; tip.style.left = p.x + '%'; tip.style.transform = `translateX(${p.x > 70 ? '-105%' : p.x < 30 ? '5%' : '-50%'})`;
+  };
+  const salir = e => { const plot = e.target.closest && e.target.closest('.tjg-plot'); if (!plot) return; plot.querySelectorAll('.tjg-cruz,.tjg-pto,.tjg-tip').forEach(x => x.hidden = true); };
+  document.addEventListener('pointermove', mover); document.addEventListener('pointerdown', mover); document.addEventListener('pointerout', e => { if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest('.tjg-plot')) salir(e); });
+})();
 function vTarjetas() {
   const head = `<div><div class="eyebrow">Tarjetas de crédito</div><h1>Cortes, pagos y saldos</h1><div class="note">Cada tarjeta agrupa sus cuentas de la app. Vincula los pagos a cada período y márcalo como pagado.</div></div>`;
   if (S.tj === null) return `<div class="stack">${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de tarjetas (tarjetas.sql).</div></div></div>`;
@@ -3679,8 +3806,10 @@ function vTarjetas() {
       <td style="white-space:nowrap">${ult ? `<span class="chip ${ult.est[1]}">${ult.est[0]}</span> <span class="num small">${fFecha(ult.corte)}</span>` : '—'}</td>
       <td style="white-space:nowrap">${pp ? `<span class="num small ${pp.fpago < hoy() ? 'neg' : ''}">${fFecha(pp.fpago)}</span>` : '<span class="muted small">al día</span>'}</td>
       <td class="acc"><div class="acc-row">${S.confirmTj === t.id ? `<button class="btn sm danger" data-act="tjBorrar">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="tjBorrarNo">No</button>` : icoBtn('editar', 'Editar tarjeta', 'tjForm') + icoBtn('borrar', 'Eliminar tarjeta', 'tjBorrar', '', 'danger')}</div></td></tr>`; }).join('');
+  const cab = `<div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>${lista.length ? tjTabs() : ''}`;
+  if (S.tjTab === 'analisis' && lista.length) return `<div class="stack">${cab}${vTjDash(lista)}</div>`;
   return `<div class="stack">
-    <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>
+    ${cab}
     ${(() => { const set = new Set(); lista.forEach(t => (t.cuentas || []).forEach(c => set.add(tjCta(c))));
       const aprox = D.txs.filter(t => tjEsUSD(t.cuenta) && set.has(tjCta(t.cuenta)) && tjMonto(t).est);
       return aprox.length ? `<div class="tj-aviso"><b>${aprox.length} montos en dólares son aproximados (≈).</b> El portal solo manda el valor en lempiras de las cuentas en dólares; el monto exacto en US$ viene en el Excel que exporta Registro Contable.
@@ -3946,6 +4075,8 @@ document.addEventListener('click', async e => {
   if (act === 'tema') { const t = TEMAS[(TEMAS.indexOf(temaActual()) + 1) % 3]; lsSet('tema', t); aplicarTema(); toast('Tema: ' + NOM_TEMA[t]); return render(); }
   /* --- tarjetas de crédito --- */
   if (act === 'tjVista') { S.tjVista = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjTab') { S.tjTab = b.dataset.v; return render(); }
+  if (act === 'tjDashReset') { S.tjDash = Object.assign(S.tjDash || {}, {desde: '', hasta: ''}); return render(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjSel') { S.tjSel = S.tjFicha = b.dataset.id; S.confirmTj = null; return pintarTjFicha(); }
@@ -4140,6 +4271,7 @@ document.addEventListener('change', async e => {
     if (raw !== '' && !(v >= 0)) return toast('Escribe un monto válido.');
     try { await q(sb.from('tarjeta_pagos').update({monto_manual: v}).eq('id', x.id), v == null ? 'Se usará el monto aproximado' : 'Monto exacto guardado'); x.monto_manual = v; } catch (er) { if (/monto_manual/.test(String(er && er.message || er))) toast('Falta correr en Supabase el SQL del monto exacto (tarjetas_monto_exacto.sql).'); }
     pintarTjPer(); return render(); }
+  if (t.dataset.tjd) { const c = tjDashCfg(); c[t.dataset.tjd] = t.value; if (t.dataset.tjd === 'banco') c.tarjeta = ''; if (c.desde > c.hasta) [c.desde, c.hasta] = [c.hasta, c.desde]; return render(); }
   if (t.dataset.tjo) { S.tjOpt = S.tjOpt || {}; S.tjOpt[t.dataset.tjo] = t.checked; return pintarTjPer(); }
   if (t.dataset.tjr) { if (t.value) S.tjRango[t.dataset.tjr] = t.value; return pintarTjPer(); }
   if (t.dataset.tjs != null) { S.tjSelP = S.tjSelP || new Set(); if (t.checked) S.tjSelP.add(t.dataset.tjs); else S.tjSelP.delete(t.dataset.tjs); return pintarTjPer(); }
@@ -4306,7 +4438,7 @@ function etiquetarTabla(t) {
 }
 // filtrosTelefono: en el teléfono, las barras con muchos filtros se pliegan: queda el buscador y un botón "Filtros · n activos".
 let _filtrosAbiertos = false;
-function filtrosActivos(f) { return [...f.querySelectorAll('select')].filter(x => x.value).length + [...f.querySelectorAll('input[type=date]:not(#bDesde)')].filter(x => x.value).length + [...f.querySelectorAll('input[type=checkbox]')].filter(x => x.checked).length; }
+function filtrosActivos(f) { return [...f.querySelectorAll('select:not([data-nocuenta])')].filter(x => x.value).length + [...f.querySelectorAll('input[type=date]:not(#bDesde)')].filter(x => x.value).length + [...f.querySelectorAll('input[type=checkbox]')].filter(x => x.checked).length; }
 function filtrosTelefono(root) {
   root.querySelectorAll('.filters').forEach(f => {
     const n = f.querySelectorAll('select, input:not([type=search])').length;
