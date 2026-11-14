@@ -410,6 +410,9 @@ body:has(.tjg-full){overflow:hidden}
   .solo-pc{display:none!important}.solo-pc-il{display:none!important}.solo-tel{display:flex}.solo-tel-il{display:contents}
   /* Controles en el teléfono: indicadores y participantes en una sola fila, y Egresos / Ingresos / Proyectos como pestañas. */
   .kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .stack>.row:has(>div>.ctl-pend),.stack>.row:has(>div>h1.solo-pc){margin-bottom:-4px}
+  div:has(>h1.solo-pc){display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
+  div:has(>h1.solo-pc) .ctl-pend{margin-left:auto;font-size:11px}
   .kpis.k4 .kpi{padding:5px 6px;min-width:0}.kpis.k4 .kpi .eyebrow{font-size:8px;white-space:nowrap}
   .kpis.k4 .kpi .v{font-size:10.5px;white-space:nowrap;letter-spacing:-.02em}
   .ctl-part{flex-wrap:nowrap!important;gap:5px!important;overflow-x:auto;scrollbar-width:none;white-space:nowrap}.ctl-part::-webkit-scrollbar{display:none}
@@ -1330,8 +1333,8 @@ function vControl(c) {
   return `<div class="stack">
     <div class="row" style="justify-content:space-between;align-items:flex-end">
       <div><div class="eyebrow">${esProy(c) ? '<a href="#proyectos" class="muted small" style="text-decoration:none">← Proyectos</a> ' : ''}<span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(esProy(c) ? 'Proyecto' : c.nombre)}</span> ${esProy(c) ? `<span class="chip ${cerrado(c) ? '' : 'app'}">${cerrado(c) ? 'Cerrado el ' + fFecha(c.cerradoEl) : 'Abierto'}</span>` : ''}</div>
-      <h1>${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>
-      ${pend ? `<div class="note"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</a></div>` : ''}</div>
+      <h1 class="${c.porMes ? 'solo-pc' : ''}">${c.porMes ? mesLargo(mes) : esc(c.nombre)}</h1>   <!-- en el teléfono el mes ya lo muestra el selector -->
+      ${pend ? `<div class="note ctl-pend"><a href="#bandeja" data-act="verPend" data-c="${c.id}" data-m="${c.porMes ? mes : ''}"><span class="solo-pc-il">${pend} movimientos de la app sugeridos para ${c.porMes ? 'este mes' : 'este proyecto'} siguen en la bandeja</span><span class="solo-tel-il">${pend} en la bandeja ›</span></a></div>` : ''}</div>
       <div class="row solo-pc">${accionesCtl(c, mes, R, a)}</div>
     </div>
     ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
