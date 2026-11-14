@@ -97,6 +97,7 @@ h2{font-size:15px;margin:0;letter-spacing:.01em}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--sunk);color:var(--muted);white-space:nowrap}
 .chip.app{background:var(--accent-soft);color:var(--accent)}
 .chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}   /* verde: pagado / conciliado */
 .chip.bad{background:var(--bad-soft);color:var(--bad)}
 .chip .dot{width:7px;height:7px;border-radius:50%}
 .c-a{background:var(--ca)} .c-b{background:var(--cb)} .c-c{background:var(--cc)} .c-d{background:var(--warn)} .c-e{background:var(--muted)}
@@ -1995,7 +1996,7 @@ function realCuota(qid) { const o = {cap: 0, int: 0, seg: 0, com: 0, mor: 0}; en
 const crTot = o => crR2(o.cap + o.int + o.seg + o.com + (o.mor || 0));
 // estadoCuota: Estado de una cuota: Conciliada (marcada a mano), Parcial, Cuadra, Con diferencia, Sin registros, Próxima o Pendiente.
 function estadoCuota(q) {
-  if (q.conciliada) return ['Conciliada', 'app'];
+  if (q.conciliada) return ['Conciliada', 'ok'];
   const re = crTot(realCuota(q.id)), pr = +q.cuota || 0;
   if (re > 0) return re < pr - 0.004 ? ['Parcial', 'warn'] : Math.abs(re - pr) <= 0.004 ? ['Cuadra · por conciliar', ''] : ['Con diferencia', 'bad'];
   const dias = (new Date(q.fecha + 'T12:00') - new Date(hoy() + 'T12:00')) / 864e5;
@@ -3628,7 +3629,7 @@ function tjPeriodos(tar) {
     const baseL = reg && reg.monto_estado != null ? +reg.monto_estado : gL, baseU = reg && reg.monto_estado_usd != null ? +reg.monto_estado_usd : gU;
     const fpago = reg && reg.fecha_pago ? reg.fecha_pago : fp; const abierto = corte >= hoyD;
     const vacio = !g.length && !pg.length && !(reg && (reg.monto_estado || reg.monto_estado_usd));   // corte sin cargos ni pagos: no se cuenta como vencido
-    const est = reg && reg.pagado ? ['Pagado', 'app'] : abierto ? ['En curso', ''] : vacio ? ['Sin cargos', ''] : fpago < hoyD ? ['Vencido', 'bad'] : ['Por pagar', 'warn'];
+    const est = reg && reg.pagado ? ['Pagado', 'ok'] : abierto ? ['En curso', ''] : vacio ? ['Sin cargos', ''] : fpago < hoyD ? ['Vencido', 'bad'] : ['Por pagar', 'warn'];
     // Saldo global: se arrastra el saldo de los cortes anteriores (lo que quedó debiendo suma, lo pagado de más resta).
     const sL = crR2(baseL - pL), sU = crR2(baseU - pU); accL = crR2(accL + sL); accU = crR2(accU + sU);
     if (ecL === null) { const dA = depos.filter(t => t.fecha < desdeP), rA = retAll.filter(t => t.fecha < desdeP); ecL = crR2(sumM(dA, 'l', fP) - sumM(rA, 'l')); ecU = crR2(sumM(dA, 'usd', fP) - sumM(rA, 'usd')); }
