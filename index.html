@@ -438,7 +438,7 @@ body:has(.graf-full){overflow:hidden}
   .ctl-tabs{display:grid}.ctl-tabs.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
   .ctl-tabs .tj-tab{font-size:11.5px;padding:5px 4px;gap:3px 5px}.ctl-tabs .tj-tab b{font-size:10.5px;width:100%}
   .ctl-secs{display:block}.ctl-secs>div{display:none}
-  .ctl-eg>.ctl-s-eg,.ctl-in>.ctl-s-in,.ctl-mp>.ctl-s-mp{display:block}
+  .ctl-eg>.ctl-s-eg,.ctl-in>.ctl-s-in,.ctl-mp>.ctl-s-mp,.ctl-gr>.ctl-s-gr{display:block}
   .ctl-s-eg>.panel>.hd,.ctl-s-in>.panel>.hd{display:none}
   .filters.f-una{display:grid!important;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;padding:6px 8px}
   .filters.f-una>*{grid-column:auto!important;min-width:0;width:100%;font-size:12px!important;padding:5px 6px!important}
@@ -1367,12 +1367,13 @@ function vControl(c) {
       <div class="kpi"><div class="eyebrow">Saldo</div><div class="v ${R.ingreso - R.egreso < 0 ? 'neg' : ''}">${L(R.ingreso - R.egreso)}</div></div>
       <div class="kpi"><div class="eyebrow">Por validar</div><div class="v ${R.pendientes ? 'warn-t' : ''}">${R.pendientes}</div></div>
     </div>
-    ${c.porMes ? vDistribucion(c, R) : vResumenProy(c, R, h)}
+    ${c.porMes ? vDistribucion(c, R) : ''}
     ${(() => { /* Teléfono: Egresos / Ingresos / Proyectos como pestañas (una sección a la vez); en computadora se ven todas. */
-      const mp = c.porMes ? vMicros(c, mes) : ''; const k = S.ctlSec === 'mp' && !mp ? 'eg' : (S.ctlSec || 'eg');
+      const mp = c.porMes ? vMicros(c, mes) : ''; const k = (S.ctlSec === 'mp' && !mp) || (S.ctlSec === 'gr' && c.porMes) ? 'eg' : (S.ctlSec || 'eg');
       const bt = (v, txt, n, tot) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="ctlSec" data-v="${v}">${txt} <span class="tj-tc">${n}</span>${tot != null ? ` <b class="num">${L(tot)}</b>` : ''}</button>`;
-      return `<div class="tj-tabs ctl-tabs ${mp ? 'c3' : ''}">${bt('eg', 'Egresos', h.egresos.length, R.egreso)}${bt('in', 'Ingresos', h.ingresos.length, R.ingreso)}${mp ? bt('mp', 'Proyectos', microsDe(c.id).length) : ''}</div>
-      <div class="ctl-secs ctl-${k}"><div class="ctl-s-eg">${tablaFilas(c, h, 'egreso')}</div><div class="ctl-s-in">${tablaFilas(c, h, 'ingreso')}</div>${mp ? `<div class="ctl-s-mp">${mp}</div>` : ''}</div>`; })()}
+      const gr = c.porMes ? '' : vResumenProy(c, R, h);   // proyectos: el gráfico de evolución es otra pestaña en el teléfono
+      return `<div class="tj-tabs ctl-tabs ${mp || gr ? 'c3' : ''}">${bt('eg', 'Egresos', h.egresos.length, R.egreso)}${bt('in', 'Ingresos', h.ingresos.length, R.ingreso)}${mp ? bt('mp', 'Proyectos', microsDe(c.id).length) : ''}${gr ? `<button class="tj-tab ${k === 'gr' ? 'on' : ''}" data-act="ctlSec" data-v="gr">Gráfico<b class="num" style="font-weight:400;color:var(--muted)">evolución</b></button>` : ''}</div>
+      <div class="ctl-secs ctl-${k}">${gr ? `<div class="ctl-s-gr">${gr}</div>` : ''}<div class="ctl-s-eg">${tablaFilas(c, h, 'egreso')}</div><div class="ctl-s-in">${tablaFilas(c, h, 'ingreso')}</div>${mp ? `<div class="ctl-s-mp">${mp}</div>` : ''}</div>`; })()}
     </div>`;
 }
 // porMesProy: Totales por mes de un proyecto.
