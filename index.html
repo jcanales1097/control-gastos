@@ -405,6 +405,13 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
+/* Lista de proyectos */
+.pr-tabs{max-width:360px}
+.pr-f{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.pr-f:last-child{border-bottom:0}.pr-i{flex:1;min-width:0}.pr-i b{font-size:12.5px}.pr-i .cat{font-size:10px;line-height:1.35}
+.pr-v{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}.pr-v .num{font-size:13px;font-weight:600}.pr-v .chip{font-size:9px;padding:0 6px}
+.pr-ir{color:var(--muted);font-size:16px;flex:none}
+@media (max-width:760px){.pr-tabs{max-width:none}}
 /* Gráfico del proyecto a pantalla completa */
 .panel.graf-full{position:fixed;inset:0;z-index:30;margin:0;border:0;border-radius:0;display:flex;flex-direction:column;overflow:auto;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
 .graf-full .chart-box{flex:1;min-height:240px}.graf-full .graf-x{order:9;font-size:16px;padding:4px 10px!important;margin-left:auto}
@@ -3081,17 +3088,24 @@ function vProyectos() {
     <td>${cerrado(c) ? `<span class="chip">Cerrado ${fFecha(c.cerradoEl)}</span>` : x.R.pendientes ? `<span class="chip warn">${x.R.pendientes} por validar</span>` : x.pend ? `<span class="chip warn">${x.pend} en bandeja</span>` : '<span class="chip app">Al día</span>'}</td>
     <td><a class="btn sm" href="${hrefC(c)}">Abrir</a></td></tr>`; };
   const tabla = (lista, vacio) => lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Proyecto</th><th>Periodo</th><th class="num">Ingresos</th><th class="num">Egresos</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>${lista.map(fila).join('')}</tbody></table></div>` : `<div class="empty">${vacio}</div>`;
+  // Teléfono: cada proyecto en una fila compacta (nombre, período y totales a la izquierda; saldo y estado a la derecha); toda la fila abre el proyecto.
+  const estado = (c, x) => cerrado(c) ? `<span class="chip">Cerrado ${fFecha(c.cerradoEl)}</span>` : x.R.pendientes ? `<span class="chip warn">${x.R.pendientes} por validar</span>` : x.pend ? `<span class="chip warn">${x.pend} en bandeja</span>` : '<span class="chip ok">Al día</span>';
+  const filaM = c => { const x = totProy(c); const sal = x.R.ingreso - x.R.egreso;
+    return `<a class="pr-f" href="${hrefC(c)}"><div class="pr-i"><b>${esc(c.nombre)}</b><div class="cat">${x.desde ? fFecha(x.desde) + ' – ' + fFecha(cerrado(c) ? c.cerradoEl : x.hasta) : 'Sin movimientos'}${a && c.incluye ? ' · clave ' + esc(c.incluye) : ''}</div><div class="cat">Ingresos ${L(x.R.ingreso)} · Egresos ${L(x.R.egreso)}</div></div>
+      <div class="pr-v"><span class="num ${sal < 0 ? 'neg' : ''}">${L(sal)}</span>${estado(c, x)}</div><span class="pr-ir" aria-hidden="true">›</span></a>`; };
+  const k = S.proyTab === 'ce' ? 'ce' : 'ab'; const lista = k === 'ce' ? ce : ab; const vacio = k === 'ce' ? 'No hay proyectos cerrados.' : (a ? '<b>No hay proyectos abiertos</b>Crea uno con “+ Nuevo proyecto”.' : 'No tienes proyectos abiertos.');
   return `<div class="stack">
-    <div><div class="eyebrow">Proyectos</div><h1>${ab.length} ${ab.length === 1 ? 'proyecto abierto' : 'proyectos abiertos'}</h1>
-      <div class="note">Cada proyecto lleva sus egresos e ingresos en una sola hoja, de principio a fin. Al cerrarlo deja de recibir movimientos y queda su saldo final.</div></div>
-    ${a ? `<div class="panel"><div class="hd"><h2>Nuevo proyecto</h2></div><div class="bd form-grid">
+    <div class="row" style="justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:nowrap"><div style="min-width:0"><div class="eyebrow">Proyectos</div><h1>${ab.length} ${ab.length === 1 ? 'proyecto abierto' : 'proyectos abiertos'}</h1>
+      <div class="note solo-pc">Cada proyecto lleva sus egresos e ingresos en una sola hoja, de principio a fin. Al cerrarlo deja de recibir movimientos y queda su saldo final.</div></div>
+      ${a ? `<button class="btn ${S.npOpen ? '' : 'pri'}" data-act="npToggle" aria-expanded="${!!S.npOpen}" style="flex:none">${S.npOpen ? 'Cancelar' : '+ Nuevo proyecto'}</button>` : ''}</div>
+    ${a && S.npOpen ? `<div class="panel"><div class="hd"><h2>Nuevo proyecto</h2></div><div class="bd form-grid">
       <label>Nombre<input id="npNombre" placeholder="Ej.: Techo casa de mis papás"></label>
       <label>Personas (TIPO), separadas por coma<input id="npPersonas" placeholder="Ej.: EDITH RUEDA, JONATHAN CANALES"></label>
       <label>Clave en el detalle de la app (opcional)<input id="npClave" placeholder="Ej.: PTECHO"></label>
       <div class="note" style="align-self:end">Con clave, la bandeja sugiere el proyecto cuando el detalle de la app la trae (ej. <span class="mono">PTECHO | FERRETERIA…</span>). Para que alguien más lo vea, dale acceso en Usuarios.</div>
       <div><button class="btn pri" data-act="nuevoProy">Crear proyecto</button></div></div></div>` : ''}
-    <div class="panel"><div class="hd"><h2>Abiertos</h2></div>${tabla(ab, a ? '<b>No hay proyectos abiertos</b>Crea uno arriba.' : 'No tienes proyectos abiertos.')}</div>
-    <div class="panel"><div class="hd"><h2>Cerrados</h2><span class="muted small">${ce.length}</span></div>${tabla(ce, 'No hay proyectos cerrados.')}</div>
+    <div class="tj-tabs pr-tabs">${[['ab', 'Abiertos', ab.length], ['ce', 'Cerrados', ce.length]].map(([v, t, n]) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="proyTab" data-v="${v}">${t} <span class="tj-tc">${n}</span></button>`).join('')}</div>
+    <div class="panel"><div class="solo-pc">${tabla(lista, vacio)}</div><div class="solo-tel-b">${lista.length ? lista.map(filaM).join('') : `<div class="empty">${vacio}</div>`}</div></div>
   </div>`;
 }
 // vConfigProy: Configuración de un proyecto.
@@ -4214,6 +4228,8 @@ document.addEventListener('click', async e => {
   if (act === 'tjDashReset') { S.tjDash = Object.assign(S.tjDash || {}, {desde: '', hasta: ''}); return render(); }
   if (act === 'editProy') { S.editProy = S.editProy === b.dataset.c ? null : b.dataset.c; return render(); }
   if (act === 'grafFull') { S.grafFull = b.dataset.c || null; return render(); }
+  if (act === 'npToggle') { S.npOpen = !S.npOpen; render(); const el = $('#npNombre'); if (el) el.focus({preventScroll: true}); return; }
+  if (act === 'proyTab') { S.proyTab = b.dataset.v; return render(); }
   if (act === 'ctlSec') { S.ctlSec = b.dataset.v; return render(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
@@ -4376,7 +4392,7 @@ document.addEventListener('click', async e => {
     const personas = $('#npPersonas').value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
     const id = 'P' + Date.now().toString(36).toUpperCase(); const colores = ['c', 'b', 'd', 'a', 'e'];
     const c = {id, nombre: nom, corto: nom, personas, porMes: false, categorias: [], incluye: $('#npClave').value.trim().toUpperCase(), excluye: '', tipoDefecto: personas[0] || 'COMPARTIDO', sugerirPorNombre: false, color: colores[proyectos().length % colores.length], estado: 'abierto', abiertoEl: hoy(), orden: 100 + proyectos().length};
-    await guardarControl(c).then(() => { S.ctrls.push(c); derive(); location.hash = 'p-' + id; toast('Proyecto creado'); }).catch(() => {}); return;
+    await guardarControl(c).then(() => { S.ctrls.push(c); S.npOpen = false; derive(); location.hash = 'p-' + id; toast('Proyecto creado'); }).catch(() => {}); return;
   }
   if (act === 'cerrarProy') {
     const c = ctrlById(b.dataset.c); if (!c) return;
