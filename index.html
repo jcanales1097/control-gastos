@@ -372,6 +372,11 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-tab .tj-tc{font-size:11px;padding:0 6px;border-radius:99px;background:var(--line);color:var(--fg)}.tj-tab b{font-size:12.5px}
 .tj-aviso{padding:10px 14px;border:1px solid var(--warn);background:var(--warn-soft);color:var(--fg);border-radius:10px;font-size:13px;line-height:1.5}.tj-aviso .btn{margin-left:8px}
 .tj-glob{background:var(--sunk)}
+.tjs-tabs{display:none}
+@media (max-width:760px){
+  .tjs-tabs{display:grid}
+  .tjs-pagos .tjs-car,.tjs-cargos .tjs-pv,.tjs-cargos .tjs-cand{display:none!important}
+}
 /* Cargos del período: la lista usa todo el alto de la columna (sin tope propio) y cada cargo ocupa menos espacio. */
 .tj-it{display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}
 .tj-it b{font-size:12px;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
@@ -3805,11 +3810,15 @@ function pintarTjPer(foco) {
           <span class="note" style="border-top:1px solid var(--line);padding-top:4px;margin-top:2px">Global: <b class="num ${p.tL > 0.004 ? 'neg' : ''}" style="font-size:13px">${L(p.tL)}</b>${usd ? ` · <b class="num ${p.tU > 0.004 ? 'neg' : ''}" style="font-size:13px">${tjU(p.tU)}</b>` : ''}</span></div>
       </div>
       ${smL || smU ? `<div class="note">Marcados: <b>${L(smL)}${smU ? ' + ' + tjU(smU) : ''}</b> · el saldo quedaría en <b>${L(crR2(p.sL - smL))}${usd ? ' / ' + tjU(crR2(p.sU - smU)) : ''}</b></div>` : ''}
-      <div class="cr-conc">
-        <div class="stack" style="gap:8px;min-width:0">
+      ${(() => { /* Teléfono: pestañas Pagos (por defecto, lo que se vincula a mano) / Cargos; en computadora se ven las dos columnas. */
+        const k = S.tjPest || 'pagos'; const bt = (v, txt, n, l, u) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="tjPest" data-v="${v}">${txt} <span class="tj-tc">${n}</span> <b class="num">${L(l)}${usd ? ' · ' + tjU(u) : ''}</b></button>`;
+        return `<div class="tj-tabs tjs-tabs">${bt('pagos', 'Pagos', p.pg.length, p.pL, p.pU)}${bt('cargos', 'Cargos', p.g.length, p.gL, p.gU)}</div>`; })()}
+      <div class="cr-conc tjs-${S.tjPest || 'pagos'}">
+        <div class="stack tjs-izq" style="gap:8px;min-width:0"><div class="stack tjs-pv" style="gap:8px">
           <div class="eyebrow">Pagos vinculados a este período</div>
           <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.monto_manual != null ? `${x.usd ? tjU(+x.monto_manual) : L(+x.monto_manual)}<div class="cat" style="text-align:right">exacto · escrito a mano</div>` : tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>
             ${tx && (x.monto_manual != null || tjPagoMonto(tx, set).est) ? `<input class="in num tj-mm" data-tjmm="${x.id}" inputmode="decimal" placeholder="${x.usd ? '$' : 'L'} exacto" value="${x.monto_manual != null ? (+x.monto_manual).toFixed(2) : ''}" title="Escribe el monto exacto que muestra la app (por ejemplo US$ 0.50). Vacío = usar el aproximado.">` : ''}${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
+          </div><div class="stack tjs-car" style="gap:8px">
           ${(() => { /* buscador de cargos: filtra por texto (descripción, categoría, cuenta) o por monto */
             const qc = ((S.tjOpt || {}).qc || '').trim().toUpperCase(); const n = parseFloat(qc.replace(/[^0-9.]/g, ''));
             const gs = qc ? p.g.filter(x => [x.nota, x.det, x.cat, x.sub, x.cuenta].join(' ').toUpperCase().includes(qc) || (isFinite(n) && n > 0 && String(x.monto).includes(String(n)))) : p.g;
@@ -3818,8 +3827,8 @@ function pintarTjPer(foco) {
             S._tjGs = PC.items; return `<div class="row" style="justify-content:space-between;margin-top:6px;gap:8px"><span class="eyebrow">Cargos del período · ${qc ? gs.length + ' de ' + p.g.length : p.g.length}</span>${qc ? '<span class="note">totales de lo que coincide con la búsqueda</span>' : ''}</div>
           <input class="in" id="tjBusC" placeholder="Buscar en los cargos (texto o monto)" value="${esc((S.tjOpt || {}).qc || '')}" style="max-width:none">${PC.html}`; })()}
           <div class="lst tj-cargos">${S._tjGs.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || `<div class="note">${(S.tjOpt || {}).qc ? 'Ningún cargo coincide con la búsqueda.' : 'Sin cargos.'}</div>`}</div>
-        </div>
-        <div class="stack" style="gap:8px;min-width:0">
+        </div></div>
+        <div class="stack tjs-cand" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
           <div class="cr-cf"><input class="in" id="tjBus" placeholder="Buscar texto o monto" value="${esc((S.tjOpt || {}).q || '')}">
             <label class="cr-ck"><input type="checkbox" data-tjo="todas" ${(S.tjOpt || {}).todas ? 'checked' : ''}> Cualquier fecha</label>
@@ -3937,6 +3946,7 @@ document.addEventListener('click', async e => {
   if (act === 'tema') { const t = TEMAS[(TEMAS.indexOf(temaActual()) + 1) % 3]; lsSet('tema', t); aplicarTema(); toast('Tema: ' + NOM_TEMA[t]); return render(); }
   /* --- tarjetas de crédito --- */
   if (act === 'tjVista') { S.tjVista = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjSel') { S.tjSel = S.tjFicha = b.dataset.id; S.confirmTj = null; return pintarTjFicha(); }
   if (act === 'tjNueva') return abrirTjForm(null);
@@ -3945,7 +3955,7 @@ document.addEventListener('click', async e => {
   if (act === 'tjBorrarNo') { S.confirmTj = null; return render(); }
   if (act === 'tjBorrar') { const r = b.closest('[data-id]'); const id = r ? r.dataset.id : S.tjSel; if (S.confirmTj !== id) { S.confirmTj = id; return render(); }
     S.confirmTj = null; try { await q(sb.from('tarjetas').delete().eq('id', id), 'Tarjeta eliminada'); if (S.tjFicha === id) { S.tjFicha = null; $('#modalRoot').innerHTML = ''; } S.tj = S.tj.filter(x => x.id !== id); const ps = new Set(S.tjp.filter(x => x.tarjeta === id).map(x => x.id)); S.tjp = S.tjp.filter(x => x.tarjeta !== id); S.tjpg = S.tjpg.filter(x => !ps.has(x.periodo) && x.tarjeta !== id); } catch (er) {} return render(); }
-  if (act === 'tjPer') return abrirTjPer(b.dataset.t, b.dataset.c);
+  if (act === 'tjPer') { S.tjPest = 'pagos'; return abrirTjPer(b.dataset.t, b.dataset.c); }   // al abrir un corte, empieza en Pagos
   if (act === 'tjNav') { const {t} = tjPerActual(); const ps = tjPeriodos(t); const i = ps.findIndex(x => x.corte === S.tjPer.c) + (+b.dataset.d); if (ps[i]) abrirTjPer(t.id, ps[i].corte); return; }
   if (act === 'tjVinc') { const {t, p} = tjPerActual(); if (!p) return; const ids = [...(S.tjSelP || [])]; if (!ids.length) return;
     try { const reg = await tjRegPeriodo(t, p); const rows = ids.map(id => D.byId.get(id)).filter(Boolean).map(x => { const m = tjPagoMonto(x, tjSet(t)); const usd = tjPagoEnUSD(x, m); return {id: crUid(), periodo: reg.id, tarjeta: t.id, tx_id: x.id, usd, monto: usd ? m.usd : m.l}; });
