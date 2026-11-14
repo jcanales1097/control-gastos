@@ -500,6 +500,14 @@ body:has(.graf-full){overflow:hidden}
   .ctl-ico .menu-pop{right:0;left:auto}
   .ctl-ico button[data-act=cerrarProy].pri{width:auto;padding:0 8px!important;font-size:11px}
 }
+/* Pagos y abonos por vincular: filas compactas como las de los cargos (sin recuadro por registro). */
+.tj-modal .cr-cands{gap:0}
+.tj-modal .cr-cand{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:5px 2px;background:none;gap:8px}
+.tj-modal .cr-cand.on{background:var(--accent-soft)}
+.tj-modal .cr-cand b{font-size:12px;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.tj-modal .cr-cand .note{font-size:11px}.tj-modal .cr-cand .num{font-size:12.5px;white-space:nowrap;font-weight:400!important;text-align:right}
+.tj-modal .cr-cand .num .cat{font-size:10px}
+.tj-modal .tj-it .btn.ico{width:26px;height:26px}
 .tc-s1{display:grid;gap:3px}
 .tc-s2{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;border-top:1px solid var(--line);padding-top:4px;margin-top:2px;font-size:12px;color:var(--muted)}
 .tc-s2 b{font-size:13px}.tc-s2 .tc-gt::after{content:":"}
@@ -4122,9 +4130,16 @@ function pintarTjPer(foco) {
         return `<div class="tj-tabs tjs-tabs">${bt('pagos', 'Pagos', p.pg.length, p.pL, p.pU)}${bt('cargos', 'Cargos', p.g.length, p.gL, p.gU)}</div>`; })()}
       <div class="cr-conc tjs-${S.tjPest || 'pagos'}">
         <div class="stack tjs-izq" style="gap:8px;min-width:0"><div class="stack tjs-pv" style="gap:8px">
-          <div class="eyebrow">Pagos vinculados a este período</div>
-          <div class="lst">${p.pg.length ? p.pg.map(x => { const tx = x.tx_id && D.byId.get(x.tx_id); return `<div class="cr-rec" style="padding:8px 10px" data-pid="${x.id}"><div class="cr-rh"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + esc(tx.cuenta) : ''}</div></div><span class="num" style="font-weight:600">${x.monto_manual != null ? `${x.usd ? tjU(+x.monto_manual) : L(+x.monto_manual)}<div class="cat" style="text-align:right">exacto · escrito a mano</div>` : tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>
-            ${tx && (x.monto_manual != null || tjPagoMonto(tx, set).est) ? `<input class="in num tj-mm" data-tjmm="${x.id}" inputmode="decimal" placeholder="${x.usd ? '$' : 'L'} exacto" value="${x.monto_manual != null ? (+x.monto_manual).toFixed(2) : ''}" title="Escribe el monto exacto que muestra la app (por ejemplo US$ 0.50). Vacío = usar el aproximado.">` : ''}${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div></div>`; }).join('') : '<div class="note">Ningún pago vinculado todavía.</div>'}</div>
+          ${(() => { /* Pagos vinculados: misma estética que los cargos (buscador, pestañas por moneda con total y filas compactas). */
+            const qv = ((S.tjOpt || {}).qv || '').trim().toUpperCase(); const nq = parseFloat(qv.replace(/[^0-9.]/g, ''));
+            const info = x => { const tx = x.tx_id && D.byId.get(x.tx_id); const m = tx ? tjPagoMonto(tx, set) : null; const v = x.monto_manual != null ? +x.monto_manual : m ? (x.usd ? m.usd : m.l) : +x.monto || 0; return {x, tx, m, v}; };
+            const todos = p.pg.map(info).sort((a, b) => ((a.tx && a.tx.fecha) || '').localeCompare((b.tx && b.tx.fecha) || ''));
+            const vis = qv ? todos.filter(o => (o.tx ? [o.tx.nota, o.tx.det, o.tx.cat, o.tx.sub, o.tx.cuenta].join(' ').toUpperCase() : '').includes(qv) || (isFinite(nq) && nq > 0 && String(o.v).includes(String(nq)))) : todos;
+            const PV = tjPest('tjMonV', vis, o => !!o.x.usd, o => o.v);
+            return `<div class="row" style="justify-content:space-between;gap:8px"><span class="eyebrow">Pagos vinculados a este período · ${qv ? vis.length + ' de ' + todos.length : todos.length}</span>${qv ? '<span class="note">totales de lo que coincide con la búsqueda</span>' : ''}</div>
+          <input class="in" id="tjBusV" placeholder="Buscar en los pagos vinculados (texto o monto)" value="${esc((S.tjOpt || {}).qv || '')}" style="max-width:none">${PV.html}
+          <div class="lst tj-cargos">${PV.items.map(({x, tx, m}) => `<div class="tj-it" data-pid="${x.id}"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + tjRuta(tx, set) : ''}</div></div><span class="num">${x.monto_manual != null ? `${x.usd ? tjU(+x.monto_manual) : L(+x.monto_manual)}<div class="cat" style="text-align:right">exacto · escrito a mano</div>` : tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>
+            ${tx && (x.monto_manual != null || m.est) ? `<input class="in num tj-mm" data-tjmm="${x.id}" inputmode="decimal" placeholder="${x.usd ? '$' : 'L'} exacto" value="${x.monto_manual != null ? (+x.monto_manual).toFixed(2) : ''}" title="Escribe el monto exacto que muestra la app (por ejemplo US$ 0.50). Vacío = usar el aproximado.">` : ''}${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div>`).join('') || `<div class="note">${todos.length ? (qv ? 'Ningún pago vinculado coincide con la búsqueda.' : `No hay pagos vinculados en ${PV.k === 'U' ? 'dólares' : 'lempiras'}; revisa la otra pestaña.`) : 'Ningún pago vinculado todavía.'}</div>`}</div>`; })()}
           </div><div class="stack tjs-car" style="gap:8px">
           ${(() => { /* buscador de cargos: filtra por texto (descripción, categoría, cuenta) o por monto */
             const qc = ((S.tjOpt || {}).qc || '').trim().toUpperCase(); const n = parseFloat(qc.replace(/[^0-9.]/g, ''));
@@ -4150,7 +4165,7 @@ function pintarTjPer(foco) {
     </div>
     <div class="cr-navft">${nav(true)}</div></div></div>`;
   document.querySelectorAll('.tj-modal .lst').forEach((d, k) => { d.scrollTop = prev[k] || 0; });
-  if (foco) { const el = $(foco === 'c' ? '#tjBusC' : '#tjBus'); if (el) { el.focus({preventScroll: true}); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (foco) { const el = $(foco === 'c' ? '#tjBusC' : foco === 'v' ? '#tjBusV' : '#tjBus'); if (el) { el.focus({preventScroll: true}); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 // tjRegPeriodo: devuelve (y crea si no existe) el registro guardado de un período, necesario para marcar pagado o vincular pagos.
 async function tjRegPeriodo(t, p) {
@@ -4534,6 +4549,7 @@ document.addEventListener('change', async e => {
 let qT;
 /* Escritura en buscadores y campos que se actualizan mientras escribes. */
 document.addEventListener('input', e => {
+  if (e.target.id === 'tjBusV') { S.tjOpt = S.tjOpt || {}; S.tjOpt.qv = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer('v'), 250); return; }
   if (e.target.id === 'tjBusC') { S.tjOpt = S.tjOpt || {}; S.tjOpt.qc = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer('c'), 250); return; }
   if (e.target.id === 'tjBus') { S.tjOpt = S.tjOpt || {}; S.tjOpt.q = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer(true), 250); return; }
   if (e.target.id === 'credBus') { S.concOpt = S.concOpt || {}; S.concOpt.q = e.target.value; clearTimeout(S._cbT); S._cbT = setTimeout(() => pintarConc(true), 250); return; }
