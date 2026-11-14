@@ -405,11 +405,17 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
-.solo-tel{display:none}.solo-tel-il{display:none}.dia-h{display:none}.ctl-tabs{display:none}.ctl-secs{display:contents}.ctl-secs>div{display:contents}
+.solo-tel{display:none}.solo-tel-b{display:none}.solo-tel-il{display:none}.dia-h{display:none}.ctl-tabs{display:none}.ctl-secs{display:contents}.ctl-secs>div{display:contents}
 @media (max-width:760px){
   .solo-pc{display:none!important}.solo-pc-il{display:none!important}.solo-tel{display:flex}.solo-tel-il{display:contents}
   /* Controles en el teléfono: indicadores y participantes en una sola fila, y Egresos / Ingresos / Proyectos como pestañas. */
   .kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .solo-tel-b{display:block}
+  .dist-m .hd{gap:8px;flex-wrap:nowrap}.dist-m .hd .note{white-space:nowrap}.dist-m .hd .btn{padding:3px 8px;font-size:11px}
+  .dm-f{display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:1px solid var(--line)}
+  .dm-i{flex:1;min-width:0}.dm-i b{font-size:12px}.dm-i .cat{font-size:10px;line-height:1.3}
+  .dm-v{display:flex;flex-direction:column;align-items:flex-end;flex:none}.dm-v .num{font-size:13px;font-weight:600}.dm-v .cat{font-size:9px}
+  .dm-t{background:var(--sunk)}
   .stack>.row:has(>div>.ctl-pend),.stack>.row:has(>div>h1.solo-pc){margin-bottom:-4px}
   div:has(>h1.solo-pc){display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
   div:has(>h1.solo-pc) .ctl-pend{margin-left:auto;font-size:11px}
@@ -1459,7 +1465,16 @@ function vDistribucion(c, R) {
       <tr><td>Ingresos</td><td class="num">${L(R.ingreso)}</td></tr><tr><td>Egresos</td><td class="num">${L(-R.egreso)}</td></tr>
       <tr class="tot"><td>Saldo</td><td class="num ${R.ingreso - R.egreso < 0 ? 'neg' : 'pos'}">${L(R.ingreso - R.egreso)}</td></tr></table>
       <p class="note">Por TIPO: ${R.per.map(x => `${esc(x.p)} ${L(-x.g)}`).join(' · ') || '—'}${R.pendientes ? ` · ${R.pendientes} registros por validar no cuentan todavía` : ''}</p></div></div>`;
-  return `<div class="dist-grid"><div class="panel"><div class="hd"><h2>Resumen de distribución</h2></div><div class="tbl-wrap"><table class="dist">
+  // Teléfono: un solo cuadro compacto. Cada persona en una línea: a la derecha lo que le falta aportar (o tiene a favor)
+  // y debajo del nombre de dónde sale (lo propio + su parte de lo compartido − lo abonado).
+  const ab = Math.abs; const parte = R.comp / R.n; const sTot = R.per.reduce((s, x) => s + x.saldo, 0);
+  const est = v => v < -0.004 ? ['falta aportar', 'neg'] : v > 0.004 ? ['a favor', 'pos'] : ['al día', ''];
+  const movil = `<div class="panel dist-m solo-tel-b"><div class="hd"><h2 style="margin-right:auto">Distribución</h2><span class="note">Compartido ${L(ab(R.comp))}${R.n > 1 ? ' ÷ ' + R.n : ''}</span>${okMes ? `<button class="btn sm ghost" data-act="verSaldos" data-c="${c.id}" aria-expanded="${ver ? 'true' : 'false'}" title="Saldos anteriores">${ver ? 'Ocultar' : 'Anteriores'}</button>` : ''}</div>
+    ${R.per.map(x => { const e = est(x.saldo); const a = P && P.per.find(y => y.p === x.p);
+      return `<div class="dm-f"><div class="dm-i"><b>${esc(x.p)}</b><div class="cat">Propio ${L(ab(x.g))} + compartido ${L(ab(parte))}${x.aporte ? ` − abonó ${L(ab(x.aporte))}` : ''}</div>${ver ? `<div class="cat">${a ? `Mes anterior ${L(a.saldo)} · ` : ''}Global ${L((G || {})[x.p] || 0)}</div>` : ''}</div>
+        <div class="dm-v"><span class="num ${e[1]}">${L(ab(x.saldo))}</span><span class="cat">${e[0]}</span></div></div>`; }).join('') || '<div class="bd note">Agrega las personas de este control en Ajustes.</div>'}
+    ${R.per.length ? `<div class="dm-f dm-t"><div class="dm-i"><b>Total</b><div class="cat">A pagar ${L(ab(R.per.reduce((s, x) => s + x.pagar, 0)))} · abonado ${L(ab(R.per.reduce((s, x) => s + x.aporte, 0)))}${R.pendientes ? ` · ${R.pendientes} por validar no cuentan` : ''}</div></div><div class="dm-v"><span class="num ${est(sTot)[1]}">${L(ab(sTot))}</span><span class="cat">${est(sTot)[0]}</span></div></div>` : ''}</div>`;
+  return movil + `<div class="dist-grid solo-pc"><div class="panel"><div class="hd"><h2>Resumen de distribución</h2></div><div class="tbl-wrap"><table class="dist">
     <thead><tr><th>Descripción</th><th class="num">Valor</th></tr></thead><tbody>
     <tr><td>COMPARTIDO</td><td class="num">${L(R.comp)}</td></tr>
     ${R.per.map(x => `<tr><td>${esc(x.p)}</td><td class="num">${L(x.g)}</td></tr>`).join('')}
