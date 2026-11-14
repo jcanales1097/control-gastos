@@ -466,6 +466,14 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   .filters.f-plegable>label,.filters.f-plegable>[data-act^=limpiar]{grid-column:1/-1}
   .filters.f-cerrado>*:not(input[type=search]):not(.f-tog):not([data-act^=limpiar]){display:none!important}
   .f-tog.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  /* Ventanas grandes a pantalla completa (como una página más, sin el menú de arriba): se activa sola en ventanas con mucho contenido. */
+  .modal-bg:has(.m-full){padding:0!important;background:var(--panel);overflow:hidden}
+  .modal.m-full{position:fixed;inset:0;width:100%!important;max-width:none!important;height:100%;max-height:none!important;border:0;border-radius:0!important;overflow:auto;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);display:block}
+  .modal.m-full .hd{top:0}
+  .modal.m-full .cr-navft{border-radius:0;flex-wrap:nowrap;padding:6px 10px}
+  .modal.m-full .cr-navft .btn{font-size:11px;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .tj-cmp{gap:6px;grid-template-columns:repeat(2,minmax(0,1fr))!important}.tj-cmp>div{padding:6px 8px;min-width:0}.tj-cmp b{font-size:14px}
+  .tj-cmp .row{flex-wrap:nowrap!important;gap:4px!important}.tj-cmp input{flex:1 1 0;width:0!important;min-width:0;font-size:12px!important;padding:4px 6px!important;height:28px}
   /* Encabezado fijo que se contrae deslizándose (sin cambiar el alto de la página, así no parpadea): al bajar se esconde la
      fila de arriba (nombre e iconos) y quedan solo las pestañas; al subir vuelve. Botones como iconos para ahorrar espacio. */
   header.top{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);transition:transform .22s ease;will-change:transform}
@@ -4248,6 +4256,12 @@ function volverVista(root, f) {
   [...root.querySelectorAll('.modal, .modal .lst, .modal .cr-plan-wrap, .modal .tbl-wrap, .modal .bd')].forEach((e, i) => { if (f.zonas[i]) e.scrollTop = f.zonas[i]; });
   if (f.k) { const el = root.querySelector(f.k); if (el && document.activeElement !== el) { el.focus({preventScroll: true}); if (f.s && el.setSelectionRange) try { el.setSelectionRange(f.s[0], f.s[1]); } catch (e) {} } }
 }
+// pantallaCompleta: en el teléfono, las ventanas de mucho contenido (tarjetas, cortes, créditos o más de 60% del alto) ocupan
+// toda la pantalla como una página normal.
+function pantallaCompleta(root) {
+  const m = root.querySelector('.modal'); if (!m) return;
+  m.classList.toggle('m-full', esTelefono() && (m.classList.contains('cr-modal') || m.scrollHeight > innerHeight * 0.6));
+}
 // Fondo fijo mientras hay una ventana abierta (solo teléfono): guarda la posición y la devuelve al cerrar.
 let _fondoY = null;
 function fijarFondo(abierta) {
@@ -4258,7 +4272,7 @@ function fijarFondo(abierta) {
 (function () {
   const mr = document.getElementById('modalRoot'); const d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
   Object.defineProperty(mr, 'innerHTML', {configurable: true, get() { return d.get.call(this); },
-    set(v) { const f = fotoVista(this); d.set.call(this, v); if (v) { volverVista(this, f); requestAnimationFrame(() => volverVista(this, f)); } fijarFondo(!!v); }});
+    set(v) { const f = fotoVista(this); d.set.call(this, v); if (v) { pantallaCompleta(this); volverVista(this, f); requestAnimationFrame(() => volverVista(this, f)); } fijarFondo(!!v); }});
 })();
 // etiquetarTabla: copia los encabezados a cada celda (data-label) respetando colspan/rowspan, y marca la celda principal,
 // la casilla de selección y las filas de una sola celda. Si la tabla no cabe a lo ancho, la pasa a modo tarjetas.
