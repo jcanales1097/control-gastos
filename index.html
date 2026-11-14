@@ -588,14 +588,19 @@ body:has(.graf-full){overflow:hidden}
   table.tcards td .tj-ctas{justify-content:flex-start}
   table.tcards tr.cr-row{cursor:pointer}
   /* Cortes de tarjetas en modo tarjeta: los 4 montos (Gastos, Pagos, Saldo, Saldo global) en una sola línea y el período en una línea arriba. */
-  table.tcards.tj2 tr{grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 6px;padding:6px 8px}
+  table.tcards.tj2 thead{display:block;position:sticky;top:var(--mhd,0px);z-index:2;background:var(--sunk);border-bottom:1px solid var(--line)}
+  table.tcards.tj2 thead tr{padding:3px 8px;border:0}
+  table.tcards.tj2 thead th{display:block;padding:0;border:0;font-size:8.5px;text-align:right;white-space:nowrap;background:none}
+  table.tcards.tj2 thead th:first-child{display:none}
+  table.tcards.tj2 tr{grid-template-columns:repeat(4,minmax(0,1fr));gap:1px 6px;padding:5px 8px}
   table.tcards.tj2 td{font-size:10px;align-items:flex-end;text-align:right}
-  table.tcards.tj2 td::before{font-size:8px;align-self:flex-end}
-  table.tcards.tj2 td.tc-main{display:flex;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 8px;text-align:left}
-  table.tcards.tj2 td.tc-main .cat{font-size:9.5px}
-  table.tcards.tj2 td.tc-main .tj-chips{margin:0}
+  table.tcards.tj2 td::before{content:none!important}
+  table.tcards.tj2 td.tc-main{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:6px;text-align:left;width:auto!important;max-width:none!important;min-width:0!important;overflow:hidden}
+  table.tcards.tj2 td.tc-main .tj-pc{font-size:13px;font-family:var(--f-num);flex:none}
+  table.tcards.tj2 td.tc-main .cat{font-size:9.5px;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  table.tcards.tj2 td.tc-main .tj-chips{margin:0;flex:none;flex-wrap:nowrap}
   table.tcards.tj2 .tj-d{align-items:flex-end;font-size:10px}
-  table.tcards.tj2 td.tj-glob{background:var(--sunk);border-radius:6px;padding:1px 4px}
+  table.tcards.tj2 td.tj-glob{background:none;padding:0}table.tcards.tj2 td.tj-glob b{font-weight:700}
   /* Filtros plegables: a la vista solo el buscador y el botón "Filtros"; el resto se abre al tocarlo. */
   .filters.f-plegable{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
   .filters.f-plegable>*{grid-column:span 3}
@@ -4007,8 +4012,10 @@ function tjD(l, u, usd, o = {}) {
   const f = (v, fmt, neg) => o.cero && !v ? `<span class="muted">${o.cero}</span>` : `<span class="${neg ? 'neg' : ''}">${o.b ? '<b>' + fmt(v) + '</b>' : fmt(v)}</span>`;
   return `<div class="tj-d">${f(l, L, o.negL)}${usd ? `<span class="u">${f(u, tjU, o.negU)}</span>` : ''}</div>`;
 }
+// tjNom: nombre corto de un corte: "AA MM" del mes del corte (ej. corte 06/11/2026 → "26 11").
+const tjNom = corte => corte.slice(2, 4) + ' ' + corte.slice(5, 7);
 // tjPerCelda: celda del período: corte, rango y estado (antes eran columnas aparte).
-const tjPerCelda = (p, extra) => `<b class="tj-pc"><span class="tj-cw">Corte </span>${fFecha(p.corte)}</b><div class="cat">${fFecha(p.desde).slice(0, 5)} – ${fFecha(p.corte).slice(0, 5)} · ${extra}</div><div class="tj-chips"><span class="chip ${p.est[1]}">${p.est[0]}</span>${!p.reg?.pagado && (p.pL || p.pU) ? '<span class="chip">con pagos</span>' : ''}</div>`;
+const tjPerCelda = (p, extra) => `<b class="tj-pc" title="Corte ${fFecha(p.corte)}">${tjNom(p.corte)}</b><div class="cat">${fFecha(p.desde).slice(0, 5)} – ${fFecha(p.corte).slice(0, 5)} · ${extra}</div><div class="tj-chips"><span class="chip ${p.est[1]}">${p.est[0]}</span>${!p.reg?.pagado && (p.pL || p.pU) ? '<span class="chip">con pagos</span>' : ''}</div>`;
 // vTjEstado: vista como la de Registro Contable por período de corte: Depósito, Retiro, Balance (depósito − retiro) y Saldo al corte
 // (negativo = lo que se debe), con lempiras arriba y dólares abajo en cada columna. No depende de marcar pagados.
 function vTjEstado(t, ps, usd) {
@@ -4083,10 +4090,10 @@ function pintarTjPer(foco) {
   const mon = x => { if (!tjEsUSD(x.cuenta)) return L(tjMonto(x).l); const m = tjMonto(x); return `<span title="${m.est ? 'Aproximado: ' + L(m.hnl) + ' ÷ tasa ' + m.tasa.toFixed(4) + ' — sube el Excel de monedas para el monto exacto' : m.sinTasa ? 'Falta la tasa de cambio' : 'Exacto (' + (m.fuente || 'Excel de monedas') + ')'}">${m.est ? '≈ ' : ''}${tjU(m.usd)}</span><div class="cat" style="text-align:right">${L(m.hnl)}</div>`; };
   const prev = [...document.querySelectorAll('.tj-modal .lst')].map(d => d.scrollTop);
   const nav = (largo) => { const a = ps[i - 1], b = ps[i + 1]; return largo
-    ? `<button class="btn" data-act="tjNav" data-d="-1" ${a ? '' : 'disabled'}>‹ ${a ? 'Corte ' + fFecha(a.corte) + ` <span class="chip ${a.est[1]}">${a.est[0]}</span>` : 'No hay anterior'}</button><span class="note">también con las teclas ← →</span><button class="btn" data-act="tjNav" data-d="1" ${b ? '' : 'disabled'}>${b ? `<span class="chip ${b.est[1]}">${b.est[0]}</span> Corte ` + fFecha(b.corte) : 'No hay siguiente'} ›</button>`
+    ? `<button class="btn" data-act="tjNav" data-d="-1" ${a ? '' : 'disabled'}>‹ ${a ? tjNom(a.corte) + ` <span class="chip ${a.est[1]}">${a.est[0]}</span>` : 'No hay anterior'}</button><span class="note">también con las teclas ← →</span><button class="btn" data-act="tjNav" data-d="1" ${b ? '' : 'disabled'}>${b ? `<span class="chip ${b.est[1]}">${b.est[0]}</span> ` + tjNom(b.corte) : 'No hay siguiente'} ›</button>`
     : `<span class="cr-nav"><button class="btn sm" data-act="tjNav" data-d="-1" ${a ? '' : 'disabled'} title="Período anterior (←)">‹ Anterior</button><button class="btn sm" data-act="tjNav" data-d="1" ${b ? '' : 'disabled'} title="Período siguiente (→)">Siguiente ›</button></span>`; };
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal tj-modal" role="dialog" aria-modal="true" aria-labelledby="tpT">
-    <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="tpT">${esc(t.banco + ' ' + t.nombre)} · corte ${fFecha(p.corte)}</h2><div class="note">${fFecha(p.desde)} – ${fFecha(p.corte)} · fecha de pago ${fFecha(p.fpago)}</div></div>
+    <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="tpT">${esc(t.banco + ' ' + t.nombre)} · ${tjNom(p.corte)}</h2><div class="note">${fFecha(p.desde)} – ${fFecha(p.corte)} · fecha de pago ${fFecha(p.fpago)}</div></div>
       <span class="chip ${p.est[1]}">${p.est[0]}</span>${nav(false)}
       ${p.abierto ? '' : `<button class="btn sm ${p.reg && p.reg.pagado ? '' : 'pri'}" data-act="tjPagado">${p.reg && p.reg.pagado ? 'Quitar pagado' : 'Marcar pagado'}</button>`}<button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     <div class="bd" style="gap:12px">
@@ -4578,6 +4585,7 @@ function volverVista(root, f) {
 function pantallaCompleta(root) {
   const m = root.querySelector('.modal'); if (!m) return;
   m.classList.toggle('m-full', esTelefono() && (m.classList.contains('cr-modal') || m.scrollHeight > innerHeight * 0.6));
+  const hd = m.querySelector('.hd'); m.style.setProperty('--mhd', (hd && getComputedStyle(hd).position === 'sticky' ? hd.offsetHeight : 0) + 'px');   // alto de la barra fija, para los encabezados de tabla que se quedan arriba
 }
 // Fondo fijo mientras hay una ventana abierta (solo teléfono): guarda la posición y la devuelve al cerrar.
 let _fondoY = null;
@@ -4645,7 +4653,7 @@ function tablasTelefono(root) {
   root.querySelectorAll('table').forEach(t => {
     if (t.closest('.no-tcards') || t.classList.contains('tdet')) return; const w = t.closest('.tbl-wrap') || t.parentElement;
     if (t.classList.contains('tcards')) return;
-    if (t.scrollWidth > w.clientWidth + 4) { etiquetarTabla(t); t.classList.add('tcards'); }
+    if (t.classList.contains('tj2') || t.scrollWidth > w.clientWidth + 4) { etiquetarTabla(t); t.classList.add('tcards'); }
   });
 }
 (function () {
