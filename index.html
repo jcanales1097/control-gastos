@@ -58,6 +58,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .top .btn.pri{background:var(--top-btn);color:var(--top-btn-ink);border-color:var(--top-btn)}
 .top .count{background:var(--top-btn);color:var(--top-btn-ink)}
 .tema-btn{width:32px;height:32px;padding:0!important;display:inline-flex!important;align-items:center;justify-content:center}
+.hico{display:none;width:17px;height:17px}
+@media (min-width:761px){.htx{display:inline}}
 .top .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:10px}
 .brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
 .brand b{font-size:17px;letter-spacing:-.01em}
@@ -464,16 +466,15 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   .filters.f-plegable>label,.filters.f-plegable>[data-act^=limpiar]{grid-column:1/-1}
   .filters.f-cerrado>*:not(input[type=search]):not(.f-tog):not([data-act^=limpiar]){display:none!important}
   .f-tog.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-  /* Encabezado contraíble: al bajar queda una sola línea delgada con las pestañas y un botón de sincronizar; al subir vuelve completo. */
-  header.top .wrap{transition:padding .18s ease}
-  header.top.top-min .wrap{flex-wrap:nowrap;padding-block:4px;gap:6px}
-  header.top.top-min .brand,header.top.top-min #syncMeta,header.top.top-min #btnTema,header.top.top-min #userBox{display:none!important}
-  header.top.top-min nav.tabs{order:1;flex:1;min-width:0;width:auto;margin:0;padding:0}
-  header.top.top-min nav.tabs a{padding:4px 8px;font-size:11.5px}
-  header.top.top-min nav.tabs .count{font-size:9.5px;padding:0 5px}
-  header.top.top-min .wrap>.row{order:2;flex:none}
-  header.top.top-min #btnSync{font-size:0;padding:0;width:30px;height:28px;display:inline-flex;align-items:center;justify-content:center}
-  header.top.top-min #btnSync::after{content:"↻";font-size:16px;line-height:1}
+  /* Encabezado fijo que se contrae deslizándose (sin cambiar el alto de la página, así no parpadea): al bajar se esconde la
+     fila de arriba (nombre e iconos) y quedan solo las pestañas; al subir vuelve. Botones como iconos para ahorrar espacio. */
+  header.top{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);transition:transform .22s ease;will-change:transform}
+  header.top.top-min{transform:translateY(calc(-1 * var(--hrow1, 44px)))}
+  main.wrap{padding-top:calc(var(--hdr, 92px) + 12px)!important}
+  .top .wrap{padding-block:6px 0;row-gap:4px}
+  .htx{display:none}.hico{display:block}
+  .top .hbtn{width:32px;height:32px;padding:0!important;display:inline-flex!important;align-items:center;justify-content:center;font-size:0}
+  #btnSync.hbtn{width:36px}
   /* Formularios (Ajustes, tarjetas, créditos…): dos campos por fila y campos más bajos. */
   .form,.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px 8px!important}
   .form label,.form-grid label{font-size:10.5px;gap:2px}
@@ -524,7 +525,7 @@ a.chip{text-decoration:none}
     <nav class="tabs" id="tabs"></nav>
     <div class="row" style="gap:8px">
       <span class="sync-meta" id="syncMeta"></span>
-      <button class="btn pri" id="btnSync" hidden>Sincronizar</button>
+      <button class="btn pri hbtn" id="btnSync" hidden title="Sincronizar" aria-label="Sincronizar"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></svg><span class="htx">Sincronizar</span></button>
       <button class="btn ghost tema-btn" id="btnTema" data-act="tema" title="Tema" aria-label="Cambiar tema"></button>
       <span id="userBox"></span>
     </div>
@@ -959,7 +960,7 @@ function renderTabs() {
   $('#btnSync').hidden = !a;
   const ls = S.aj.ultimaSync;
   $('#syncMeta').textContent = a ? (ls ? `Sincronizado: ${new Date(ls.at).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}` : 'Sin sincronizar') : '';
-  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost" href="guia.html?n=${encodeURIComponent(((S.me.nombre || '').trim().split(/\s+/)[0]) || '')}&p=${encodeURIComponent(S.me.persona || '')}" target="_blank" rel="noopener" title="Cómo funciona la plataforma">Guía</a><button class="btn sm ghost" data-act="salir">Salir</button>`;
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost hbtn" href="guia.html?n=${encodeURIComponent(((S.me.nombre || '').trim().split(/\s+/)[0]) || '')}&p=${encodeURIComponent(S.me.persona || '')}" target="_blank" rel="noopener" title="Cómo funciona la plataforma" aria-label="Guía"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 21V5"/><path d="M9 8h6M9 12h4"/></svg><span class="htx">Guía</span></a><button class="btn sm ghost hbtn" data-act="salir" title="Salir" aria-label="Salir"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg><span class="htx">Salir</span></button>`;
 }
 // render: DIBUJA LA PANTALLA: elige la vista según S.view y la pinta en el contenedor principal.
 function render() {
@@ -992,7 +993,7 @@ function render() {
 // renderEspera: Pantalla para cuentas creadas que el administrador aún no activa.
 function renderEspera() {
   $('#topbar').hidden = false; $('#tabs').innerHTML = ''; $('#btnSync').hidden = true; $('#syncMeta').textContent = '';
-  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.email || '')}</b></span><button class="btn sm ghost" data-act="salir">Salir</button>`;
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.email || '')}</b></span><button class="btn sm ghost hbtn" data-act="salir" title="Salir" aria-label="Salir"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg><span class="htx">Salir</span></button>`;
   app().innerHTML = `<div class="auth"><div class="panel"><div class="bd stack"><div class="eyebrow">Cuenta creada</div><h1>Tu cuenta espera acceso</h1>
     <p class="small" style="margin:0">El administrador tiene que activarla y elegir qué controles y proyectos puedes ver. Cuando lo haga, vuelve a abrir esta página.</p>
     <div><button class="btn" data-act="recargar">Revisar de nuevo</button></div></div></div></div>`;
@@ -4290,14 +4291,21 @@ function filtrosTelefono(root) {
     const a = filtrosActivos(f); b.classList.toggle('on', a > 0); const tx = (_filtrosAbiertos ? 'Ocultar filtros' : 'Filtros') + (a ? ' · ' + a : ''); if (b.textContent !== tx) b.textContent = tx;   // solo si cambia (evita redibujos en cadena)
   });
 }
-// Encabezado contraíble en el teléfono: se encoge al bajar (más de 60 px) y se abre de nuevo al subir o al volver arriba.
+// Encabezado contraíble en el teléfono. El encabezado es fijo y solo se desliza hacia arriba (transform), así el alto de la página
+// no cambia y no hay parpadeo. Se ignoran los rebotes de iOS al inicio y al final, y hace falta un recorrido mínimo para cambiar.
 (function () {
-  let yAnt = 0;
+  const h = () => document.getElementById('topbar');
+  const medir = () => { const t = h(); if (!t) return; const tabs = document.getElementById('tabs'); const r = document.documentElement.style;
+    r.setProperty('--hdr', t.offsetHeight + 'px'); r.setProperty('--hrow1', (tabs ? tabs.offsetTop : 44) + 'px'); };
+  const poner = v => { const t = h(); if (t && t.classList.contains('top-min') !== v) t.classList.toggle('top-min', v); };
+  try { new ResizeObserver(medir).observe(document.getElementById('topbar')); } catch (e) {} addEventListener('resize', medir);
+  let yAnt = window.scrollY, acc = 0;
   addEventListener('scroll', () => {
-    const h = document.getElementById('topbar'); if (!h) return; const y = window.scrollY;
-    if (!esTelefono() || _fondoY !== null) { if (!esTelefono()) h.classList.remove('top-min'); yAnt = y; return; }
-    if (y < 40) h.classList.remove('top-min'); else if (y > yAnt + 8) h.classList.add('top-min'); else if (y < yAnt - 16) h.classList.remove('top-min');
-    yAnt = y;
+    if (!esTelefono() || _fondoY !== null) { poner(false); return; }
+    const y = window.scrollY, max = document.documentElement.scrollHeight - innerHeight; if (y < 0 || y > max) return;
+    const d = y - yAnt; yAnt = y; if (y < 50) { acc = 0; return poner(false); }
+    if (d && Math.sign(d) !== Math.sign(acc)) acc = 0; acc += d;
+    if (acc > 30) poner(true); else if (acc < -30) poner(false);
   }, {passive: true});
 })();
 function tablasTelefono(root) {
