@@ -1182,6 +1182,7 @@ function accionesCtl(c, mes, R, a) {
         <button data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte completo</button>
         ${(() => { const ps = [...new Set([...personasDe(c, mes), ...R.per.map(x => x.p)])].filter(Boolean); return ps.length ? `<div class="sep"></div><div class="eyebrow">Solo para una persona</div>${ps.map(p => `<button data-act="pdf" data-c="${c.id}" data-m="${mes}" data-p="${esc(p)}">${esc(p)} <span class="muted small">· sus gastos y los compartidos</span></button>`).join('')}` : ''; })()}
       </div></details><button class="btn" data-act="export" data-c="${c.id}" title="Exportar a Excel" aria-label="Exportar a Excel">${ICTL.xls}<span class="htx">Exportar a Excel</span></button>
+      ${a && esProy(c) ? `<button class="btn ${S.editProy === c.id ? 'pri' : ''}" data-act="editProy" data-c="${c.id}" title="Editar datos del proyecto" aria-label="Editar datos del proyecto" aria-expanded="${S.editProy === c.id}"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO.editar}</svg><span class="htx">${S.editProy === c.id ? 'Cerrar edición' : 'Editar proyecto'}</span></button>` : ''}
       ${a && esProy(c) ? (cerrado(c) ? `<button class="btn" data-act="reabrir" data-c="${c.id}" title="Reabrir proyecto" aria-label="Reabrir proyecto">${ICTL.abrir}<span class="htx">Reabrir proyecto</span></button>` : `<button class="btn ${S.confirmCierre === c.id ? 'pri' : ''}" data-act="cerrarProy" data-c="${c.id}" title="Cerrar proyecto">${S.confirmCierre === c.id ? '¿Cerrar? Confirmar' : `${ICTL.cerrar}<span class="htx">Cerrar proyecto</span>`}</button>`) : ''}`;
 }
 // vSelMes: Selector de mes y año (con flechas) de un control.
@@ -1345,6 +1346,7 @@ function vControl(c) {
     </div>
     ${cerrado(c) ? `<div class="panel"><div class="bd small">Proyecto cerrado el ${fFecha(c.cerradoEl)}. Ya no recibe movimientos; su saldo final quedó en <b class="num">${L(R.ingreso - R.egreso)}</b>.${a ? ' Para hacer cambios, reábrelo.' : ''}</div></div>` : ''}
     <div class="ctl-barra solo-tel">${c.porMes ? vSelMes(c, mes, meses) : ''}<div class="ctl-ico">${accionesCtl(c, mes, R, a)}</div></div>
+    ${a && esProy(c) && S.editProy === c.id ? vConfigProy(c) : ''}
     ${c.porMes ? `<div class="solo-pc">${vSelMes(c, mes, meses)}</div>
     ${vParticipantes(c, mes)}` : ''}
     <div class="kpis k4">
@@ -1359,7 +1361,7 @@ function vControl(c) {
       const bt = (v, txt, n, tot) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="ctlSec" data-v="${v}">${txt} <span class="tj-tc">${n}</span>${tot != null ? ` <b class="num">${L(tot)}</b>` : ''}</button>`;
       return `<div class="tj-tabs ctl-tabs ${mp ? 'c3' : ''}">${bt('eg', 'Egresos', h.egresos.length, R.egreso)}${bt('in', 'Ingresos', h.ingresos.length, R.ingreso)}${mp ? bt('mp', 'Proyectos', microsDe(c.id).length) : ''}</div>
       <div class="ctl-secs ctl-${k}"><div class="ctl-s-eg">${tablaFilas(c, h, 'egreso')}</div><div class="ctl-s-in">${tablaFilas(c, h, 'ingreso')}</div>${mp ? `<div class="ctl-s-mp">${mp}</div>` : ''}</div>`; })()}
-    ${a && esProy(c) ? vConfigProy(c) : ''}</div>`;
+    </div>`;
 }
 // porMesProy: Totales por mes de un proyecto.
 function porMesProy(h) {
@@ -3089,7 +3091,7 @@ function vProyectos() {
 function vConfigProy(c) {
   const vacio = !totProy(c).filas;
   const conAcceso = S.accesos.filter(x => x.control === c.id).map(x => nombreDe(x.usuario));
-  return `<div class="panel" data-cid="${c.id}"><div class="hd"><h2>Datos del proyecto</h2><span class="note">Acceso: ${conAcceso.length ? esc(conAcceso.join(', ')) : 'solo tú'} · <a href="#usuarios">cambiar</a></span></div><div class="bd form-grid">
+  return `<div class="panel" data-cid="${c.id}"><div class="hd"><h2>Datos del proyecto</h2><span class="note" style="margin-right:auto">Acceso: ${conAcceso.length ? esc(conAcceso.join(', ')) : 'solo tú'} · <a href="#usuarios">cambiar</a></span><button class="btn sm" data-act="editProy" data-c="${c.id}">Listo</button></div><div class="bd form-grid">
     <label>Nombre<input data-cf="nombre" value="${esc(c.nombre)}"></label>
     <label>Personas (TIPO), separadas por coma<input data-cf="personas" value="${esc((c.personas || []).join(', '))}"></label>
     <label>TIPO por defecto<input data-cf="tipoDefecto" value="${esc(c.tipoDefecto || '')}"></label>
@@ -4203,6 +4205,7 @@ document.addEventListener('click', async e => {
   if (act === 'tjDashCerrar') { S.tjDashFull = null; return render(); }
   if (act === 'tjTab') { S.tjTab = b.dataset.v; return render(); }
   if (act === 'tjDashReset') { S.tjDash = Object.assign(S.tjDash || {}, {desde: '', hasta: ''}); return render(); }
+  if (act === 'editProy') { S.editProy = S.editProy === b.dataset.c ? null : b.dataset.c; return render(); }
   if (act === 'ctlSec') { S.ctlSec = b.dataset.v; return render(); }
   if (act === 'tjPest') { S.tjPest = b.dataset.v; return pintarTjPer(); }
   if (act === 'tjMon') { S[b.dataset.k] = b.dataset.v; return pintarTjPer(); }
