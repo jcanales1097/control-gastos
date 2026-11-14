@@ -508,6 +508,12 @@ body:has(.graf-full){overflow:hidden}
 .tj-modal .cr-cand .note{font-size:11px}.tj-modal .cr-cand .num{font-size:12.5px;white-space:nowrap;font-weight:400!important;text-align:right}
 .tj-modal .cr-cand .num .cat{font-size:10px}
 .tj-modal .tj-it .btn.ico{width:26px;height:26px}
+/* Encabezado de día en las listas del corte (día, día de la semana, mes/año y total del día). */
+.tj-dia{display:flex;align-items:center;gap:6px;padding:3px 8px;background:var(--sunk);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
+.tj-dia b{font-size:15px;font-family:var(--f-num)}
+.tj-dia .dia-s{font-size:9px;padding:0 5px;border-radius:4px;background:var(--muted);color:var(--panel);font-weight:600}
+.tj-dia .dia-m{font-size:9.5px;color:var(--muted)}.tj-dia .dia-t{margin-left:auto;font-size:11px;font-weight:600}
+.tj-modal .tj-it,.tj-modal .cr-cand{padding-inline:8px}
 .tc-s1{display:grid;gap:3px}
 .tc-s2{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;border-top:1px solid var(--line);padding-top:4px;margin-top:2px;font-size:12px;color:var(--muted)}
 .tc-s2 b{font-size:13px}.tc-s2 .tc-gt::after{content:":"}
@@ -4105,6 +4111,13 @@ function pintarTjPer(foco) {
     const b = (v, n, t, txt) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="tjMon" data-k="${clave}" data-v="${v}" aria-pressed="${k === v}">${txt} <span class="tj-tc">${n}</span> <b class="num">${t}</b></button>`;
     return {k, items: k === 'U' ? gu : gl, html: `<div class="tj-tabs" role="group">${b('L', gl.length, L(tl), 'Lempiras')}${b('U', gu.length, tjU(tu), 'Dólares')}</div>`};
   };
+  // tjDias: lista agrupada por día (como el detalle de registros): encabezado con día, día de la semana, mes/año y total del día;
+  // los días van del más reciente al más antiguo.
+  const tjDias = (items, fecha, val, fmt, fila) => { const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+    const ord = items.map((o, i) => [o, i]).sort((a, b) => fecha(b[0]).localeCompare(fecha(a[0])) || a[1] - b[1]).map(z => z[0]);
+    const tot = {}; ord.forEach(o => { const f = fecha(o); tot[f] = crR2((tot[f] || 0) + (+val(o) || 0)); }); let ant = null;
+    return ord.map(o => { const f = fecha(o); let h = ''; if (f !== ant) { ant = f; const d = f ? new Date(f + 'T12:00') : null;
+      h = `<div class="tj-dia"><b>${f ? f.slice(8, 10) : '—'}</b>${d ? `<span class="dia-s">${DS[d.getDay()]}</span><span class="dia-m">${f.slice(5, 7)}/${f.slice(0, 4)}</span>` : ''}<span class="dia-t num">${fmt(tot[f])}</span></div>`; } return h + fila(o); }).join(''); };
   const pagoEnUSD = x => tjPagoEnUSD(x, tjPagoMonto(x, set));
   const valPago = x => { const m = tjPagoMonto(x, set); return pagoEnUSD(x) ? m.usd : m.l; };
   const PA = tjPest('tjMonA', cand, pagoEnUSD, valPago);
@@ -4142,17 +4155,17 @@ function pintarTjPer(foco) {
             const PV = tjPest('tjMonV', vis, o => !!o.x.usd, o => o.v);
             return `<div class="row" style="justify-content:space-between;gap:8px"><span class="eyebrow">Pagos vinculados a este período · ${qv ? vis.length + ' de ' + todos.length : todos.length}</span>${qv ? '<span class="note">totales de lo que coincide con la búsqueda</span>' : ''}</div>
           <input class="in" id="tjBusV" placeholder="Buscar en los pagos vinculados (texto o monto)" value="${esc((S.tjOpt || {}).qv || '')}" style="max-width:none">${PV.html}
-          <div class="lst tj-cargos">${PV.items.map(({x, tx, m}) => `<div class="tj-it" data-pid="${x.id}"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? fFecha(tx.fecha) + ' · ' + tjRuta(tx, set) : ''}</div></div><span class="num">${x.monto_manual != null ? `${x.usd ? tjU(+x.monto_manual) : L(+x.monto_manual)}<div class="cat" style="text-align:right">exacto · escrito a mano</div>` : tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>
-            ${tx && (x.monto_manual != null || m.est) ? `<input class="in num tj-mm" data-tjmm="${x.id}" inputmode="decimal" placeholder="${x.usd ? '$' : 'L'} exacto" value="${x.monto_manual != null ? (+x.monto_manual).toFixed(2) : ''}" title="Escribe el monto exacto que muestra la app (por ejemplo US$ 0.50). Vacío = usar el aproximado.">` : ''}${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div>`).join('') || `<div class="note">${todos.length ? (qv ? 'Ningún pago vinculado coincide con la búsqueda.' : `No hay pagos vinculados en ${PV.k === 'U' ? 'dólares' : 'lempiras'}; revisa la otra pestaña.`) : 'Ningún pago vinculado todavía.'}</div>`}</div>`; })()}
+          <div class="lst tj-cargos">${tjDias(PV.items, o => (o.tx && o.tx.fecha) || '', o => o.v, PV.k === 'U' ? tjU : L, ({x, tx, m}) => `<div class="tj-it" data-pid="${x.id}"><div style="min-width:0;flex:1"><b>${tx ? desc(tx) : 'Registro ya no disponible'}</b><div class="note">${tx ? tjRuta(tx, set) : ''}</div></div><span class="num">${x.monto_manual != null ? `${x.usd ? tjU(+x.monto_manual) : L(+x.monto_manual)}<div class="cat" style="text-align:right">exacto · escrito a mano</div>` : tx ? monP(tx) : (x.usd ? tjU(+x.monto) : L(+x.monto))}</span>
+            ${tx && (x.monto_manual != null || m.est) ? `<input class="in num tj-mm" data-tjmm="${x.id}" inputmode="decimal" placeholder="${x.usd ? '$' : 'L'} exacto" value="${x.monto_manual != null ? (+x.monto_manual).toFixed(2) : ''}" title="Escribe el monto exacto que muestra la app (por ejemplo US$ 0.50). Vacío = usar el aproximado.">` : ''}${icoBtn('quitar', 'Desvincular', 'tjDesv')}</div>`) || `<div class="note">${todos.length ? (qv ? 'Ningún pago vinculado coincide con la búsqueda.' : `No hay pagos vinculados en ${PV.k === 'U' ? 'dólares' : 'lempiras'}; revisa la otra pestaña.`) : 'Ningún pago vinculado todavía.'}</div>`}</div>`; })()}
           </div><div class="stack tjs-car" style="gap:8px">
           ${(() => { /* buscador de cargos: filtra por texto (descripción, categoría, cuenta) o por monto */
             const qc = ((S.tjOpt || {}).qc || '').trim().toUpperCase(); const n = parseFloat(qc.replace(/[^0-9.]/g, ''));
             const gs = qc ? p.g.filter(x => [x.nota, x.det, x.cat, x.sub, x.cuenta].join(' ').toUpperCase().includes(qc) || (isFinite(n) && n > 0 && String(x.monto).includes(String(n)))) : p.g;
             const tot = gs.reduce((a, x) => { const m = tjMonto(x); a.l += m.l; a.u += m.usd; return a; }, {l: 0, u: 0});
             const PC = tjPest('tjMonC', gs, x => tjEsUSD(x.cuenta), x => tjEsUSD(x.cuenta) ? tjMonto(x).usd : tjMonto(x).l);
-            S._tjGs = PC.items; return `<div class="row" style="justify-content:space-between;margin-top:6px;gap:8px"><span class="eyebrow">Cargos del período · ${qc ? gs.length + ' de ' + p.g.length : p.g.length}</span>${qc ? '<span class="note">totales de lo que coincide con la búsqueda</span>' : ''}</div>
+            S._tjGs = PC.items; S._tjGk = PC.k; return `<div class="row" style="justify-content:space-between;margin-top:6px;gap:8px"><span class="eyebrow">Cargos del período · ${qc ? gs.length + ' de ' + p.g.length : p.g.length}</span>${qc ? '<span class="note">totales de lo que coincide con la búsqueda</span>' : ''}</div>
           <input class="in" id="tjBusC" placeholder="Buscar en los cargos (texto o monto)" value="${esc((S.tjOpt || {}).qc || '')}" style="max-width:none">${PC.html}`; })()}
-          <div class="lst tj-cargos">${S._tjGs.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${fFecha(x.fecha)} · ${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`).join('') || `<div class="note">${(S.tjOpt || {}).qc ? 'Ningún cargo coincide con la búsqueda.' : 'Sin cargos.'}</div>`}</div>
+          <div class="lst tj-cargos">${tjDias(S._tjGs, x => x.fecha, x => tjEsUSD(x.cuenta) ? tjMonto(x).usd : tjMonto(x).l, S._tjGk === 'U' ? tjU : L, x => `<div class="tj-it"><div style="min-width:0;flex:1"><b>${desc(x)}</b><div class="note">${tjRuta(x, set)}</div></div><span class="num">${mon(x)}</span></div>`) || `<div class="note">${(S.tjOpt || {}).qc ? 'Ningún cargo coincide con la búsqueda.' : 'Sin cargos.'}</div>`}</div>
         </div></div>
         <div class="stack tjs-cand" style="gap:8px;min-width:0">
           <div class="eyebrow">Pagos y abonos que entraron a la tarjeta</div>
@@ -4162,7 +4175,7 @@ function pintarTjPer(foco) {
             ${(S.tjOpt || {}).todas ? '' : `<span class="cr-ck">Del <input class="in" type="date" data-tjr="d" value="${S.tjRango.d}"> al <input class="in" type="date" data-tjr="h" value="${S.tjRango.h}"></span>`}</div>
           <div class="row" style="justify-content:space-between"><span class="note">${cand.length} sin vincular</span><button class="btn sm pri" data-act="tjVinc" ${sel.size ? '' : 'disabled'}>Vincular seleccionados${sel.size ? ' (' + sel.size + ')' : ''}</button></div>
           ${PA.html}
-          <div class="lst cr-cands">${PA.items.length ? PA.items.map(x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${fFecha(x.fecha)} · ${tjRuta(x, set)}${!tjEsTras(x) && x.cat ? ' · ' + esc(x.cat) : ''}</span></span><span class="num" style="font-weight:600">${monP(x)}</span></label>`).join('')
+          <div class="lst cr-cands">${PA.items.length ? tjDias(PA.items, x => x.fecha, valPago, PA.k === 'U' ? tjU : L, x => `<label class="cr-cand ${sel.has(x.id) ? 'on' : ''}"><input type="checkbox" data-tjs="${esc(x.id)}" ${sel.has(x.id) ? 'checked' : ''}><span style="min-width:0;flex:1"><b>${desc(x)}</b><span class="note" style="display:block">${tjRuta(x, set)}${!tjEsTras(x) && x.cat ? ' · ' + esc(x.cat) : ''}</span></span><span class="num" style="font-weight:600">${monP(x)}</span></label>`)
             : cand.length ? `<div class="note" style="padding:8px 0">No hay pagos en ${PA.k === 'U' ? 'dólares' : 'lempiras'}; revisa la otra pestaña.</div>` : `<div class="note" style="padding:8px 0">No hay pagos sin vincular ${(S.tjOpt || {}).todas ? '' : `del ${fFecha(S.tjRango.d)} al ${fFecha(S.tjRango.h)}`}. Cambia el rango o marca “Cualquier fecha”.</div>`}</div>
         </div>
       </div>
