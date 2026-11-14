@@ -447,6 +447,15 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
   table.tcards td .chip{font-size:9.5px;padding:0 6px}
   table.tcards td .tj-ctas{justify-content:flex-start}
   table.tcards tr.cr-row{cursor:pointer}
+  /* Cortes de tarjetas en modo tarjeta: los 4 montos (Gastos, Pagos, Saldo, Saldo global) en una sola línea y el período en una línea arriba. */
+  table.tcards.tj2 tr{grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 6px;padding:6px 8px}
+  table.tcards.tj2 td{font-size:10px;align-items:flex-end;text-align:right}
+  table.tcards.tj2 td::before{font-size:8px;align-self:flex-end}
+  table.tcards.tj2 td.tc-main{display:flex;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 8px;text-align:left}
+  table.tcards.tj2 td.tc-main .cat{font-size:9.5px}
+  table.tcards.tj2 td.tc-main .tj-chips{margin:0}
+  table.tcards.tj2 .tj-d{align-items:flex-end;font-size:10px}
+  table.tcards.tj2 td.tj-glob{background:var(--sunk);border-radius:6px;padding:1px 4px}
   /* Filtros plegables: a la vista solo el buscador y el botón "Filtros"; el resto se abre al tocarlo. */
   .filters.f-plegable{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
   .filters.f-plegable>*{grid-column:span 3}
