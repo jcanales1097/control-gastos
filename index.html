@@ -423,6 +423,17 @@ body:has(.graf-full){overflow:hidden}
   /* Controles en el teléfono: indicadores y participantes en una sola fila, y Egresos / Ingresos / Proyectos como pestañas. */
   .kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
   .solo-tel-b{display:block}
+  /* Todos los cuadros resumen (indicadores) en el teléfono: una sola fila compacta; si son 5 o más, filas de 3. */
+  .kpis{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+  .kpis .kpi{padding:5px 6px!important;min-width:0}
+  .kpis .kpi .eyebrow{font-size:8px!important;line-height:1.2;letter-spacing:.03em}
+  .kpis .kpi .v{font-size:10.5px!important;white-space:nowrap;letter-spacing:-.02em;line-height:1.5}
+  .kpis .kpi .note{font-size:8.5px!important;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .kpis:has(.kpi:nth-child(5)){grid-auto-flow:row;grid-template-columns:repeat(6,minmax(0,1fr))!important}
+  .kpis:has(.kpi:nth-child(5)) .kpi{grid-column:span 2}
+  .kpis:has(.kpi:nth-child(5)) .kpi:nth-child(3n+1):nth-last-child(2),.kpis:has(.kpi:nth-child(5)) .kpi:nth-child(3n+2):last-child{grid-column:span 3}
+  .kpis:has(.kpi:nth-child(5)) .kpi:nth-child(3n+1):last-child{grid-column:span 6}
+  .kpis:has(.kpi:nth-child(5)) .kpi .v{font-size:11.5px!important}
   .dist-m .hd{gap:8px;flex-wrap:nowrap}.dist-m .hd .note{white-space:nowrap}.dist-m .hd .btn{padding:3px 8px;font-size:11px}
   .dm-f{display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:1px solid var(--line)}
   .dm-i{flex:1;min-width:0}.dm-i b{font-size:12px}.dm-i .cat{font-size:10px;line-height:1.3}
