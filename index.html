@@ -441,7 +441,13 @@ body:has(.graf-full){overflow:hidden}
   .dm-i{flex:1;min-width:0}.dm-i b{font-size:12px}.dm-i .cat{font-size:10px;line-height:1.3}
   .dm-v{display:flex;flex-direction:column;align-items:flex-end;flex:none}.dm-v .num{font-size:13px;font-weight:600}.dm-v .cat{font-size:9px}
   .dm-t{background:var(--sunk)}
-  .dist-m .hd .btn.neg{color:var(--bad);font-weight:600}.dm-g{color:var(--fg)}
+  .dm-g{color:var(--fg)}
+  /* Selector Del mes / Global: las dos opciones a la vista y resaltada la que se está viendo. */
+  .dm-seg{display:flex;flex:none;background:var(--sunk);border-radius:8px;padding:2px}
+  .dm-seg button{border:0;background:none;font:inherit;font-size:11.5px;font-weight:600;color:var(--muted);padding:4px 10px;border-radius:6px;-webkit-user-select:none;user-select:none}
+  .dm-seg button.on{background:var(--accent);color:var(--accent-ink)}
+  .dm-que{padding:3px 10px;font-size:10px;color:var(--muted);background:var(--sunk);border-top:1px solid var(--line)}
+  .dm-que b{color:var(--fg)}.dm-que.g{background:var(--accent-soft)}
   .stack>.row:has(>div>.ctl-pend),.stack>.row:has(>div>h1.solo-pc){margin-bottom:-4px}
   div:has(>h1.solo-pc){display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
   div:has(>h1.solo-pc) .ctl-pend{margin-left:auto;font-size:11px}
@@ -1558,11 +1564,12 @@ function vDistribucion(c, R) {
   const comoGlobal = x => { const ant = r2(gl(x) - x.saldo); const fm = v => `${L(ab(v))}${v > 0.004 ? ' a favor' : ''}`;
     return `Este mes ${fm(x.saldo)} ${ant < -0.004 ? '+' : ant > 0.004 ? '−' : '+'} meses anteriores ${L(ab(ant))}${ant > 0.004 ? ' a favor' : ''}`; };
   const gTot = ver ? r2(R.per.reduce((s, x) => s + gl(x), 0)) : 0;
-  const movil = `<div class="panel dist-m solo-tel-b"><div class="hd"><h2 style="margin-right:auto">Distribución</h2><span class="note">Compartido ${L(ab(R.comp))}${R.n > 1 ? ' ÷ ' + R.n : ''}</span>${okMes ? `<button class="btn sm ghost ${ver ? '' : 'neg'}" data-act="verSaldos" data-c="${c.id}" aria-pressed="${ver ? 'true' : 'false'}" title="${ver ? 'Volver al saldo de este mes' : 'Ver el saldo global (este mes más los meses anteriores)'}">${ver ? 'Saldo del mes' : 'Saldo global'}</button>` : ''}</div>
+  const movil = `<div class="panel dist-m solo-tel-b"><div class="hd"><div style="margin-right:auto;min-width:0"><h2>Distribución</h2><div class="note">Compartido ${L(ab(R.comp))}${R.n > 1 ? ' ÷ ' + R.n : ''}</div></div>${okMes ? `<div class="dm-seg" role="group" aria-label="Saldo que se muestra">${[[false, 'Del mes'], [true, 'Global']].map(([v, t]) => `<button class="${!!ver === v ? 'on' : ''}" data-act="verSaldos" data-c="${c.id}" data-v="${v ? 1 : 0}" aria-pressed="${!!ver === v}">${t}</button>`).join('')}</div>` : ''}</div>
+    ${okMes ? `<div class="dm-que ${ver ? 'g' : ''}">Mostrando: <b>${ver ? 'saldo global' : 'saldo de ' + esc(mesLargo(R.mes))}</b>${ver ? ' · este mes más lo arrastrado de meses anteriores' : ''}</div>` : ''}
     ${R.per.map(x => { const v = ver ? gl(x) : x.saldo; const e = est(v);
       return `<div class="dm-f"><div class="dm-i"><b>${esc(x.p)}</b><div class="cat">Propio ${L(ab(x.g))} + compartido ${L(ab(parte))}${x.aporte ? ` − abonó ${L(ab(x.aporte))}` : ''}</div>${ver ? `<div class="cat dm-g">${comoGlobal(x)}</div>` : ''}</div>
-        <div class="dm-v"><span class="num ${e[1]}">${L(ab(v))}</span><span class="cat">${ver ? 'global · ' : ''}${e[0]}</span></div></div>`; }).join('') || '<div class="bd note">Agrega las personas de este control en Ajustes.</div>'}
-    ${R.per.length ? `<div class="dm-f dm-t"><div class="dm-i"><b>Total${ver ? ' global' : ''}</b><div class="cat">${ver ? `Este mes ${L(ab(sTot))} + meses anteriores ${L(ab(r2(gTot - sTot)))}${gTot - sTot > 0.004 ? ' a favor' : ''}` : `A pagar ${L(ab(R.per.reduce((s, x) => s + x.pagar, 0)))} · abonado ${L(ab(R.per.reduce((s, x) => s + x.aporte, 0)))}`}${R.pendientes ? ` · ${R.pendientes} por validar no cuentan` : ''}</div></div><div class="dm-v"><span class="num ${est(ver ? gTot : sTot)[1]}">${L(ab(ver ? gTot : sTot))}</span><span class="cat">${ver ? 'global · ' : ''}${est(ver ? gTot : sTot)[0]}</span></div></div>` : ''}</div>`;
+        <div class="dm-v"><span class="num ${e[1]}">${L(ab(v))}</span><span class="cat">${okMes ? (ver ? 'global · ' : 'del mes · ') : ''}${e[0]}</span></div></div>`; }).join('') || '<div class="bd note">Agrega las personas de este control en Ajustes.</div>'}
+    ${R.per.length ? `<div class="dm-f dm-t"><div class="dm-i"><b>Total${ver ? ' global' : okMes ? ' del mes' : ''}</b><div class="cat">${ver ? `Este mes ${L(ab(sTot))} + meses anteriores ${L(ab(r2(gTot - sTot)))}${gTot - sTot > 0.004 ? ' a favor' : ''}` : `A pagar ${L(ab(R.per.reduce((s, x) => s + x.pagar, 0)))} · abonado ${L(ab(R.per.reduce((s, x) => s + x.aporte, 0)))}`}${R.pendientes ? ` · ${R.pendientes} por validar no cuentan` : ''}</div></div><div class="dm-v"><span class="num ${est(ver ? gTot : sTot)[1]}">${L(ab(ver ? gTot : sTot))}</span><span class="cat">${okMes ? (ver ? 'global · ' : 'del mes · ') : ''}${est(ver ? gTot : sTot)[0]}</span></div></div>` : ''}</div>`;
   return movil + `<div class="dist-grid solo-pc"><div class="panel"><div class="hd"><h2>Resumen de distribución</h2></div><div class="tbl-wrap"><table class="dist">
     <thead><tr><th>Descripción</th><th class="num">Valor</th></tr></thead><tbody>
     <tr><td>COMPARTIDO</td><td class="num">${L(R.comp)}</td></tr>
@@ -4438,7 +4445,7 @@ document.addEventListener('click', async e => {
   if (act === 'detalle') { const m = movDe(b); if (m) abrirDetalle(m.id); return; }
   if (act === 'dividir') { const tr = b.closest('tr[data-tx]'); const sel = x => tr && tr.querySelector(`[data-f=${x}]`); return abrirReparto(b.dataset.id, tr && sel('ctrl') && sel('ctrl').value ? {control: sel('ctrl').value, tipo: sel('tipo') && sel('tipo').value, mes: sel('mes') && sel('mes').value, grupo: sel('grupo') && sel('grupo').value} : null); }
   if (act === 'dividirMov') { const m = movDe(b) || S.movs.get(b.dataset.movId); if (m && m.tx_id) abrirReparto(m.tx_id); return; }
-  if (act === 'verSaldos') { S.verSaldos = S.verSaldos || {}; S.verSaldos[b.dataset.c] = !S.verSaldos[b.dataset.c]; return render(); }
+  if (act === 'verSaldos') { S.verSaldos = S.verSaldos || {}; S.verSaldos[b.dataset.c] = b.dataset.v != null ? b.dataset.v === '1' : !S.verSaldos[b.dataset.c]; return render(); }   // data-v: elige directamente Del mes (0) o Global (1)
   if (act === 'microVerTodos') { S.microVerTodos = S.microVerTodos || {}; S.microVerTodos[b.dataset.c] = !S.microVerTodos[b.dataset.c]; return render(); }
   if (act === 'rpAgregar') { const t = S.rep.t; const resto = Math.round((t.monto - S.rep.partes.reduce((s, p) => s + (+p.valor || 0), 0)) * 100) / 100; const c = familiares()[0]; S.rep.partes.push({control: c.id, tipo: c.tipoDefecto || 'COMPARTIDO', mes: t.mes, valor: Math.max(resto, 0)}); return pintarReparto(); }
   if (act === 'rpQuitar') { const i = +b.closest('tr').dataset.i; const [p] = S.rep.partes.splice(i, 1); if (p && p.id) S.rep.borrar.push(p.id); return pintarReparto(); }
