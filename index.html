@@ -227,6 +227,7 @@ tr.en-grupo td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .bulk .sel-tot{font-size:13px;opacity:.85;margin-right:6px}.bulk .sel-tot b{font-family:var(--f-num);opacity:1}
 .bulk select{background:var(--bg);color:var(--fg);border:0}
 .bulk .btn{background:var(--bg);color:var(--fg);border:0}
+.bulk-ops{display:contents}.bulk-min{display:none}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:50;max-width:90vw}
 .modal-bg{position:fixed;inset:0;background:rgba(10,16,13,.55);z-index:40;display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 16px 24px;overflow:auto}
 .modal{background:var(--panel);border-radius:12px;max-width:640px;width:100%;border:1px solid var(--line)}
@@ -613,6 +614,16 @@ body:has(.graf-full){overflow:hidden}
   table.tcards td .chip{font-size:9.5px;padding:0 6px}
   table.tcards td .tj-ctas{justify-content:flex-start}
   table.tcards tr.cr-row{cursor:pointer}
+  /* Barra de selección masiva: minimizada (cantidad, total y botón "Aplicar"); las opciones se despliegan al tocarlo. */
+  .bulk{padding:6px 8px 6px 12px;gap:4px 8px;font-size:12px;flex-wrap:nowrap;align-items:center}
+  .bulk.open{flex-wrap:wrap}
+  .bulk>b{white-space:nowrap}.bulk .sel-tot{font-size:11px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bulk-min{display:flex;gap:6px;flex:none;margin-left:auto}.bulk-min .btn{padding:5px 10px}.bulk-x{width:30px;padding:5px 0!important}
+  .bulk-ops{display:none}
+  .bulk.open .bulk-ops{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%;padding:4px 0 2px}
+  .bulk.open .bulk-ops select{width:100%;min-width:0}.bulk.open .bulk-ops [hidden]{display:none}
+  .bulk.open .bulk-ops [data-act=bulkAsignar]{grid-column:1/-1;padding:8px;font-weight:600}
+  .bulk-qs{display:none}.bulk.open .bulk-ops [data-act=bulkIgnorar]{grid-column:1/-1}
   /* Toque en el teléfono: se resalta la fila completa (no cada celda ni el texto) y solo mientras se toca. */
   *{-webkit-tap-highlight-color:transparent}
   tr[data-act],tr[data-mov],tr.cr-row,.tj-tab,.btn,.pr-f,.cr-cand,.tj-it,.dm-f,nav.tabs a,summary,th,.chip,.eyebrow,.tj-dia,.dia-h,label.cr-ck{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -1356,12 +1367,13 @@ function vBandeja() {
         ${total > shown.length ? `<div class="bd"><button class="btn" data-act="mas">Mostrar ${Math.min(300, total - shown.length)} más (${total - shown.length} restantes)</button></div>` : ''}`
       : `<div class="empty"><b>No hay movimientos con estos filtros</b>Cuando sincronices, aquí aparecen los nuevos registros de la app.</div>`}
     </div>
-    ${S.sel.size ? `<div class="bulk" role="region" aria-label="Acciones para la selección"><b>${S.sel.size} seleccionados</b>${(() => { let ing = 0, egr = 0; S.sel.forEach(id => { const t = D.byId.get(id); if (!t) return; const v = restante(t); t.code === 0 ? ing += v : egr += v; }); const r = x => Math.round(x * 100) / 100; return `<span class="sel-tot">${egr ? `Egresos <b class="num">${L(r(egr))}</b>` : ''}${ing && egr ? ' · ' : ''}${ing ? `Ingresos <b class="num">${L(r(ing))}</b>` : ''}</span>`; })()}
-      ${ctrlSelect((familiares()[0] || {}).id, 'id="bCtrl" aria-label="Control o proyecto"')}
+    ${S.sel.size ? `<div class="bulk ${S.bulkOpen ? 'open' : ''}" role="region" aria-label="Acciones para la selección"><b>${S.sel.size} seleccionados</b>${(() => { let ing = 0, egr = 0; S.sel.forEach(id => { const t = D.byId.get(id); if (!t) return; const v = restante(t); t.code === 0 ? ing += v : egr += v; }); const r = x => Math.round(x * 100) / 100; return `<span class="sel-tot">${egr ? `Egresos <b class="num">${L(r(egr))}</b>` : ''}${ing && egr ? ' · ' : ''}${ing ? `Ingresos <b class="num">${L(r(ing))}</b>` : ''}</span>`; })()}
+      <span class="bulk-min"><button class="btn sm bulk-tog" data-act="bulkTog" aria-expanded="${!!S.bulkOpen}">${S.bulkOpen ? 'Ocultar ▾' : 'Aplicar ▴'}</button><button class="btn sm bulk-x" data-act="bulkClear" title="Quitar selección" aria-label="Quitar selección">✕</button></span>
+      <div class="bulk-ops">${ctrlSelect((familiares()[0] || {}).id, 'id="bCtrl" aria-label="Control o proyecto"')}
       <select id="bTipo" aria-label="Tipo">${tipoOptions(familiares()[0], 'COMPARTIDO', 'egreso')}</select>
       <select id="bGrupo" aria-label="Micro proyecto" ${familiares()[0] && microsDe(familiares()[0].id, true).length ? '' : 'hidden'}>${familiares()[0] ? microOptions(familiares()[0].id, '') : ''}</select>
       <select id="bMes" aria-label="Mes para la selección" ${familiares()[0] ? '' : 'disabled'}><option value="">Mes de cada movimiento</option>${mesOptions('').replace(/ selected/g, '')}</select>
-      <button class="btn sm" data-act="bulkAsignar">Asignar selección</button><button class="btn sm" data-act="bulkIgnorar">Marcar como no aplica</button><button class="btn sm" data-act="bulkClear">Quitar selección</button></div>` : ''}
+      <button class="btn sm" data-act="bulkAsignar">Asignar selección</button><button class="btn sm" data-act="bulkIgnorar">Marcar como no aplica</button><button class="btn sm bulk-qs" data-act="bulkClear">Quitar selección</button></div></div>` : ''}
   </div>`;
 }
 
@@ -4266,7 +4278,9 @@ document.addEventListener('click', async e => {
   if (act === 'ignorar') return ignorar([b.dataset.id]);
   if (act === 'bulkAsignar') { const g = $('#bGrupo'); const c = ctrlById($('#bCtrl').value); const mm = $('#bMes'); return asignar([...S.sel], $('#bCtrl').value, $('#bTipo').value, c && c.porMes && mm && mm.value ? mm.value : null, g ? g.value : ''); }
   if (act === 'bulkIgnorar') return ignorar([...S.sel]);
-  if (act === 'bulkClear') { S.sel.clear(); return render(); }
+  if (act === 'bulkClear') { S.sel.clear(); S.bulkOpen = false; return render(); }
+  // bulkTog: en el teléfono, despliega u oculta las opciones de aplicación masiva sin redibujar (conserva lo elegido en las listas).
+  if (act === 'bulkTog') { S.bulkOpen = !S.bulkOpen; const bk = b.closest('.bulk'); bk.classList.toggle('open', S.bulkOpen); b.textContent = S.bulkOpen ? 'Ocultar ▾' : 'Aplicar ▴'; b.setAttribute('aria-expanded', S.bulkOpen); return; }
   if (act === 'restaurar') { await q(sb.from('ignorados').delete().eq('tx_id', b.dataset.id), 'Devuelto a la bandeja').catch(() => null); S.ign.delete(b.dataset.id); derive(); return render(); }
   if (act === 'asignarOtro') { const tr = b.closest('tr'); const t = D.byId.get(b.dataset.id); b.parentElement.innerHTML = ''; tr.insertAdjacentHTML('afterend', `<tr class="addrow"><td colspan="6"><table><tr data-tx="${esc(t.id)}">${asignarCells(t)}</tr></table></td></tr>`); return; }
   if (act === 'mesPaso') { const c = ctrlById(b.dataset.c); const [y, m] = mesActualDe(c).split('-').map(Number); const d = new Date(y, m - 1 + (+b.dataset.d), 1); return irMes(c.id, `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
