@@ -106,7 +106,8 @@ table{border-collapse:collapse;width:100%}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--panel);position:sticky;top:0}
 td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
 tr:last-child td{border-bottom:0}
-tbody tr:hover td{background:var(--sunk)}
+/* El resaltado al pasar el cursor solo aplica donde hay mouse: en pantallas táctiles se quedaba "pegado" tras tocar una fila. */
+@media (hover:hover){tbody tr:hover td{background:var(--sunk)}}
 td.desc{min-width:220px}
 td .cat{font-size:11px;color:var(--muted)}
 select.in,input.in{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 6px;font-size:12.5px;max-width:190px}
@@ -612,6 +613,13 @@ body:has(.graf-full){overflow:hidden}
   table.tcards td .chip{font-size:9.5px;padding:0 6px}
   table.tcards td .tj-ctas{justify-content:flex-start}
   table.tcards tr.cr-row{cursor:pointer}
+  /* Toque en el teléfono: se resalta la fila completa (no cada celda ni el texto) y solo mientras se toca. */
+  *{-webkit-tap-highlight-color:transparent}
+  tr[data-act],tr[data-mov],tr.cr-row,.tj-tab,.btn,.pr-f,.cr-cand,.tj-it,.dm-f,nav.tabs a,summary,th,.chip,.eyebrow,.tj-dia,.dia-h,label.cr-ck{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  table.tcards tr>td,table.tdet tr>td{background:none!important}
+  table.tcards tr.cr-sel,table.tdet tr.cr-sel{background:var(--accent-soft)}
+  table.tcards tr.st-pendiente,table.tdet tr.st-pendiente{background:var(--warn-soft)}
+  table.tcards tr[data-act]:active,table.tcards tr.cr-row:active,table.tdet tr[data-mov]:active,.pr-f:active,.cr-cand:active{background:var(--sunk)}
   /* Cortes de tarjetas en modo tarjeta: los 4 montos (Gastos, Pagos, Saldo, Saldo global) en una sola línea y el período en una línea arriba. */
   table.tcards.tj2 thead{display:block;position:sticky;top:var(--mhd,0px);z-index:2;background:var(--sunk);border-bottom:1px solid var(--line)}
   table.tcards.tj2 thead tr{padding:3px 8px;border:0}
