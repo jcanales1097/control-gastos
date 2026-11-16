@@ -989,7 +989,11 @@ function rowToTx(r) {
   const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)};
   t.montoApp = t.monto; if (r[10] && typeof r[10] === 'object') t.x = r[10];   // datos extra del portal
   const fx = S.mon && S.mon.get(id);
-  if (fx && fx.moneda && fx.moneda !== 'HNL' && +fx.original) { t.moneda = fx.moneda; t.original = Math.abs(+fx.original); t.monto = Math.abs(+fx.hnl); t.tasa = Math.round(t.monto / t.original * 10000) / 10000; }
+  // La moneda importada solo se usa si corresponde a ESTE registro: su valor en lempiras (o el original) debe ser casi igual al monto
+  // que manda el portal. Así se ignoran emparejamientos viejos equivocados (ej. un traslado de L 3,000 que quedó con US$ 60 de otro).
+  const fxOk = fx && [+fx.hnl, +fx.original].some(v => Math.abs(Math.abs(v) - t.monto) <= Math.max(1, t.monto * 0.02));
+  if (fx && !fxOk) t.fxDescartado = true;
+  if (fxOk && fx.moneda && fx.moneda !== 'HNL' && +fx.original) { t.moneda = fx.moneda; t.original = Math.abs(+fx.original); t.monto = Math.abs(+fx.hnl); t.tasa = Math.round(t.monto / t.original * 10000) / 10000; }
   else if (/\$\s*$/.test((cuenta || '').trim())) t.sinTasa = true;
   return t;
 }
@@ -3726,6 +3730,9 @@ async function importarMonedas(file, msg) {
      entró ("Dinero ingresado") o salió ("Dinero gastado"). Se guarda por registro (ajuste trasExcel) junto con la hora, para que
      cada traslado cuente bien en sus dos cuentas aunque el portal no mande la otra cuenta. */
   const tx = Object.assign({}, S.aj.trasExcel || {}); const usT = new Set(); let nTras = 0, nTrasOk = 0;
+  { // Lo que ya se había guardado para las fechas que trae este Excel se vuelve a calcular desde cero (corrige emparejamientos viejos).
+    let fMin = '9999', fMax = ''; ws.eachRow((row, n) => { if (n === 1) return; const f = fecha(val(row.getCell(iF))); if (f && f < fMin) fMin = f; if (f > fMax) fMax = f; });
+    for (const id of Object.keys(tx)) { const t0 = D.byId.get(id); if (!t0 || (t0.fecha >= fMin && t0.fecha <= fMax)) delete tx[id]; } }
   ws.eachRow((row, n) => { if (n === 1) return;
     const tipo = iTipo >= 0 ? String(val(row.getCell(iTipo)) || '') : ''; const f0 = val(row.getCell(iF));
     const hora = f0 instanceof Date && (f0.getUTCHours() || f0.getUTCMinutes()) ? String(f0.getUTCHours()).padStart(2, '0') + ':' + String(f0.getUTCMinutes()).padStart(2, '0') : '';
@@ -3737,7 +3744,7 @@ async function importarMonedas(file, msg) {
     const mismoTipo = t => esTras ? tjEsTrasApp(t) || (t.code !== 0 && t.code !== 1) : !tjEsTrasApp(t) && (tjEsAjuste(t) || (/^ingreso/i.test(tipo) ? t.code === 0 : /^gasto/i.test(tipo) ? t.code !== 0 : true));
     const cand = (idx.get(k) || []).filter(t => !usT.has(t.id) && mismoTipo(t)); const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && !esTras ? cand[0] : null);   // un traslado solo se toma con el mismo monto
     if (!t) return; usT.add(t.id);
-    tx[t.id] = [esTras ? String(val(row.getCell(iCat)) || '').trim() : '', esTras ? (/ingresad/i.test(tipo) ? 'entra' : 'sale') : '', hora]; if (esTras) nTrasOk++; });
+    tx[t.id] = [esTras ? String(val(row.getCell(iCat)) || '').trim() : '', esTras ? (/ingresad/i.test(tipo) ? 'entra' : 'sale') : '', hora, +t.montoApp || 0]; if (esTras) nTrasOk++; });
   if (Object.keys(tx).length) { try { await guardarAjuste('trasExcel', tx); } catch (e) {} }
   // Moneda de cada cuenta: en las filas en otra moneda, la última columna ("Cuentas") trae el monto en la moneda de la cuenta.
   // Si es igual al Importe en US$ la cuenta es en dólares (ej. PayPal); si es igual al valor en lempiras, la cuenta es en lempiras.
@@ -3955,7 +3962,7 @@ const tjEsTrasApp = t => t.code === 3 || t.code === 4 || /dinero (ingresad|gasta
 const tjEsTras = t => tjEsTrasApp(t) || (t.code !== 0 && t.code !== 1 && !!(trasX(t) || [])[1]);
 // tjSentido: desde el punto de vista de su propia cuenta, si el dinero 'entra' o 'sale' (null si el texto no lo dice).
 // trasX: lo que dice el Excel de Registro Contable de un registro: [otra cuenta, sentido ('entra'/'sale'), hora 'HH:MM'].
-const trasX = t => { const m = S.aj && S.aj.trasExcel; return m && m[t.id] || null; };
+const trasX = t => { const m = S.aj && S.aj.trasExcel; const x = m && m[t.id]; if (!x) return null; if (x[3] != null && Math.abs(x[3] - (+t.montoApp || 0)) > 0.011) return null; return x; };   // [3] = monto con que se emparejó
 const tjSentido = t => { const xx = trasX(t); if (xx && xx[1]) return xx[1]; const m = String(t.tipoMov || '').toLowerCase(); if (t.code === 4 || /ingres|entrad|recib|deposit/.test(m)) return 'entra'; if (/gast|salid|envi|retir|transfer.*out/.test(m)) return 'sale'; return null; };
 // tjCuentas: nombres de todas las cuentas de la app; tjAssets: id de cuenta del portal → nombre (si el portal lo trae).
 let _tjCu = null, _tjCuD = null;
@@ -4576,7 +4583,7 @@ function ctaIdx() {
 }
 // ctaVal: monto del registro en la moneda de la cuenta. Cuentas en dólares: monto exacto del Excel de monedas o del portal; si no, aproximado (≈).
 function ctaVal(t, mon, propia) {
-  if (mon !== 'USD') return {v: +t.monto || 0};
+  if (mon !== 'USD') return {v: t.montoApp != null ? +t.montoApp || 0 : +t.monto || 0};   // en lempiras manda el monto del portal (el mismo que usa la app)
   if (propia && tjEsUSD(t.cuenta)) { const m = tjMonto(t); return {v: m.usd, est: !!(m.est || m.sinTasa)}; }
   if (t.moneda === 'USD' && +t.original) return {v: +t.original};
   const ex = tjUSDExacto(t, +t.monto || 0); if (ex) return {v: ex.usd};
