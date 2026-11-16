@@ -611,6 +611,7 @@ body:has(.graf-full){overflow:hidden}
 .tj-it b{font-size:12px;font-weight:600;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .tj-it .note{font-size:11px}.tj-it .num{font-size:12.5px;white-space:nowrap}
 .tj-it:hover b{-webkit-line-clamp:unset}
+.tj-ctasel>label[hidden]{display:none!important}
 .tj-ctasel{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px;max-height:260px;overflow:auto;padding:8px;border:1px solid var(--line);border-radius:10px}
 /* ================= TELÉFONO =================
    Barra superior compacta (marca + botones en una línea, pestañas deslizables), letras compactas (el iPhone no hace zoom gracias a maximum-scale=1),
@@ -4346,7 +4347,8 @@ function abrirTjForm(id) {
         <label>Estado<select id="tfEst"><option value="activa" ${t && t.estado === 'cerrada' ? '' : 'selected'}>Activa</option><option value="cerrada" ${t && t.estado === 'cerrada' ? 'selected' : ''}>Cerrada</option></select></label>
         <label style="grid-column:1/-1">Notas<input id="tfNotas" value="${v('notas')}"></label>
       </div>
-      <div><div class="eyebrow" style="margin-bottom:6px">Cuentas de la app que forman la tarjeta</div>
+      <div><div class="row" style="justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:nowrap"><span class="eyebrow">Cuentas de la app que forman la tarjeta</span><span class="note" id="tfCnt"></span></div>
+        <input class="in" id="tfBus" type="search" placeholder="Buscar cuenta (ej.: 5312, BAC, TC)" autocomplete="off" style="max-width:none;margin-bottom:6px">
         <div class="tj-ctasel">${todas.map(c => `<label class="cr-ck ${usadas.has(c) ? 'muted' : ''}"><input type="checkbox" data-tfc value="${esc(c)}" ${mias.has(c) ? 'checked' : ''}> ${esc(c)} <span class="note">· ${cnt.get(c)}${usadas.has(c) ? ' · en ' + esc(usadas.get(c)) : ''}</span></label>`).join('')}</div></div>
       <div class="note">El día de pago se toma del mismo mes si es después del corte, o del mes siguiente si es antes. Cada fecha de pago se puede corregir en su período.</div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="cerrarModal">Cancelar</button><button class="btn pri" data-act="tjGuardar">${t ? 'Guardar cambios' : 'Crear tarjeta'}</button></div>
@@ -4708,6 +4710,10 @@ document.addEventListener('change', async e => {
 let qT;
 /* Escritura en buscadores y campos que se actualizan mientras escribes. */
 document.addEventListener('input', e => {
+  // tfBus: buscador de cuentas en el formulario de la tarjeta. Solo oculta las que no coinciden (las marcadas siguen marcadas aunque no se vean).
+  if (e.target.id === 'tfBus') { const qq = e.target.value.trim().toUpperCase().split(/\s+/).filter(Boolean); let n = 0;
+    document.querySelectorAll('.tj-ctasel > label').forEach(l => { const ok = qq.every(w => l.textContent.toUpperCase().includes(w)); l.hidden = !ok; if (ok) n++; });
+    const c = $('#tfCnt'); if (c) c.textContent = qq.length ? `${n} coinciden · ${document.querySelectorAll('[data-tfc]:checked').length} marcadas` : ''; return; }
   if (e.target.id === 'tjBusV') { S.tjOpt = S.tjOpt || {}; S.tjOpt.qv = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer('v'), 250); return; }
   if (e.target.id === 'tjBusC') { S.tjOpt = S.tjOpt || {}; S.tjOpt.qc = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer('c'), 250); return; }
   if (e.target.id === 'tjBus') { S.tjOpt = S.tjOpt || {}; S.tjOpt.q = e.target.value; clearTimeout(S._tbT); S._tbT = setTimeout(() => pintarTjPer(true), 250); return; }
