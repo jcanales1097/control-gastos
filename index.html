@@ -3732,7 +3732,10 @@ async function importarMonedas(file, msg) {
     const esTras = /dinero (ingresad|gastad)/i.test(tipo); if (!esTras && !hora) return; if (esTras) nTras++;
     const k = fecha(f0) + '|' + norm(val(row.getCell(iCta))) + '|' + norm(val(row.getCell(iDesc)));
     const imp = Math.abs(+val(row.getCell(iImp)) || 0), hnl = Math.abs(+val(row.getCell(iHnl)) || 0), ctaM = Math.abs(+val(row.getCell(iCtaM)) || 0);
-    const cand = (idx.get(k) || []).filter(t => !usT.has(t.id)); const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && !esTras ? cand[0] : null);   // un traslado solo se toma con el mismo monto
+    // Solo se empareja con un registro del mismo tipo: traslado con traslado; ingreso con ingreso; gasto con gasto.
+    // (Ej.: el 23/02/2023 a las 7:04 hubo en Efectivo L un ingreso de LACM y un traslado a BA-CH, los dos de L 12,815.00.)
+    const mismoTipo = t => esTras ? tjEsTrasApp(t) || (t.code !== 0 && t.code !== 1) : !tjEsTrasApp(t) && (/^ingreso/i.test(tipo) ? t.code === 0 : /^gasto/i.test(tipo) ? t.code !== 0 : true);
+    const cand = (idx.get(k) || []).filter(t => !usT.has(t.id) && mismoTipo(t)); const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && !esTras ? cand[0] : null);   // un traslado solo se toma con el mismo monto
     if (!t) return; usT.add(t.id);
     tx[t.id] = [esTras ? String(val(row.getCell(iCat)) || '').trim() : '', esTras ? (/ingresad/i.test(tipo) ? 'entra' : 'sale') : '', hora]; if (esTras) nTrasOk++; });
   if (Object.keys(tx).length) { try { await guardarAjuste('trasExcel', tx); } catch (e) {} }
@@ -3748,7 +3751,8 @@ async function importarMonedas(file, msg) {
     const mon = String(val(row.getCell(iMon)) || '').trim().toUpperCase(); if (!mon || mon === 'HNL') return; extranjeras++;
     const imp = Math.abs(+val(row.getCell(iImp)) || 0), hnl = Math.abs(+val(row.getCell(iHnl)) || 0), ctaM = Math.abs(+val(row.getCell(iCtaM)) || 0);
     const k = fecha(val(row.getCell(iF))) + '|' + norm(val(row.getCell(iCta))) + '|' + norm(val(row.getCell(iDesc)));
-    const cand = (idx.get(k) || []).filter(t => !usados.has(t.id));
+    const tipoF = iTipo >= 0 ? String(val(row.getCell(iTipo)) || '') : ''; const esT = /dinero (ingresad|gastad)/i.test(tipoF);
+    const cand = (idx.get(k) || []).filter(t => !usados.has(t.id) && (esT ? tjEsTrasApp(t) || (t.code !== 0 && t.code !== 1) : !tjEsTrasApp(t)));   // mismo tipo de registro
     const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && hnl && Math.abs(cand[0].montoApp - hnl) / hnl < 0.02 ? cand[0] : null);   // solo un monto casi igual
     if (!t || !imp || !hnl) { sinPar++; return; }
     usados.add(t.id); filas.push({tx_id: t.id, moneda: mon, original: imp, hnl, actualizado: new Date().toISOString()});
@@ -3946,7 +3950,9 @@ const tjEsUSD = c => /\$\s*$/.test(String(c || ''));
    dinero de la tarjeta por traslado (avances, pasar saldo a otra cuenta o tarjeta). Un traslado puede venir en dos filas (la que sale y la que entra)
    o en una sola fila desde la cuenta de origen con la cuenta destino en la categoría. Aquí se toman en cuenta ambos casos sin contarlos dos veces. */
 // tjEsTras: el registro es un traslado entre cuentas.
-const tjEsTras = t => t.code === 3 || t.code === 4 || /dinero (ingresad|gastad)|transfer|traslad/i.test(String(t.tipoMov || '')) || !!(trasX(t) || [])[1];
+// tjEsTrasApp: el propio registro dice que es traslado (código o tipo). Un ingreso o gasto de la app nunca se vuelve traslado por el Excel.
+const tjEsTrasApp = t => t.code === 3 || t.code === 4 || /dinero (ingresad|gastad)|transfer|traslad/i.test(String(t.tipoMov || ''));
+const tjEsTras = t => tjEsTrasApp(t) || (t.code !== 0 && t.code !== 1 && !!(trasX(t) || [])[1]);
 // tjSentido: desde el punto de vista de su propia cuenta, si el dinero 'entra' o 'sale' (null si el texto no lo dice).
 // trasX: lo que dice el Excel de Registro Contable de un registro: [otra cuenta, sentido ('entra'/'sale'), hora 'HH:MM'].
 const trasX = t => { const m = S.aj && S.aj.trasExcel; return m && m[t.id] || null; };
