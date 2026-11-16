@@ -630,7 +630,7 @@ table.cta-adm td{vertical-align:middle}table.cta-adm .in{min-width:0;width:100%;
 .cta-chx{border:0;background:none;color:inherit;cursor:pointer;padding:0 0 0 2px;font-size:13px;line-height:1}
 .cta-subs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.cta-subs .chip{font-size:10px;font-weight:400}
 .cta-cx{width:22px;height:22px;padding:0;margin-right:4px}.cta-oc td{opacity:.6}
-.cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}.cta-tfix{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.cta-tfix .in{width:auto;max-width:260px;padding:3px 6px;font-size:12px}.cta-atabs{grid-template-columns:repeat(4,1fr);max-width:600px}
+.cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}@media (max-width:760px){.cta-lst .cta-it{flex-wrap:wrap;row-gap:4px}.cta-lst .cta-it>div:first-child{flex:1 1 100%!important}.cta-lst .cta-it>.num{margin-right:auto}}.aj-seg{flex:none}.aj-seg button{padding:3px 9px;font-size:11.5px}.cta-tfix{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.cta-tfix .in{width:auto;max-width:260px;padding:3px 6px;font-size:12px}.cta-atabs{grid-template-columns:repeat(5,1fr);max-width:720px}
 .cta-ar,.cta-cr{display:grid;gap:8px 12px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line)}
 .cta-ar{grid-template-columns:minmax(200px,1.5fr) minmax(150px,1fr) 64px minmax(150px,1fr) 115px 80px}
 .cta-cr{grid-template-columns:minmax(240px,1.6fr) minmax(200px,1.2fr) minmax(170px,1fr) 80px}
@@ -3744,7 +3744,7 @@ async function importarMonedas(file, msg) {
     const mismoTipo = t => esTras ? tjEsTrasApp(t) || (t.code !== 0 && t.code !== 1) : !tjEsTrasApp(t) && (tjEsAjuste(t) || (/^ingreso/i.test(tipo) ? t.code === 0 : /^gasto/i.test(tipo) ? t.code !== 0 : true));
     const cand = (idx.get(k) || []).filter(t => !usT.has(t.id) && mismoTipo(t)); const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && !esTras ? cand[0] : null);   // un traslado solo se toma con el mismo monto
     if (!t) return; usT.add(t.id);
-    tx[t.id] = [esTras ? String(val(row.getCell(iCat)) || '').trim() : '', esTras ? (/ingresad/i.test(tipo) ? 'entra' : 'sale') : '', hora, +t.montoApp || 0]; if (esTras) nTrasOk++; });
+    tx[t.id] = [esTras ? String(val(row.getCell(iCat)) || '').trim() : '', esTras ? (/ingresad/i.test(tipo) ? 'entra' : 'sale') : tjEsAjuste(t) ? (/^ingreso/i.test(tipo) ? 'entra' : /^gasto/i.test(tipo) ? 'sale' : '') : '', hora, +t.montoApp || 0]; if (esTras) nTrasOk++; });
   if (Object.keys(tx).length) { try { await guardarAjuste('trasExcel', tx); } catch (e) {} }
   // Moneda de cada cuenta: en las filas en otra moneda, la última columna ("Cuentas") trae el monto en la moneda de la cuenta.
   // Si es igual al Importe en US$ la cuenta es en dólares (ej. PayPal); si es igual al valor en lempiras, la cuenta es en lempiras.
@@ -3987,7 +3987,12 @@ const tjEspejo = t => tjIdx().get(tjKey(t.fecha, t.montoApp != null ? t.montoApp
 /* Ajustes de saldo: Registro Contable tiene la función "Modificar saldo" (categoría "Modificar saldo"); el contenido dice si el ajuste
    SUMÓ ("Ingresos") o RESTÓ ("Gastos") al saldo de la cuenta, sin importar el código con que lo mande el portal. */
 const tjEsAjuste = t => /modificar saldo|ajuste de saldo/i.test((t.cat || '') + ' ' + (t.tipoMov || ''));
-const tjSignoBase = t => { if (tjEsAjuste(t)) { const x = [t.nota, t.sub, t.det].join(' '); if (/ingres|dep[oó]sit|aument|entrad/i.test(x)) return 1; if (/gast|retir|egres|dismin|salid/i.test(x)) return -1; } return t.code === 0 ? 1 : -1; };
+// ajusteOrigen: de dónde sale el sentido de un ajuste: 'mano' (elegido en Cuentas → Ajustes), 'excel', 'contenido' o 'codigo' (dudoso).
+function ajusteOrigen(t) { const m = S.aj && S.aj.ajusteSigno; if (m && m[t.id]) return ['mano', m[t.id] > 0 ? 1 : -1];
+  const xx = trasX(t); if (xx && xx[1]) return ['excel', xx[1] === 'entra' ? 1 : -1];
+  const x = [t.nota, t.sub, t.det].join(' '); if (/ingres|dep[oó]sit|aument|entrad/i.test(x)) return ['contenido', 1]; if (/gast|retir|egres|dismin|salid/i.test(x)) return ['contenido', -1];
+  return ['codigo', t.code === 0 ? 1 : -1]; }
+const tjSignoBase = t => tjEsAjuste(t) || ![0, 1].includes(t.code) ? ajusteOrigen(t)[1] : t.code === 0 ? 1 : -1;   // ingreso +, gasto −, ajuste o código raro según ajusteOrigen
 function tjDir(t, set) {
   const mia = set.has(tjCta(t.cuenta));
   if (!tjEsTras(t)) { if (!mia) return null; return tjSignoBase(t) > 0 ? 'abono' : 'gasto'; }
@@ -4807,11 +4812,37 @@ function vCtaTras() {
     <div class="note">Cómo se ubica cada traslado: si llegan las dos filas (la que sale y la que entra) cada una cuenta en su cuenta; si llega una sola, la otra cuenta se toma de la categoría (en la app es el nombre de la otra cuenta) y se anota allí también.
       <b>Sin la otra cuenta</b>: el portal no dijo a qué cuenta fue y todavía no está en el Excel subido; sube el Excel de la app de ese período. <b>Mismo sentido</b> o <b>montos distintos</b>: las dos filas no coinciden; revisa ese traslado en la app.</div>`;
 }
+/* --- Ajustes de saldo ("Modificar saldo" en la app) y registros con tipo desconocido ---
+   El portal no siempre dice si un ajuste sumó o restó. Aquí se listan todos con el sentido que se está usando y de dónde sale;
+   los que solo se basan en el código del portal son dudosos y se pueden fijar a mano (Suma / Resta). */
+const ctaAjustes = () => D.txs.filter(t => !t.borradoApp && !tjEsTras(t) && (tjEsAjuste(t) || ![0, 1].includes(t.code)));
+function vCtaAjustes() {
+  const l = ctaAjustes(); const dud = l.filter(t => ajusteOrigen(t)[0] === 'codigo'); const ver = S.ajVer || (dud.length ? 'dud' : 'todos');
+  const vis = ver === 'dud' ? dud : l; const ORG = {mano: ['a mano', 'ok'], excel: ['Excel de la app', 'ok'], contenido: ['por el contenido', ''], codigo: ['dudoso: solo el código', 'warn']};
+  const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; let ant = null;
+  const filas = vis.slice(0, 500).map(t => { const [o, sg] = ajusteOrigen(t); let h = '';
+    if (t.fecha !== ant) { ant = t.fecha; const dt = new Date(t.fecha + 'T12:00'); h = `<div class="tj-dia"><b>${t.fecha.slice(8, 10)}</b><span class="dia-s">${DS[dt.getDay()]}</span><span class="dia-m">${t.fecha.slice(5, 7)}/${t.fecha.slice(0, 4)}</span></div>`; }
+    const mon = tjEsUSD(t.cuenta) ? tjU(tjMonto0(t).usd) : L(+t.montoApp || 0);
+    return h + `<div class="tj-it cta-it"><div style="min-width:0;flex:1"><b>${esc(tjCta(t.cuenta))} · ${esc(t.nota || t.cat || 'Registro')}</b><div class="note">${esc([t.cat, t.sub, t.det].filter(Boolean).join(' · '))}${tjEsAjuste(t) ? '' : ` · tipo en la app: ${esc(t.tipoMov || '—')} (código ${esc(String(t.code))})`} · <span class="chip ${ORG[o][1]}">${ORG[o][0]}</span></div></div>
+      <span class="num ${sg > 0 ? 'rc-d' : 'rc-r'}">${sg > 0 ? '+' : '−'} ${mon}</span>
+      <div class="dm-seg aj-seg" role="group" aria-label="Sentido del ajuste">${[[1, 'Suma'], [-1, 'Resta']].map(([v, tx]) => `<button class="${sg === v ? 'on' : ''}" data-act="ajSigno" data-id="${esc(t.id)}" data-v="${v}" aria-pressed="${sg === v}">${tx}</button>`).join('')}</div>
+      <button class="btn sm ghost" data-act="ctaSel" data-n="${esc(tjCta(t.cuenta))}">Ver cuenta</button></div>`; }).join('');
+  const bt = (v, tx, n) => `<button class="tj-tab ${ver === v ? 'on' : ''}" data-act="ajVer" data-v="${v}">${tx} <span class="tj-tc">${n}</span></button>`;
+  return `<div class="kpis cta-kpis cta-tk"><div class="kpi"><div class="eyebrow">Ajustes y tipos raros</div><div class="v">${l.length}</div><div class="note">"Modificar saldo" y registros que no son ingreso, gasto ni traslado</div></div>
+      <div class="kpi"><div class="eyebrow">Sentido seguro</div><div class="v pos">${l.length - dud.length}</div><div class="note">a mano, por el Excel o por el contenido</div></div>
+      <div class="kpi"><div class="eyebrow">Dudosos</div><div class="v ${dud.length ? 'neg' : ''}">${dud.length}</div><div class="note">${dud.length ? 'revisa si suman o restan' : 'nada pendiente'}</div></div></div>
+    ${dud.length ? `<div class="tj-aviso"><b>Fija el sentido de los dudosos</b> como lo muestra la app (azul = suma, rojo = resta), o sube el Excel de Registro Contable de esas fechas: su columna "Ingreso/Gasto" dice si el ajuste fue ingreso o gasto. <button class="btn sm pri" data-act="sync">Subir Excel</button></div>` : ''}
+    <div class="tj-tabs cta-ctabs">${bt('dud', 'Dudosos', dud.length)}${bt('todos', 'Todos', l.length)}</div>
+    <div class="lst tj-cargos cta-lst">${filas || '<div class="note" style="padding:10px">Nada en esta lista.</div>'}</div>
+    <div class="note">El sentido se toma, en este orden: lo que elijas aquí, el Excel de la app, el contenido del registro ("Ingresos" suma, "Gastos" resta) y, si no hay nada más, el código del portal.</div>`;
+}
+async function guardarAjusteSigno(id, v) { const m = Object.assign({}, (S.aj && S.aj.ajusteSigno) || {}); m[id] = +v;
+  try { await guardarAjuste('ajusteSigno', m); derive(); render(); toast(+v > 0 ? 'El ajuste ahora suma' : 'El ajuste ahora resta'); } catch (e) {} }
 /* --- Administración --- */
 function vCtaAdm() {
   const k = S.ctaAdm || 'cuentas';
-  const seg = `<div class="tj-tabs cta-atabs" role="tablist">${[['cuentas', 'Cuentas'], ['tipos', 'Tipos'], ['tras', 'Traslados'], ['cats', 'Categorías']].map(([v, l]) => { const nP = v === 'tras' ? ctaTrasProblemas().length : 0; return `<button class="tj-tab ${k === v ? 'on' : ''}" role="tab" aria-selected="${k === v}" data-act="ctaAdm" data-v="${v}">${l}${nP ? ` <span class="count warn-bg">${nP}</span>` : ''}</button>`; }).join('')}</div>`;
-  return seg + (k === 'tipos' ? vCtaTipos() : k === 'cats' ? vCtaCats() : k === 'tras' ? vCtaTras() : vCtaAdmCuentas());
+  const seg = `<div class="tj-tabs cta-atabs" role="tablist">${[['cuentas', 'Cuentas'], ['tipos', 'Tipos'], ['tras', 'Traslados'], ['ajus', 'Ajustes'], ['cats', 'Categorías']].map(([v, l]) => { const nP = v === 'tras' ? ctaTrasProblemas().length : v === 'ajus' ? ctaAjustes().filter(t => ajusteOrigen(t)[0] === 'codigo').length : 0; return `<button class="tj-tab ${k === v ? 'on' : ''}" role="tab" aria-selected="${k === v}" data-act="ctaAdm" data-v="${v}">${l}${nP ? ` <span class="count warn-bg">${nP}</span>` : ''}</button>`; }).join('')}</div>`;
+  return seg + (k === 'tipos' ? vCtaTipos() : k === 'cats' ? vCtaCats() : k === 'tras' ? vCtaTras() : k === 'ajus' ? vCtaAjustes() : vCtaAdmCuentas());
 }
 function vCtaAdmCuentas() {
   const tipos = ctTipos(); const nombres = ctaNombres(); const qq = (S.ctaAdmQ || '').trim().toUpperCase();
@@ -4885,6 +4916,8 @@ document.addEventListener('click', async e => {
   if (act === 'ctaEditar') { S.ctaEdit = !S.ctaEdit; return pintarCtaFicha(); }
   if (act === 'ctaIrTras') { $('#modalRoot').innerHTML = ''; S.ctaFicha = null; S.ctaTab = 'adm'; S.ctaAdm = 'tras'; history.replaceState(null, '', '#cuentas'); render(); return window.scrollTo(0, 0); }
   if (act === 'trasVer') { S.trasVer = b.dataset.v; return render(); }
+  if (act === 'ajVer') { S.ajVer = b.dataset.v; return render(); }
+  if (act === 'ajSigno') return guardarAjusteSigno(b.dataset.id, b.dataset.v);
   if (act === 'trasSug') return guardarTrasManual({[b.dataset.id]: b.dataset.n});
   if (act === 'trasSugTodas') { const c = {}; for (const [id, x] of ctaTrasSugerencias()) c[id] = x.otra; return guardarTrasManual(c); }
   if (act === 'ctaGuardarF') { const n = S.ctaFicha; const inc = $('#ctaFI').value;
