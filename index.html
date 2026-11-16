@@ -596,14 +596,18 @@ body:has(.graf-full){overflow:hidden}
 .rc-dia b{font-size:18px;font-family:var(--f-num)}.rc-dia .num{font-size:13px;text-align:right;min-width:80px}
 .rc-wd{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--muted);color:var(--panel);font-weight:600}.rc-wd.dom{background:var(--bad)}.rc-wd.sab{background:var(--azul)}
 .rc-my{font-size:11px;color:var(--muted)}
-.rc-it{display:grid;grid-template-columns:minmax(70px,105px) 1fr auto;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line)}
+.rc-it{cursor:pointer;display:grid;grid-template-columns:minmax(70px,105px) 1fr auto;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line)}
 .rc-c{font-size:10.5px;color:var(--muted);line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .rc-m{min-width:0}.rc-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}.rc-t b{font-weight:600}.rc-t span{color:var(--muted);font-size:11.5px}
 .rc-s{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rc-s .chip{font-size:9.5px;padding:0 5px}
 .rc-v{display:flex;flex-direction:column;align-items:flex-end;gap:1px}.rc-v .num:first-child{font-size:13.5px}.rc-v .rc-sl{font-size:11px;color:var(--muted)}
 .rc-th,.rc-pr{display:grid;grid-template-columns:52px repeat(4,1fr);gap:6px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
 .rc-th{font-size:11px;color:var(--muted);text-align:right;padding-block:6px}.rc-pr{cursor:pointer;text-align:right}.rc-pr b{text-align:left;font-size:14px}.rc-pr .num{font-size:12.5px}
-@media (hover:hover){.rc-pr:hover{background:var(--sunk)}}
+@media (hover:hover){.rc-pr:hover,.rc-it:hover{background:var(--sunk)}}.rc-it:active{background:var(--sunk)}
+.dtx-cta{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.dtx-cta>div{background:var(--panel);padding:8px 10px;display:grid;gap:2px}.dtx-cta span{font-size:11px;color:var(--muted)}.dtx-cta b{font-size:15px}
+.dtx-cta>div{min-width:0}@media (max-width:760px){.dtx-cta>div{padding:6px 7px}.dtx-cta b{font-size:12px}.dtx-cta span{font-size:10px}}
+.dtx-tras{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:10px}.dtx-tras .dtx-fl{color:var(--muted)}
 @media (max-width:760px){.rc-it{grid-template-columns:72px 1fr auto;gap:6px;padding:7px 10px}.rc-dia .num{min-width:0}.rc-th,.rc-pr{grid-template-columns:38px repeat(4,1fr);gap:4px;padding-inline:10px}.rc-pr .num,.rc-th{font-size:11px}.rc-sum b{font-size:12.5px}}
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -3792,14 +3796,27 @@ function abrirDetalleTx(id) {
         ${(h.cambios || []).length ? '' : '<tr><th>Modificaciones</th><td>Sin cambios desde que llegó</td></tr>'}
       </tbody></table>`;
   const snap = pp.filter(m => m.app_monto != null).map(m => { const d = []; if (cents(m.app_monto) !== cents(t.monto)) d.push(`monto ${L(m.app_monto)}`); if (m.app_fecha && m.app_fecha !== t.fecha) d.push(`fecha ${fFecha(m.app_fecha)}`); if (m.app_detalle != null && m.app_detalle !== t.det) d.push(`detalle "${esc(m.app_detalle)}"`); return d; }).find(d => d.length);
-  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="dtxT">
-    <div class="hd"><h2 id="dtxT" style="margin-right:auto">${esc(t.det || 'Movimiento')}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">Cerrar</button></div>
+  // Abierto desde el detalle de una cuenta: lo que hizo en esa cuenta (monto y saldo antes / después) y, si es traslado, sus dos lados.
+  const ctaN = S.ctaVolver && S.view === 'cuentas' ? S.ctaVolver : ''; const cd = ctaN ? ctaDatos(ctaN) : null; const cf = cd ? cd.filas.find(x => x.t.id === t.id) : null;
+  const fmtC = v => ctaFmt(v, cd ? cd.i.mon : 'L'); const hx = (trasX(t) || [])[2];
+  const horaTxt = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m.' : ' p. m.') : '';
+  const enCta = cf ? `<div class="eyebrow">En ${esc(cd.i.nom)}${cf.via ? ' · con ' + esc(cf.via) : ''}</div>
+      <div class="dtx-cta"><div><span>${cf.v < 0 ? 'Retiro' : 'Depósito'}</span><b class="num ${cf.v < 0 ? 'rc-r' : 'rc-d'}">${cf.est ? '≈ ' : ''}${fmtC(Math.abs(cf.v))}</b></div>
+        <div><span>Saldo antes</span><b class="num">${cd.i.pago ? '—' : fmtC(crR2(cf.saldo - cf.v))}</b></div><div><span>Saldo después</span><b class="num">${cd.i.pago ? '—' : fmtC(cf.saldo)}</b></div></div>` : '';
+  const trasHtml = tjEsTras(t) ? (() => { const r = ctaTrasRev().get(t.id) || {}; const x = CTA_TRAS_TXT[r.k] || ['', '']; const otra = r.otra || tjDestino(t); const sale = ctaSigno(t) < 0;
+      const de = sale ? tjCta(t.cuenta) : otra, a = sale ? otra : tjCta(t.cuenta); const btn = n => n ? `<button class="linkish" data-act="ctaSel" data-n="${esc(n)}">${esc(n)}</button>` : '<span class="muted">¿?</span>';
+      const e = r.esp; return `<div class="eyebrow">Traslado entre cuentas</div><div class="dtx-tras">${btn(de)}<span class="dtx-fl">→</span>${btn(a)}${x[0] ? `<span class="chip ${x[1]}">${x[0]}</span>` : ''}</div>
+        ${e ? `<div class="note">La otra fila: ${esc(tjCta(e.cuenta))} · ${fFecha(e.fecha)} · ${tjEsUSD(e.cuenta) ? tjU(tjMonto(e).usd) : L(+e.monto || 0)} (${ctaSigno(e) < 0 ? 'sale' : 'entra'}).</div>` : r.k === 'una' ? `<div class="note">Llegó una sola fila; se anotó también en ${esc(otra)}.</div>` : r.k === 'sin' ? '<div class="note">No se sabe a qué cuenta fue: sube el Excel de Registro Contable de ese período.</div>' : ''}`; })() : '';
+  const tjDe = ctaTj(tjCta(t.cuenta));
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal dtx-modal" role="dialog" aria-modal="true" aria-labelledby="dtxT">
+    <div class="hd"><h2 id="dtxT" style="margin-right:auto">${esc(t.nota || t.det || 'Movimiento')}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="${ctaN ? 'Volver a la cuenta' : 'Cerrar'}">${ctaN ? '‹ Volver' : 'Cerrar'}</button></div>
     <div class="bd">
-      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${t.code === 0 ? 'Ingreso' : t.code === 3 ? 'Traslado' : 'Egreso'}</span>${t.versionWeb ? '<span class="chip">Versión web conservada</span>' : ''}</div>
+      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${tjEsTras(t) ? 'Traslado' : t.code === 0 ? 'Ingreso' : 'Egreso'}</span>${t.versionWeb ? '<span class="chip">Versión web conservada</span>' : ''}</div>
       ${t.borradoApp ? `<div class="panel"><div class="bd small row" style="justify-content:space-between"><span><b class="neg">Borrado en la app.</b> Lo mantuviste en la plataforma el ${fFecha(t.borradoApp.slice(0, 10))}. Elimínalo cuando quieras homologar con la app${partes(t.id).length ? '; también se quitará de los controles donde está asignado' : ''}.</span><button class="btn sm danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? '¿Seguro? Eliminar' : 'Eliminar de la plataforma'}</button></div></div>` : ''}
+      ${enCta}${trasHtml}
       <div class="eyebrow">En Registro Contable</div>
       <table class="dist"><tbody>
-        ${fila('Fecha', fFecha(t.fecha))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta))}${t.code === 3 || t.code === 4 ? fila('Cuenta destino', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
+        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
       </tbody></table>
       <div class="eyebrow">En la plataforma</div>
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
@@ -4257,9 +4274,12 @@ function pintarTjFicha() {
 }
 // cerrarCapa: cierra la ventana de arriba. Si era un corte o el formulario de una tarjeta abierta, vuelve al detalle de esa tarjeta.
 function cerrarCapa() {
+  const volverCta = !!document.querySelector('.dtx-modal') && S.ctaVolver;   // movimiento abierto desde el detalle de una cuenta
   const enFicha = !!document.querySelector('.tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
   if (enFicha || !enTj()) S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
   S.ctaFicha = null; S.ctaEdit = false;   // detalle de una cuenta
+  if (volverCta) { S.ctaFicha = volverCta; S.ctaVolver = null; S.detAbierto = null; pintarCtaFicha(); const m = document.querySelector('.cta-modal'); if (m) m.scrollTop = S.ctaScroll || 0; return; }
+  S.ctaVolver = null;
   if (enFicha || !enCred()) S.credFicha = null; else if (S.credFicha) pintarCredFicha();   // créditos: vuelve al detalle del crédito
 }
 // vTjEstado: vista como la de Registro Contable por período de corte: Depósito, Retiro, Balance (depósito − retiro) y Saldo al corte
@@ -4642,7 +4662,7 @@ function pintarCtaFicha() {
       const tit = t.nota || (tras ? 'Traslado' : t.sub || t.cat || 'Registro');
       const hx = (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
-      return `<div class="rc-it"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
+      return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="Ver todo el detalle del movimiento"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
         <div class="rc-v"><span class="num ${f.v < 0 ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${num(f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
     cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const r = resumen(ls, fe); const wd = dt.getDay();
       return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}</span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
@@ -4811,7 +4831,8 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
   if (act === 'ctaTab') { S.ctaTab = b.dataset.v; const h = S.ctaTab === 'tc' ? '#tarjetas' : S.ctaTab === 'pre' ? '#creditos' : '#cuentas'; if (location.hash !== h) history.replaceState(null, '', h); render(); return window.scrollTo(0, 0); }
   if (act === 'ctaVerOc') { S.ctaVerOc = !S.ctaVerOc; return render(); }
-  if (act === 'ctaSel') { S.ctaFicha = b.dataset.n; S.ctaMes = null; S.ctaAnio = null; S.ctaVista = 'd'; S.ctaQ = ''; S.ctaBus = false; S.ctaEdit = false; return pintarCtaFicha(); }
+  if (act === 'ctaMov') { const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.ctaVolver = S.ctaFicha; return abrirDetalleTx(b.dataset.id); }
+  if (act === 'ctaSel') { S.ctaVolver = null; S.ctaFicha = b.dataset.n; S.ctaMes = null; S.ctaAnio = null; S.ctaVista = 'd'; S.ctaQ = ''; S.ctaBus = false; S.ctaEdit = false; return pintarCtaFicha(); }
   if (act === 'ctaVista') { S.ctaVista = b.dataset.v; S.ctaQ = ''; return pintarCtaFicha(); }
   if (act === 'ctaAnio') { if (!b.dataset.v) return; S.ctaAnio = b.dataset.v; return pintarCtaFicha(); }
   if (act === 'ctaIr') { S.ctaVista = b.dataset.vista; if (b.dataset.vista === 'd') S.ctaMes = b.dataset.v; else S.ctaAnio = b.dataset.v; return pintarCtaFicha(); }
@@ -5220,7 +5241,7 @@ document.addEventListener('paste', e => {
 document.addEventListener('keydown', e => {
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button], .rc-it[data-act], .rc-pr[data-act], .cta-r[data-act]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.crGrafFull) { S.crGrafFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.vchartFull) { S.vchartFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.grafFull) { S.grafFull = null; return render(); }
