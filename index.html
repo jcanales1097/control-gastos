@@ -986,7 +986,7 @@ const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha 
 // rowToTx: Convierte una fila de Registro Contable [id, fecha, código, cuenta, …, monto] en un objeto "tx". Aplica la moneda extranjera si se importó.
 function rowToTx(r) {
   const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
-  const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), mes: fecha.slice(0, 7)};
+  const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), neg: (+monto || 0) < 0, mes: fecha.slice(0, 7)};
   t.montoApp = t.monto; if (r[10] && typeof r[10] === 'object') t.x = r[10];   // datos extra del portal
   const fx = S.mon && S.mon.get(id);
   // La moneda importada solo se usa si corresponde a ESTE registro: su valor en lempiras (o el original) debe ser casi igual al monto
@@ -3812,7 +3812,7 @@ function abrirDetalleTx(id) {
   const fmtC = v => ctaFmt(v, cd ? cd.i.mon : 'L'); const hx = (trasX(t) || [])[2];
   const horaTxt = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m.' : ' p. m.') : '';
   const enCta = cf ? `<div class="eyebrow">En ${esc(cd.i.nom)}${cf.via ? ' · con ' + esc(cf.via) : ''}</div>
-      <div class="dtx-cta"><div><span>${cf.v < 0 ? 'Retiro' : 'Depósito'}</span><b class="num ${cf.v < 0 ? 'rc-r' : 'rc-d'}">${cf.est ? '≈ ' : ''}${fmtC(Math.abs(cf.v))}</b></div>
+      <div class="dtx-cta"><div><span>${cf.lado === 'r' ? 'Retiro' : 'Depósito'}</span><b class="num ${cf.lado === 'r' ? 'rc-r' : 'rc-d'}">${cf.est ? '≈ ' : ''}${fmtC(cf.lado === 'r' ? -cf.v : cf.v)}</b></div>
         <div><span>Saldo antes</span><b class="num">${cd.i.pago ? '—' : fmtC(crR2(cf.saldo - cf.v))}</b></div><div><span>Saldo después</span><b class="num">${cd.i.pago ? '—' : fmtC(cf.saldo)}</b></div></div>` : '';
   const trasHtml = tjEsTras(t) ? (() => { const r = ctaTrasRev().get(t.id) || {}; const x = CTA_TRAS_TXT[r.k] || ['', '']; const otra = r.otra || tjDestino(t); const sale = ctaSigno(t) < 0;
       const de = sale ? tjCta(t.cuenta) : otra, a = sale ? otra : tjCta(t.cuenta); const btn = n => n ? `<button class="linkish" data-act="ctaSel" data-n="${esc(n)}">${esc(n)}</button>` : '<span class="muted">¿?</span>';
@@ -4051,7 +4051,9 @@ function tjPagoMonto(t, set) {
 }
 // tjPagoEnUSD: el pago abona en dólares (cuenta $, cambio de moneda desde la cuenta L, o traslado registrado en US$).
 const tjPagoEnUSD = (x, m) => !!m.aUSD || (tjEsUSD(x.cuenta) !== !!m.cruce);
-function tjMonto(t) {
+// tjMonto: monto con signo: un gasto o ingreso NEGATIVO en la app (ej. −0.53) resta de su columna en vez de sumar.
+function tjMonto(t) { const m = tjMonto0(t); if (t.neg && !tjEsTras(t)) { m.l = -m.l; m.usd = -m.usd; if (m.hnl) m.hnl = -m.hnl; } return m; }
+function tjMonto0(t) {
   if (!tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0};
   const hnl = +t.monto || 0;
   if (t.moneda && t.moneda !== 'USD') return {usd: +t.original || 0, l: 0, hnl};
@@ -4595,7 +4597,8 @@ function ctaDatos(n) {
   ctaIdx(); const ck = n + '|' + S._ctaVer; if (_ctaCache.has(ck)) return _ctaCache.get(ck);
   const i = ctaInfo(n); const hoyD = hoy(); const por = ctaIdx();
   const fuentes = [[n, '']]; ctaNombres().forEach(o => { if (o !== n && ctaInfo(o).pago === n) fuentes.push([o, o]); });
-  const filas = []; fuentes.forEach(([c, via]) => (por.get(c) || []).forEach(o => { const m = ctaVal(o.t, i.mon, o.propia); filas.push({t: o.t, v: crR2(o.s * m.v), est: !!m.est, via, propia: o.propia}); }));
+  const filas = []; fuentes.forEach(([c, via]) => (por.get(c) || []).forEach(o => { const m = ctaVal(o.t, i.mon, o.propia); // Monto negativo en la app (ej. un gasto de −0.53): queda en su columna (retiro) pero con signo contrario, así que SUMA al saldo, como en la app.
+    const neg = o.t.neg && !tjEsTras(o.t) ? -1 : 1; filas.push({t: o.t, v: crR2(o.s * m.v * neg), lado: o.s > 0 ? 'd' : 'r', est: !!m.est, via, propia: o.propia}); }));
   const fh = t => t.fecha + ' ' + ((trasX(t) || [])[2] || '');   // fecha y hora (la hora viene del Excel de la app)
   filas.sort((a, b) => fh(a.t).localeCompare(fh(b.t)));
   const base = 0;   // el saldo es la suma de las transacciones
@@ -4661,7 +4664,7 @@ function pintarCtaFicha() {
   const conMov = new Set(d.filas.map(f => f.t.mes)); const mDef = conMov.has(mHoy) || !d.filas.length ? mHoy : [...conMov].filter(m => m <= mHoy).sort().pop() || mHoy;
   const mes = S.ctaMes && S.ctaMes >= mIni && S.ctaMes <= mFin ? S.ctaMes : mDef; const anio = S.ctaAnio || mes.slice(0, 4);
   const saldoAl = fin => { let s = d.base; for (const f of d.filas) { if (f.t.fecha > fin) break; s = f.saldo; } return s; };
-  const resumen = (l, fin) => { const dep = crR2(l.filter(f => f.v > 0).reduce((s, f) => s + f.v, 0)), ret = crR2(-l.filter(f => f.v < 0).reduce((s, f) => s + f.v, 0)); return {dep, ret, bal: crR2(dep - ret), saldo: saldoAl(fin), n: l.length}; };
+  const resumen = (l, fin) => { const dep = crR2(l.filter(f => f.lado === 'd').reduce((s, f) => s + f.v, 0)), ret = crR2(-l.filter(f => f.lado === 'r').reduce((s, f) => s + f.v, 0)); return {dep, ret, bal: crR2(dep - ret), saldo: saldoAl(fin), n: l.length}; };
   const finMes = m => tjFechaDia(+m.slice(0, 4), +m.slice(5, 7) - 1, 31);
   const qq = (S.ctaQ || '').trim().toUpperCase(); const nq = parseFloat(qq.replace(/[^0-9.]/g, ''));
   const coincide = f => [f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, f.via].join(' ').toUpperCase().includes(qq) || (isFinite(nq) && nq > 0 && String(Math.abs(f.v)).includes(String(nq)));
@@ -4680,7 +4683,7 @@ function pintarCtaFicha() {
       const hx = (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
       return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="Ver todo el detalle del movimiento"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
-        <div class="rc-v"><span class="num ${f.v < 0 ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${num(f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
+        <div class="rc-v"><span class="num ${f.lado === 'r' ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${sNum(f.lado === 'r' ? -f.v : f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
     cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const r = resumen(ls, fe); const wd = dt.getDay();
       return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}</span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
       || `<div class="note" style="padding:14px">${qq ? 'Ningún registro coincide con la búsqueda.' : 'Sin movimientos en este mes.'}</div>`;
