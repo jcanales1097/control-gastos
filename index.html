@@ -3705,33 +3705,54 @@ const fxTxt = t => t && t.moneda ? `<span class="fx" title="Monto original ${fmt
 const fxFilas = (t, fila) => t && t.moneda ? fila('Moneda', `<span class="chip fxc" style="margin:0">${esc(t.moneda)}</span>`) + fila('Monto original', `<span class="num">${fmtOrig(t.moneda, t.original)}</span>`) + fila('Tasa de cambio', `<span class="num">${fmtTasa(t.tasa)}</span>`) + fila('Valor en lempiras', `<b class="num">${L(t.monto)}</b>`) + (cents(t.montoApp) !== cents(t.monto) && cents(t.montoApp) !== cents(t.original) ? fila('Importe en el portal', `<span class="num">${t.montoApp.toFixed(2)}</span>`) : '') : t && t.sinTasa ? fila('Moneda', S.mon ? 'Cuenta en dólares: falta subir el Excel de Registro Contable para conocer el monto original y la tasa' : 'Cuenta en dólares') : '';
 // importarMonedas: Importa el Excel exportado de la app para obtener la moneda y el valor en lempiras.
 async function importarMonedas(file, msg) {
-  if (!S.mon) { msg.innerHTML = '<span class="neg">Primero corre en Supabase el SQL de monedas (tabla tx_moneda).</span>'; return; }
   msg.textContent = 'Leyendo Excel…';
   if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el lector de Excel')); document.head.appendChild(s); });
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); const ws = wb.worksheets[0];
   const val = c => { const v = c && c.value; return v && typeof v === 'object' && !(v instanceof Date) ? (v.result ?? v.text ?? (v.richText ? v.richText.map(x => x.text).join('') : '')) : v; };
   const hdr = []; ws.getRow(1).eachCell({includeEmpty: true}, (c, i) => { hdr[i] = String(val(c) || '').trim(); });
   const col = n => hdr.findIndex(h => h && h.toLowerCase() === n.toLowerCase());
-  const iImp = col('Importe'), iMon = col('Moneda'), iDesc = col('Descripción'), iNota = col('Nota');
+  const iImp = col('Importe'), iMon = col('Moneda'), iDesc = col('Descripción'), iNota = col('Nota'), iCat = col('Categoría'), iTipo = col('Ingreso/Gasto');
   if (iImp < 0 || iMon < 0 || iDesc < 0) { msg.innerHTML = '<span class="neg">Ese Excel no tiene las columnas Importe, Moneda y Descripción. Usa el Excel que exporta Registro Contable.</span>'; return; }
   const iF = 1, iCta = 2, iHnl = iNota > 0 ? iNota + 1 : 6, iCtaM = iMon + 1;
   const norm = x => String(x || '').replace(/\s+/g, ' ').trim().toUpperCase();
   const fecha = v => v instanceof Date ? v.toISOString().slice(0, 10) : typeof v === 'number' ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : String(v || '').slice(0, 10);
   const idx = new Map(); D.txs.forEach(t => { const k = t.fecha + '|' + norm(t.cuenta) + '|' + norm(t.det); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(t); });
   const usados = new Set(); const filas = []; let leidas = 0, extranjeras = 0, sinPar = 0;
+  /* Traslados: en el Excel cada traslado trae en "Categoría" el nombre de la OTRA cuenta y en "Ingreso/Gasto" si el dinero
+     entró ("Dinero ingresado") o salió ("Dinero gastado"). Se guarda por registro (ajuste trasExcel) junto con la hora, para que
+     cada traslado cuente bien en sus dos cuentas aunque el portal no mande la otra cuenta. */
+  const tx = Object.assign({}, S.aj.trasExcel || {}); const usT = new Set(); let nTras = 0, nTrasOk = 0;
+  ws.eachRow((row, n) => { if (n === 1) return;
+    const tipo = iTipo >= 0 ? String(val(row.getCell(iTipo)) || '') : ''; const f0 = val(row.getCell(iF));
+    const hora = f0 instanceof Date && (f0.getUTCHours() || f0.getUTCMinutes()) ? String(f0.getUTCHours()).padStart(2, '0') + ':' + String(f0.getUTCMinutes()).padStart(2, '0') : '';
+    const esTras = /dinero (ingresad|gastad)/i.test(tipo); if (!esTras && !hora) return; if (esTras) nTras++;
+    const k = fecha(f0) + '|' + norm(val(row.getCell(iCta))) + '|' + norm(val(row.getCell(iDesc)));
+    const imp = Math.abs(+val(row.getCell(iImp)) || 0), hnl = Math.abs(+val(row.getCell(iHnl)) || 0), ctaM = Math.abs(+val(row.getCell(iCtaM)) || 0);
+    const cand = (idx.get(k) || []).filter(t => !usT.has(t.id)); const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && !esTras ? cand[0] : null);   // un traslado solo se toma con el mismo monto
+    if (!t) return; usT.add(t.id);
+    tx[t.id] = [esTras ? String(val(row.getCell(iCat)) || '').trim() : '', esTras ? (/ingresad/i.test(tipo) ? 'entra' : 'sale') : '', hora]; if (esTras) nTrasOk++; });
+  if (Object.keys(tx).length) { try { await guardarAjuste('trasExcel', tx); } catch (e) {} }
+  // Moneda de cada cuenta: en las filas en otra moneda, la última columna ("Cuentas") trae el monto en la moneda de la cuenta.
+  // Si es igual al Importe en US$ la cuenta es en dólares (ej. PayPal); si es igual al valor en lempiras, la cuenta es en lempiras.
+  { const mc = Object.assign({}, S.aj.ctaMoneda || {}); let cambio = false;
+    ws.eachRow((row, n) => { if (n === 1) return; const mon = String(val(row.getCell(iMon)) || '').trim().toUpperCase(); if (!mon || mon === 'HNL') return;
+      const imp = Math.abs(+val(row.getCell(iImp)) || 0), hnl = Math.abs(+val(row.getCell(iHnl)) || 0), ctaM = Math.abs(+val(row.getCell(iCtaM)) || 0); if (!imp || !hnl || Math.abs(imp - hnl) < 0.011) return;
+      const c = tjCta(val(row.getCell(iCta))); const m = Math.abs(ctaM - imp) < 0.011 ? mon : Math.abs(ctaM - hnl) < 0.011 ? 'L' : ''; if (c && m && mc[c] !== m) { mc[c] = m; cambio = true; } });
+    if (cambio) { try { await guardarAjuste('ctaMoneda', mc); } catch (e) {} } }
+  if (!S.mon) { derive(); render(); msg.innerHTML = `<b class="pos">Listo.</b> ${nTrasOk} de ${nTras} traslados del Excel quedaron con su otra cuenta. <span class="neg">Para guardar las monedas corre en Supabase el SQL de monedas (tabla tx_moneda).</span>`; return; }
   ws.eachRow((row, n) => { if (n === 1) return; leidas++;
     const mon = String(val(row.getCell(iMon)) || '').trim().toUpperCase(); if (!mon || mon === 'HNL') return; extranjeras++;
     const imp = Math.abs(+val(row.getCell(iImp)) || 0), hnl = Math.abs(+val(row.getCell(iHnl)) || 0), ctaM = Math.abs(+val(row.getCell(iCtaM)) || 0);
     const k = fecha(val(row.getCell(iF))) + '|' + norm(val(row.getCell(iCta))) + '|' + norm(val(row.getCell(iDesc)));
     const cand = (idx.get(k) || []).filter(t => !usados.has(t.id));
-    const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 ? cand[0] : null);
+    const t = cand.find(t => [imp, hnl, ctaM].some(v => Math.abs(t.montoApp - v) < 0.011)) || (cand.length === 1 && hnl && Math.abs(cand[0].montoApp - hnl) / hnl < 0.02 ? cand[0] : null);   // solo un monto casi igual
     if (!t || !imp || !hnl) { sinPar++; return; }
     usados.add(t.id); filas.push({tx_id: t.id, moneda: mon, original: imp, hnl, actualizado: new Date().toISOString()});
   });
   for (let i = 0; i < filas.length; i += 500) { const lote = filas.slice(i, i + 500); msg.textContent = `Guardando monedas… ${Math.min(i + 500, filas.length)} de ${filas.length}`; await q(sb.from('tx_moneda').upsert(lote)); lote.forEach(x => S.mon.set(x.tx_id, x)); }
   derive(); render();
   const nc = cambios().length;
-  msg.innerHTML = `<b class="pos">Listo.</b> ${leidas} filas leídas del Excel, ${extranjeras} en otra moneda. ${filas.length} quedaron con su monto original y su tasa${sinPar ? `; ${sinPar} no se encontraron entre lo sincronizado (sincroniza ese periodo primero)` : ''}.${nc ? ` <a href="#cambios" data-act="cerrarModal">Revisar ${nc} en Cambios</a>` : ''}`;
+  msg.innerHTML = `<b class="pos">Listo.</b> ${leidas} filas leídas del Excel, ${extranjeras} en otra moneda. ${nTras ? `${nTrasOk} de ${nTras} traslados quedaron con su otra cuenta. ` : ''}${filas.length} quedaron con su monto original y su tasa${sinPar ? `; ${sinPar} no se encontraron entre lo sincronizado (sincroniza ese periodo primero)` : ''}.${nc ? ` <a href="#cambios" data-act="cerrarModal">Revisar ${nc} en Cambios</a>` : ''}`;
 }
 // CAMPOS_TX: Campos que se comparan para detectar cambios en un registro.
 const CAMPOS_TX = [['monto', 'Monto', v => L(v)], ['fecha', 'Fecha', v => fFecha(v)], ['det', 'Detalle'], ['cuenta', 'Cuenta'], ['cat', 'Categoría'], ['sub', 'Subcategoría'], ['nota', 'Contenido'], ['tipoMov', 'Tipo en la app']];
@@ -3908,15 +3929,18 @@ const tjEsUSD = c => /\$\s*$/.test(String(c || ''));
    dinero de la tarjeta por traslado (avances, pasar saldo a otra cuenta o tarjeta). Un traslado puede venir en dos filas (la que sale y la que entra)
    o en una sola fila desde la cuenta de origen con la cuenta destino en la categoría. Aquí se toman en cuenta ambos casos sin contarlos dos veces. */
 // tjEsTras: el registro es un traslado entre cuentas.
-const tjEsTras = t => t.code === 3 || t.code === 4 || /dinero (ingresad|gastad)|transfer|traslad/i.test(String(t.tipoMov || ''));
+const tjEsTras = t => t.code === 3 || t.code === 4 || /dinero (ingresad|gastad)|transfer|traslad/i.test(String(t.tipoMov || '')) || !!(trasX(t) || [])[1];
 // tjSentido: desde el punto de vista de su propia cuenta, si el dinero 'entra' o 'sale' (null si el texto no lo dice).
-const tjSentido = t => { const m = String(t.tipoMov || '').toLowerCase(); if (t.code === 4 || /ingres|entrad|recib|deposit/.test(m)) return 'entra'; if (/gast|salid|envi|retir|transfer.*out/.test(m)) return 'sale'; return null; };
+// trasX: lo que dice el Excel de Registro Contable de un registro: [otra cuenta, sentido ('entra'/'sale'), hora 'HH:MM'].
+const trasX = t => { const m = S.aj && S.aj.trasExcel; return m && m[t.id] || null; };
+const tjSentido = t => { const xx = trasX(t); if (xx && xx[1]) return xx[1]; const m = String(t.tipoMov || '').toLowerCase(); if (t.code === 4 || /ingres|entrad|recib|deposit/.test(m)) return 'entra'; if (/gast|salid|envi|retir|transfer.*out/.test(m)) return 'sale'; return null; };
 // tjCuentas: nombres de todas las cuentas de la app; tjAssets: id de cuenta del portal → nombre (si el portal lo trae).
 let _tjCu = null, _tjCuD = null;
 function tjCuentas() { if (_tjCuD !== D.txs) { const c = new Set(), a = new Map(); D.txs.forEach(t => { c.add(tjCta(t.cuenta)); const x = t.x; if (x) for (const k of ['assetId', 'payTypeId', 'assetUid']) if (x[k]) a.set(x[k], tjCta(t.cuenta)); }); _tjCu = {c, a}; _tjCuD = D.txs; } return _tjCu; }
 // tjDestino: la otra cuenta de un traslado. Se toma de la categoría si es el nombre de una cuenta; si no, de los datos extra del portal
 // (un campo con el nombre de una cuenta, o un id de cuenta destino). '' si no se sabe.
 function tjDestino(t) {
+  { const xx = trasX(t); if (xx && xx[0] && tjCta(xx[0]) !== tjCta(t.cuenta)) return tjCta(xx[0]); }   // dato exacto del Excel de la app
   const {c, a} = tjCuentas(); const cat = tjCta(t.cat); if (cat && c.has(cat)) return cat; const x = t.x; if (!x) return '';
   for (const k in x) { const v = tjCta(x[k]); if (k !== 'payType' && v !== tjCta(t.cuenta) && c.has(v)) return v; }
   for (const k in x) { if (/asset|pay/i.test(k) && !/^(assetId|payTypeId|assetUid)$/.test(k) && a.has(x[k]) && a.get(x[k]) !== tjCta(t.cuenta)) return a.get(x[k]); }
@@ -4501,7 +4525,8 @@ function ctaInfo(n) {
   const clase = tipo ? tipo.clase : null;
   const incl = cfg.incluir_total != null ? !!cfg.incluir_total : tipo ? tipo.incluir_total !== false : true;
   const pago = clase === 'debito' && cfg.cuenta_pago ? cfg.cuenta_pago : '';
-  return {n, cfg, tj, tipo, clase, mon: cfg.moneda || (tjEsUSD(n) ? 'USD' : 'L'), nom: cfg.alias || n, incl, oculta: !!cfg.oculta, pago, deuda: CTA_DEUDA.has(clase)};
+  const mx = (S.aj && S.aj.ctaMoneda || {})[n];
+  return {n, cfg, tj, tipo, clase, mon: cfg.moneda || (mx ? (mx === 'L' ? 'L' : 'USD') : tjEsUSD(n) ? 'USD' : 'L'), nom: cfg.alias || n, incl, oculta: !!cfg.oculta, pago, deuda: CTA_DEUDA.has(clase)};
 }
 // ctaSigno: +1 si el dinero entra a la cuenta del registro, −1 si sale.
 function ctaSigno(t) {
@@ -4514,9 +4539,9 @@ let _ci = null, _ciD = null;
 function ctaIdx() {
   if (_ciD === D.txs && _ci) return _ci;
   const por = new Map(); const add = (c, o) => { if (!por.has(c)) por.set(c, []); por.get(c).push(o); };
-  const tras = new Set(); D.txs.forEach(t => { if (tjEsTras(t)) { const c = tjCta(t.cuenta); tras.add(t.fecha + '|' + c + '|' + tjCta(t.cat)); const d = tjDestino(t); if (d) tras.add(t.fecha + '|' + c + '|' + d); } });
+  const rev = ctaTrasRev();
   D.txs.forEach(t => { if (t.borradoApp) return; const c = tjCta(t.cuenta); const s = ctaSigno(t); add(c, {t, s, propia: true});
-    if (tjEsTras(t)) { const d = tjDestino(t); if (d && d !== c && !tjEspejo(t) && !tras.has(t.fecha + '|' + d + '|' + c)) add(d, {t, s: -s, propia: false}); } });
+    if (tjEsTras(t) && (rev.get(t.id) || {}).k === 'una') add(tjDestino(t), {t, s: -s, propia: false}); });   // traslado de una sola fila: también en la otra cuenta
   _ci = por; _ciD = D.txs; _ctaCache = new Map(); return por;
 }
 // ctaVal: monto del registro en la moneda de la cuenta. Cuentas en dólares: monto exacto del Excel de monedas o del portal; si no, aproximado (≈).
@@ -4534,7 +4559,8 @@ function ctaDatos(n) {
   const i = ctaInfo(n); const hoyD = hoy(); const por = ctaIdx();
   const fuentes = [[n, '']]; ctaNombres().forEach(o => { if (o !== n && ctaInfo(o).pago === n) fuentes.push([o, o]); });
   const filas = []; fuentes.forEach(([c, via]) => (por.get(c) || []).forEach(o => { const m = ctaVal(o.t, i.mon, o.propia); filas.push({t: o.t, v: crR2(o.s * m.v), est: !!m.est, via, propia: o.propia}); }));
-  filas.sort((a, b) => a.t.fecha.localeCompare(b.t.fecha));
+  const fh = t => t.fecha + ' ' + ((trasX(t) || [])[2] || '');   // fecha y hora (la hora viene del Excel de la app)
+  filas.sort((a, b) => fh(a.t).localeCompare(fh(b.t)));
   const base = 0;   // el saldo es la suma de las transacciones
   let acc = base; filas.forEach(f => { acc = crR2(acc + f.v); f.saldo = acc; });
   const hasta = filas.filter(f => f.t.fecha <= hoyD); const saldo = hasta.length ? hasta[hasta.length - 1].saldo : base;
@@ -4614,8 +4640,9 @@ function pintarCtaFicha() {
     const fila = f => { const t = f.t; const tras = tjEsTras(t);
       const izq = tras ? 'Transferencia' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(t.sub) : ''}`;
       const tit = t.nota || (tras ? 'Traslado' : t.sub || t.cat || 'Registro');
+      const hx = (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
-      return `<div class="rc-it"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
+      return `<div class="rc-it"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
         <div class="rc-v"><span class="num ${f.v < 0 ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${num(f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
     cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const r = resumen(ls, fe); const wd = dt.getDay();
       return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}</span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
@@ -4675,12 +4702,19 @@ async function ctaGuardar(n, campos, okMsg) {
 let _ctr = null, _ctrD = null;
 function ctaTrasRev() {
   if (_ctrD === D.txs && _ctr) return _ctr;
-  const idx = new Map(); const contra = t => tjDestino(t) || tjCta(t.cat);
-  D.txs.forEach(t => { if (!tjEsTras(t) || t.borradoApp) return; const k = t.fecha + '|' + tjCta(t.cuenta) + '|' + contra(t); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(t); });
+  const tr = D.txs.filter(t => tjEsTras(t) && !t.borradoApp); const contra = t => tjDestino(t) || tjCta(t.cat);
+  const idx = new Map(); tr.forEach(t => { const k = t.fecha + '|' + tjCta(t.cuenta) + '|' + contra(t); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(t); });
+  // Emparejar cada fila con la del otro lado (mismo día, cuentas cruzadas). Con varios traslados el mismo día entre las mismas cuentas
+  // se empareja primero por monto igual y sentido contrario; entre monedas distintas (L ↔ $) el monto puede diferir.
+  const par = new Map(); const igual = (a, b) => Math.abs((+a.montoApp || 0) - (+b.montoApp || 0)) < 0.011;
+  const cruce = (a, b) => tjEsUSD(a.cuenta) || tjEsUSD(b.cuenta) || !!a.moneda || !!b.moneda;
+  for (const paso of [1, 2]) tr.forEach(t => { if (par.has(t.id)) return; const c = tjCta(t.cuenta), d = contra(t); if (!d || d === c) return;
+    const cs = (idx.get(t.fecha + '|' + d + '|' + c) || []).filter(o => o !== t && !par.has(o.id));
+    const o = paso === 1 ? cs.find(o => igual(o, t) && ctaSigno(o) !== ctaSigno(t)) : cs.find(o => cruce(o, t) && ctaSigno(o) !== ctaSigno(t));
+    if (o) { par.set(t.id, o); par.set(o.id, t); } });
   const r = new Map();
-  D.txs.forEach(t => { if (!tjEsTras(t) || t.borradoApp) return; const c = tjCta(t.cuenta); const d = tjDestino(t);
-    const esp = tjEspejo(t) || (d ? (idx.get(t.fecha + '|' + d + '|' + c) || [])[0] : null); let k;
-    if (esp) k = ctaSigno(esp) === ctaSigno(t) ? 'dir' : (!tjEsUSD(c) && !tjEsUSD(esp.cuenta) && !t.moneda && !esp.moneda && Math.abs((+t.monto || 0) - (+esp.monto || 0)) > 0.005 ? 'monto' : 'par');
+  tr.forEach(t => { const c = tjCta(t.cuenta); const d = tjDestino(t); const esp = par.get(t.id) || null; let k;
+    if (esp) k = ctaSigno(esp) === ctaSigno(t) ? 'dir' : !cruce(t, esp) && !igual(t, esp) ? 'monto' : 'par';
     else k = d && d !== c ? 'una' : 'sin';
     r.set(t.id, {k, otra: d || (esp ? tjCta(esp.cuenta) : ''), esp}); });
   _ctr = r; _ctrD = D.txs; return r;
@@ -4703,10 +4737,11 @@ function vCtaTras() {
       <div class="kpi"><div class="eyebrow">Traslados</div><div class="v">${rev.size}</div><div class="note">filas de traslado sincronizadas</div></div>
       <div class="kpi"><div class="eyebrow">Bien ubicados</div><div class="v pos">${cnt.par + cnt.una}</div><div class="note">${cnt.par} con sus dos filas · ${cnt.una} de una fila</div></div>
       <div class="kpi"><div class="eyebrow">Por revisar</div><div class="v ${prob ? 'neg' : ''}">${prob}</div><div class="note">${prob ? 'afectan el saldo de sus cuentas' : 'todo cuadra entre cuentas'}</div></div></div>
+    ${prob ? `<div class="tj-aviso"><b>Para corregirlos, sube el Excel que exporta Registro Contable</b> (el mismo de las monedas, con todo el rango de fechas). En cada traslado trae la otra cuenta en "Categoría" y si el dinero entró o salió en "Ingreso/Gasto"; con eso cada traslado queda en sus dos cuentas. <button class="btn sm pri" data-act="sync">Subir Excel</button></div>` : ''}
     <div class="tj-tabs cta-ttabs">${bt('prob', 'Por revisar', prob)}${bt('una', 'Una fila', cnt.una)}${bt('par', 'Dos filas', cnt.par)}${bt('todos', 'Todos', rev.size)}</div>
     <div class="lst tj-cargos cta-lst">${filas || `<div class="note" style="padding:10px">${ver === 'prob' ? 'Ningún traslado por revisar: todos cuentan en sus dos cuentas.' : 'Nada en esta lista.'}</div>`}</div>
     <div class="note">Cómo se ubica cada traslado: si llegan las dos filas (la que sale y la que entra) cada una cuenta en su cuenta; si llega una sola, la otra cuenta se toma de la categoría (en la app es el nombre de la otra cuenta) y se anota allí también.
-      <b>Sin la otra cuenta</b>: la app no dice a qué cuenta fue, así que solo se movió una; corrígelo en Registro Contable eligiendo la cuenta destino. <b>Mismo sentido</b> o <b>montos distintos</b>: las dos filas no coinciden; revisa ese traslado en la app.</div>`;
+      <b>Sin la otra cuenta</b>: el portal no dijo a qué cuenta fue y todavía no está en el Excel subido; sube el Excel de la app de ese período. <b>Mismo sentido</b> o <b>montos distintos</b>: las dos filas no coinciden; revisa ese traslado en la app.</div>`;
 }
 /* --- Administración --- */
 function vCtaAdm() {
@@ -4791,7 +4826,7 @@ document.addEventListener('click', async e => {
   if (act === 'ctaTiposApp') { try { const rows = CTA_TIPOS_APP.filter(([id]) => !ctTipo(id)).map(([id, nombre, clase], k) => ({id, nombre, clase, orden: (k + 1) * 10, incluir_total: true}));
       const d = await q(sb.from('cuenta_tipos').upsert(rows).select(), 'Tipos de cuenta creados'); S.ctT.push(...(d && d.length ? d : rows)); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
   if (act === 'ctaSugerir') { const sinT = ctaNombres().filter(n => ctaTipoMal(n) && ctaTipoSug(n)); let k = 0;
-    for (const n of sinT) { try { const t = ctaTipoSug(n); await ctaGuardar(n, {tipo: t.id, moneda: ctaCfg(n).moneda || (tjEsUSD(n) ? 'USD' : 'L')}); k++; } catch (er) { break; } }
+    for (const n of sinT) { try { const t = ctaTipoSug(n); await ctaGuardar(n, {tipo: t.id}); k++; } catch (er) { break; } }
     toast(`${k} cuentas con tipo sugerido. Revisa las que no sean correctas.`); return render(); }
   if (act === 'cttNuevo') { const nombre = $('#cttN').value.trim(); if (!nombre) return toast('Escribe el nombre del tipo.');
     const row = {id: 't' + crUid().slice(0, 8), nombre, clase: $('#cttC').value, orden: (Math.max(0, ...(S.ctT || []).map(t => +t.orden || 0)) + 10), incluir_total: true};
@@ -4809,7 +4844,7 @@ document.addEventListener('change', async e => {
   if (el.id === 'ctaFT') { const t = ctTipo(el.value); const lb = document.querySelector('.cta-fpago'); if (lb) lb.hidden = !(t && t.clase === 'debito'); return; }
   const tr = el.closest && el.closest('[data-ctan]');
   if (tr && el.dataset.ctaf) { const n = tr.dataset.ctan; const k = el.dataset.ctaf; let v = el.type === 'checkbox' ? el.checked : el.value;
-    if (k === 'incluir_total') v = v === '' ? null : v === '1'; const campos = {[k]: v}; if (k === 'tipo' && !ctaCfg(n).moneda) campos.moneda = tjEsUSD(n) ? 'USD' : 'L';
+    if (k === 'incluir_total') v = v === '' ? null : v === '1'; const campos = {[k]: v};
     try { await ctaGuardar(n, campos); } catch (er) {} return render(); }
   const tt = el.closest && el.closest('tr[data-ctt]');
   if (tt && el.dataset.cttf) { const t = ctTipo(tt.dataset.ctt); if (!t) return; const k = el.dataset.cttf; const v = el.type === 'checkbox' ? el.checked : k === 'orden' ? (+el.value || 0) : el.value.trim(); if (k === 'nombre' && !v) return render();
