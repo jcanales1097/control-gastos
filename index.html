@@ -630,7 +630,7 @@ table.cta-adm td{vertical-align:middle}table.cta-adm .in{min-width:0;width:100%;
 .cta-chx{border:0;background:none;color:inherit;cursor:pointer;padding:0 0 0 2px;font-size:13px;line-height:1}
 .cta-subs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.cta-subs .chip{font-size:10px;font-weight:400}
 .cta-cx{width:22px;height:22px;padding:0;margin-right:4px}.cta-oc td{opacity:.6}
-.cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}.cta-atabs{grid-template-columns:repeat(4,1fr);max-width:600px}
+.cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}.cta-tfix{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.cta-tfix .in{width:auto;max-width:260px;padding:3px 6px;font-size:12px}.cta-atabs{grid-template-columns:repeat(4,1fr);max-width:600px}
 .cta-ar,.cta-cr{display:grid;gap:8px 12px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line)}
 .cta-ar{grid-template-columns:minmax(200px,1.5fr) minmax(150px,1fr) 64px minmax(150px,1fr) 115px 80px}
 .cta-cr{grid-template-columns:minmax(240px,1.6fr) minmax(200px,1.2fr) minmax(170px,1fr) 80px}
@@ -3970,6 +3970,7 @@ function tjCuentas() { if (_tjCuD !== D.txs) { const c = new Set(), a = new Map(
 // tjDestino: la otra cuenta de un traslado. Se toma de la categoría si es el nombre de una cuenta; si no, de los datos extra del portal
 // (un campo con el nombre de una cuenta, o un id de cuenta destino). '' si no se sabe.
 function tjDestino(t) {
+  { const mm = S.aj && S.aj.trasManual && S.aj.trasManual[t.id]; if (mm && tjCta(mm) !== tjCta(t.cuenta)) return tjCta(mm); }   // elegida a mano en Cuentas → Traslados
   { const xx = trasX(t); if (xx && xx[0] && tjCta(xx[0]) !== tjCta(t.cuenta)) return tjCta(xx[0]); }   // dato exacto del Excel de la app
   const {c, a} = tjCuentas(); const cat = tjCta(t.cat); if (cat && c.has(cat)) return cat; const x = t.x; if (!x) return '';
   for (const k in x) { const v = tjCta(x[k]); if (k !== 'payType' && v !== tjCta(t.cuenta) && c.has(v)) return v; }
@@ -4752,13 +4753,33 @@ function ctaTrasRev() {
     const cs = (idx.get(t.fecha + '|' + d + '|' + c) || []).filter(o => o !== t && !par.has(o.id));
     const o = paso === 1 ? cs.find(o => igual(o, t) && ctaSigno(o) !== ctaSigno(t)) : cs.find(o => cruce(o, t) && ctaSigno(o) !== ctaSigno(t));
     if (o) { par.set(t.id, o); par.set(o.id, t); } });
+  // Filas que no dicen su otra cuenta: si en OTRA cuenta hay una fila de traslado sin pareja del mismo día, mismo monto y sentido
+  // contrario, son los dos lados del mismo traslado (ej. Efectivo L sale 12,815 y BA-CH entra 12,815 el mismo día).
+  const sueltas = tr.filter(t => !par.has(t.id) && !tjDestino(t)); const deduc = new Map();
+  sueltas.forEach(t => { if (par.has(t.id)) return; const o = tr.find(o => o !== t && !par.has(o.id) && o.fecha === t.fecha && tjCta(o.cuenta) !== tjCta(t.cuenta) && igual(o, t) && ctaSigno(o) !== ctaSigno(t) && (!tjDestino(o) || tjDestino(o) === tjCta(t.cuenta)));
+    if (o) { par.set(t.id, o); par.set(o.id, t); deduc.set(t.id, tjCta(o.cuenta)); deduc.set(o.id, tjCta(t.cuenta)); } });
   const r = new Map();
-  tr.forEach(t => { const c = tjCta(t.cuenta); const d = tjDestino(t); const esp = par.get(t.id) || null; let k;
+  tr.forEach(t => { const c = tjCta(t.cuenta); const d = tjDestino(t) || deduc.get(t.id) || ''; const esp = par.get(t.id) || null; let k;
     if (esp) k = ctaSigno(esp) === ctaSigno(t) ? 'dir' : !cruce(t, esp) && !igual(t, esp) ? 'monto' : 'par';
     else k = d && d !== c ? 'una' : 'sin';
     r.set(t.id, {k, otra: d || (esp ? tjCta(esp.cuenta) : ''), esp}); });
   _ctr = r; _ctrD = D.txs; return r;
 }
+// ctaTrasSugerencias: para cada traslado "sin la otra cuenta", la cuenta a la que van los traslados iguales que sí la dicen
+// (misma cuenta, mismo sentido y misma descripción). Solo si al menos 3 lo confirman y 9 de cada 10 van a la misma cuenta.
+function ctaTrasSugerencias() {
+  const rev = ctaTrasRev(); const nrm = x => String(x || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const llave = (t, conDet) => tjCta(t.cuenta) + '|' + ctaSigno(t) + '|' + nrm(t.nota) + (conDet ? '|' + nrm(t.det) : '');
+  const cnt = new Map(); const sumar = (k, o) => { if (!cnt.has(k)) cnt.set(k, new Map()); const m = cnt.get(k); m.set(o, (m.get(o) || 0) + 1); };
+  for (const [id, r] of rev) { if (r.k === 'sin' || !r.otra) continue; const t = D.byId.get(id); if (!t) continue; sumar(llave(t, true), r.otra); sumar(llave(t, false), r.otra); }
+  const out = new Map(); const man = (S.aj && S.aj.trasManual) || {};
+  for (const [id, r] of rev) { if (r.k !== 'sin' || man[id]) continue; const t = D.byId.get(id); if (!t) continue;
+    for (const conDet of [true, false]) { const m = cnt.get(llave(t, conDet)); if (!m) continue; const tot = [...m.values()].reduce((a, b) => a + b, 0); const [o, n] = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (n >= 3 && n / tot >= 0.9 && o !== tjCta(t.cuenta)) { out.set(id, {otra: o, n}); break; } } }
+  return out;
+}
+async function guardarTrasManual(cambios) { const m = Object.assign({}, (S.aj && S.aj.trasManual) || {}, cambios); Object.keys(m).forEach(k => { if (!m[k]) delete m[k]; });
+  try { await guardarAjuste('trasManual', m); derive(); render(); toast(Object.keys(cambios).length === 1 ? 'Traslado actualizado' : Object.keys(cambios).length + ' traslados actualizados'); } catch (e) {} }
 const CTA_TRAS_TXT = {par: ['Con sus dos filas', 'ok'], una: ['Una fila, otra cuenta conocida', ''], sin: ['Sin la otra cuenta', 'bad'], dir: ['Mismo sentido en las dos filas', 'bad'], monto: ['Montos distintos', 'warn']};
 const ctaTrasProblemas = () => D.txs.filter(t => ['sin', 'dir', 'monto'].includes((ctaTrasRev().get(t.id) || {}).k));
 function ctaTrasChip(t) { const r = tjEsTras(t) && ctaTrasRev().get(t.id); if (!r || !['sin', 'dir', 'monto'].includes(r.k)) return ''; const x = CTA_TRAS_TXT[r.k]; return ` · <span class="chip ${x[1]}">${x[0].toLowerCase()}</span>`; }
@@ -4767,17 +4788,20 @@ function vCtaTras() {
   const prob = cnt.sin + cnt.dir + cnt.monto; const ver = S.trasVer || (prob ? 'prob' : 'todos');
   const lista = D.txs.filter(t => { const r = rev.get(t.id); return r && (ver === 'todos' || (ver === 'prob' ? ['sin', 'dir', 'monto'].includes(r.k) : r.k === ver)); }).slice(0, 400);
   const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; let ant = null;
+  const sug = ctaTrasSugerencias(); const nombres = ctaNombres(); const man = (S.aj && S.aj.trasManual) || {};
   const filas = lista.map(t => { const r = rev.get(t.id); const x = CTA_TRAS_TXT[r.k]; let h = '';
     if (t.fecha !== ant) { ant = t.fecha; const dt = new Date(t.fecha + 'T12:00'); h = `<div class="tj-dia"><b>${t.fecha.slice(8, 10)}</b><span class="dia-s">${DS[dt.getDay()]}</span><span class="dia-m">${t.fecha.slice(5, 7)}/${t.fecha.slice(0, 4)}</span></div>`; }
     const s = ctaSigno(t); const de = s < 0 ? tjCta(t.cuenta) : (r.otra || '¿?'), a = s < 0 ? (r.otra || '¿?') : tjCta(t.cuenta);
     const mon = tjEsUSD(t.cuenta) ? tjU(tjMonto(t).usd) : L(+t.monto || 0);
-    return h + `<div class="tj-it cta-it"><div style="min-width:0;flex:1"><b>${esc(de)} → ${esc(a)}</b><div class="note">${esc([t.nota, t.det].filter(Boolean).join(' | ') || t.tipoMov || 'Traslado')} · fila de ${esc(tjCta(t.cuenta))} (${s < 0 ? 'sale' : 'entra'}) · <span class="chip ${x[1]}">${x[0]}</span></div></div><span class="num">${mon}</span><button class="btn sm ghost" data-act="ctaSel" data-n="${esc(tjCta(t.cuenta))}">Ver cuenta</button></div>`; }).join('');
+    return h + `<div class="tj-it cta-it"><div style="min-width:0;flex:1"><b>${esc(de)} → ${esc(a)}</b><div class="note">${esc([t.nota, t.det].filter(Boolean).join(' | ') || t.tipoMov || 'Traslado')} · fila de ${esc(tjCta(t.cuenta))} (${s < 0 ? 'sale' : 'entra'})${man[t.id] ? ' · <span class="chip">elegida a mano</span>' : ''} · <span class="chip ${x[1]}">${x[0]}</span></div>
+      ${r.k === 'sin' || man[t.id] ? `<div class="cta-tfix"><select class="in" data-trasman="${esc(t.id)}" aria-label="Otra cuenta del traslado"><option value="">${s < 0 ? '¿A qué cuenta fue?' : '¿De qué cuenta vino?'}</option>${nombres.filter(n => n !== tjCta(t.cuenta)).map(n => `<option value="${esc(n)}" ${man[t.id] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${sug.get(t.id) && !man[t.id] ? `<button class="btn sm" data-act="trasSug" data-id="${esc(t.id)}" data-n="${esc(sug.get(t.id).otra)}">Usar ${esc(sug.get(t.id).otra)}</button><span class="note">${sug.get(t.id).n} traslados iguales van a esa cuenta</span>` : ''}</div>` : ''}</div><span class="num">${mon}</span><button class="btn sm ghost" data-act="ctaSel" data-n="${esc(tjCta(t.cuenta))}">Ver cuenta</button></div>`; }).join('');
   const bt = (v, t, n) => `<button class="tj-tab ${ver === v ? 'on' : ''}" data-act="trasVer" data-v="${v}">${t} <span class="tj-tc">${n}</span></button>`;
   return `<div class="kpis cta-kpis cta-tk">
       <div class="kpi"><div class="eyebrow">Traslados</div><div class="v">${rev.size}</div><div class="note">filas de traslado sincronizadas</div></div>
       <div class="kpi"><div class="eyebrow">Bien ubicados</div><div class="v pos">${cnt.par + cnt.una}</div><div class="note">${cnt.par} con sus dos filas · ${cnt.una} de una fila</div></div>
       <div class="kpi"><div class="eyebrow">Por revisar</div><div class="v ${prob ? 'neg' : ''}">${prob}</div><div class="note">${prob ? 'afectan el saldo de sus cuentas' : 'todo cuadra entre cuentas'}</div></div></div>
     ${prob ? `<div class="tj-aviso"><b>Para corregirlos, sube el Excel que exporta Registro Contable</b> (el mismo de las monedas, con todo el rango de fechas). En cada traslado trae la otra cuenta en "Categoría" y si el dinero entró o salió en "Ingreso/Gasto"; con eso cada traslado queda en sus dos cuentas. <button class="btn sm pri" data-act="sync">Subir Excel</button></div>` : ''}
+    ${sug.size ? `<div class="tj-aviso"><b>${sug.size} ${sug.size === 1 ? 'traslado tiene' : 'traslados tienen'} otra cuenta sugerida</b> por traslados iguales (misma cuenta, mismo sentido y misma descripción) que sí la dicen. <button class="btn sm pri" data-act="trasSugTodas">Aplicar las ${sug.size} sugerencias</button></div>` : ''}
     <div class="tj-tabs cta-ttabs">${bt('prob', 'Por revisar', prob)}${bt('una', 'Una fila', cnt.una)}${bt('par', 'Dos filas', cnt.par)}${bt('todos', 'Todos', rev.size)}</div>
     <div class="lst tj-cargos cta-lst">${filas || `<div class="note" style="padding:10px">${ver === 'prob' ? 'Ningún traslado por revisar: todos cuentan en sus dos cuentas.' : 'Nada en esta lista.'}</div>`}</div>
     <div class="note">Cómo se ubica cada traslado: si llegan las dos filas (la que sale y la que entra) cada una cuenta en su cuenta; si llega una sola, la otra cuenta se toma de la categoría (en la app es el nombre de la otra cuenta) y se anota allí también.
@@ -4861,6 +4885,8 @@ document.addEventListener('click', async e => {
   if (act === 'ctaEditar') { S.ctaEdit = !S.ctaEdit; return pintarCtaFicha(); }
   if (act === 'ctaIrTras') { $('#modalRoot').innerHTML = ''; S.ctaFicha = null; S.ctaTab = 'adm'; S.ctaAdm = 'tras'; history.replaceState(null, '', '#cuentas'); render(); return window.scrollTo(0, 0); }
   if (act === 'trasVer') { S.trasVer = b.dataset.v; return render(); }
+  if (act === 'trasSug') return guardarTrasManual({[b.dataset.id]: b.dataset.n});
+  if (act === 'trasSugTodas') { const c = {}; for (const [id, x] of ctaTrasSugerencias()) c[id] = x.otra; return guardarTrasManual(c); }
   if (act === 'ctaGuardarF') { const n = S.ctaFicha; const inc = $('#ctaFI').value;
     try { await ctaGuardar(n, {tipo: $('#ctaFT').value, moneda: $('#ctaFM').value, alias: $('#ctaFA').value.trim(), cuenta_pago: $('#ctaFP') && !$('#ctaFP').closest('label').hidden ? $('#ctaFP').value : null, incluir_total: inc === '' ? null : inc === '1', oculta: $('#ctaFO').checked, nota: $('#ctaFN').value.trim()}, 'Cuenta guardada'); S.ctaEdit = false; render(); pintarCtaFicha(); } catch (er) {} return; }
   if (act === 'ctaAdm') { S.ctaAdm = b.dataset.v; return render(); }
@@ -4890,6 +4916,7 @@ document.addEventListener('change', async e => {
   const tt = el.closest && el.closest('tr[data-ctt]');
   if (tt && el.dataset.cttf) { const t = ctTipo(tt.dataset.ctt); if (!t) return; const k = el.dataset.cttf; const v = el.type === 'checkbox' ? el.checked : k === 'orden' ? (+el.value || 0) : el.value.trim(); if (k === 'nombre' && !v) return render();
     try { const d = await q(sb.from('cuenta_tipos').update({[k]: v}).eq('id', t.id).select()); Object.assign(t, d && d[0] ? d[0] : {[k]: v}); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
+  if (el.dataset && el.dataset.trasman !== undefined) return guardarTrasManual({[el.dataset.trasman]: el.value});
   const tc = el.closest && el.closest('[data-catr]');
   if (tc && el.dataset.catf) { const c = tc.dataset.catr; const k = el.dataset.catf; try { await catGuardar(c, {[k]: el.type === 'checkbox' ? el.checked : el.value}); } catch (er) {} return render(); }
   if (el.dataset && el.dataset.catctl !== undefined && el.value) { const c = ctrlById(el.value); const cat = el.dataset.catctl; if (!c) return; c.categorias = [...(c.categorias || []), cat];
