@@ -4480,7 +4480,12 @@ function ctaClaseSug(n) {
   if (/(^|[\s-])TD([\s-]|$)|D[EÉ]BITO|^[A-Z]+ - \d{4}$/.test(u)) return 'debito'; if (/AHORRO|INVERSI|APORTACI|ACTIVO|NAVIDAD/.test(u)) return 'ahorro';
   if (/PR[EÉ]STAMO|L[IÍ]NEA/.test(u)) return 'prestamo'; if (/PAYPAL|PAGO ELECTR|TIGO|WALLET|ZELLE/.test(u)) return 'otros'; return 'banco';
 }
+// ctaTj: tarjeta de crédito (módulo Tarjetas) a la que pertenece la cuenta. Esas cuentas SIEMPRE son de clase tarjeta de crédito.
+const ctaTj = n => (S.tj || []).find(t => (t.cuentas || []).some(c => tjCta(c) === n));
+const ctaTipoTC = () => ctTipo('tc') || ctTipos().find(t => t.clase === 'credito') || null;
+const ctaTipoMal = n => { const t = ctTipo(ctaCfg(n).tipo); return !t || (!!ctaTj(n) && t.clase !== 'credito'); };   // sin tipo, o de una tarjeta pero con tipo que no es de crédito
 function ctaTipoSug(n) {
+  if (ctaTj(n)) return ctaTipoTC();
   const cl = ctaClaseSug(n); const pref = {efectivo: 'efectivo', banco: 'banco', debito: 'debito', credito: 'tc', ahorro: 'activos', prestamo: 'prestamo', otros: /PAYPAL|ELECTR/i.test(n) ? 'pago_e' : 'otros'}[cl];
   return ctTipo(pref) || ctTipos().find(t => t.clase === cl) || null;
 }
@@ -4491,10 +4496,12 @@ function ctaNombres() {
   return _ctaN;
 }
 function ctaInfo(n) {
-  const cfg = ctaCfg(n); const tipo = ctTipo(cfg.tipo); const clase = tipo ? tipo.clase : null;
+  const cfg = ctaCfg(n); const tj = ctaTj(n); let tipo = ctTipo(cfg.tipo);
+  if (tj && (!tipo || tipo.clase !== 'credito')) tipo = ctaTipoTC() || {id: '', nombre: 'Tarjetas de crédito', clase: 'credito', incluir_total: true};   // cuenta de una tarjeta de crédito
+  const clase = tipo ? tipo.clase : null;
   const incl = cfg.incluir_total != null ? !!cfg.incluir_total : tipo ? tipo.incluir_total !== false : true;
   const pago = clase === 'debito' && cfg.cuenta_pago ? cfg.cuenta_pago : '';
-  return {n, cfg, tipo, clase, mon: cfg.moneda || (tjEsUSD(n) ? 'USD' : 'L'), nom: cfg.alias || n, incl, oculta: !!cfg.oculta, pago, deuda: CTA_DEUDA.has(clase)};
+  return {n, cfg, tj, tipo, clase, mon: cfg.moneda || (tjEsUSD(n) ? 'USD' : 'L'), nom: cfg.alias || n, incl, oculta: !!cfg.oculta, pago, deuda: CTA_DEUDA.has(clase)};
 }
 // ctaSigno: +1 si el dinero entra a la cuenta del registro, −1 si sale.
 function ctaSigno(t) {
@@ -4710,17 +4717,17 @@ function vCtaAdm() {
 function vCtaAdmCuentas() {
   const tipos = ctTipos(); const nombres = ctaNombres(); const qq = (S.ctaAdmQ || '').trim().toUpperCase();
   if (!tipos.length) return `<div class="panel"><div class="bd" style="gap:10px"><b>Primero los tipos de cuenta</b><div class="note">Crea los mismos tipos que tienes en Registro Contable (Dinero en efectivo, Banco, Tarjetas de débito, TC BAC AMEX, TC BAC VISA, Tarjetas de crédito, 5. Activos, Pago electrónico, Inversión, Línea de crédito, Préstamo, Seguro, Otros) y luego asigna uno a cada cuenta.</div><div><button class="btn pri" data-act="ctaTiposApp">Crear los tipos de Registro Contable</button></div></div></div>`;
-  const sinT = nombres.filter(n => !ctaCfg(n).tipo); const bancos = nombres.filter(o => !['debito', 'credito'].includes(ctaInfo(o).clase));
+  const sinT = nombres.filter(ctaTipoMal); const bancos = nombres.filter(o => !['debito', 'credito'].includes(ctaInfo(o).clase));
   const por = ctaIdx(); const vis = nombres.filter(n => !qq || (n + ' ' + (ctaCfg(n).alias || '') + ' ' + ((ctTipo(ctaCfg(n).tipo) || {}).nombre || '')).toUpperCase().includes(qq));
-  const filas = vis.map(n => { const i = ctaInfo(n); const l = por.get(n) || []; const ult = l.reduce((m, o) => o.t.fecha > m ? o.t.fecha : m, ''); const sg = !i.cfg.tipo && ctaTipoSug(n);
+  const filas = vis.map(n => { const i = ctaInfo(n); const l = por.get(n) || []; const ult = l.reduce((m, o) => o.t.fecha > m ? o.t.fecha : m, ''); const sg = ctaTipoMal(n) && ctaTipoSug(n); const tps = i.tj ? tipos.filter(t => t.clase === 'credito') : tipos;
     return `<div class="cta-ar" data-ctan="${esc(n)}"><div class="cta-a1"><b class="cta-an" data-act="ctaSel" data-n="${esc(n)}" role="button" tabindex="0">${esc(i.nom)}</b><div class="cat">${i.cfg.alias ? esc(n) + ' · ' : ''}${l.length} registros${ult ? ' · último ' + fFecha(ult) : ''}</div></div>
-      <label class="cta-fl"><span>Tipo</span><select class="in" data-ctaf="tipo"><option value="">Sin tipo</option>${tipos.map(t => `<option value="${esc(t.id)}" ${i.cfg.tipo === t.id ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select>${sg ? `<i class="cat">sugerido: ${esc(sg.nombre)}</i>` : ''}</label>
+      <label class="cta-fl"><span>Tipo</span><select class="in" data-ctaf="tipo">${i.tj ? '' : '<option value="">Sin tipo</option>'}${tps.map(t => `<option value="${esc(t.id)}" ${(i.tipo && i.tipo.id) === t.id ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select>${i.tj ? `<i class="cat">de la tarjeta ${esc((i.tj.banco || '') + ' · ' + (i.tj.nombre || ''))}</i>` : sg ? `<i class="cat">sugerido: ${esc(sg.nombre)}</i>` : ''}</label>
       <label class="cta-fl"><span>Moneda</span><select class="in" data-ctaf="moneda"><option value="L" ${i.mon === 'L' ? 'selected' : ''}>L</option><option value="USD" ${i.mon === 'USD' ? 'selected' : ''}>$</option></select></label>
       <label class="cta-fl ${i.clase === 'debito' ? '' : 'cta-na'}"><span>Cuenta de pago</span>${i.clase === 'debito' ? `<select class="in" data-ctaf="cuenta_pago"><option value="">Ninguna</option>${bancos.filter(o => o !== n).map(o => `<option value="${esc(o)}" ${i.cfg.cuenta_pago === o ? 'selected' : ''}>${esc(ctaInfo(o).nom)}</option>`).join('')}</select>` : '<b class="muted">—</b>'}</label>
       <label class="cta-fl"><span>En el total</span><select class="in" data-ctaf="incluir_total"><option value="" ${i.cfg.incluir_total == null ? 'selected' : ''}>Según tipo</option><option value="1" ${i.cfg.incluir_total === true ? 'selected' : ''}>Sí</option><option value="0" ${i.cfg.incluir_total === false ? 'selected' : ''}>No</option></select></label>
       <label class="cr-ck cta-ock"><input type="checkbox" data-ctaf="oculta" ${i.oculta ? 'checked' : ''}> Oculta</label></div>`; }).join('');
   return `<div class="panel"><div class="hd filters"><input type="search" class="in" id="ctaAdmQ" placeholder="Buscar cuenta (ej.: BAC, TC, 5312)" value="${esc(S.ctaAdmQ || '')}" style="max-width:320px">
-      <span class="note" style="margin-right:auto">${nombres.length} cuentas · ${sinT.length} sin tipo</span>${sinT.length ? `<button class="btn sm pri" data-act="ctaSugerir">Asignar tipos sugeridos (${sinT.length})</button>` : ''}</div>
+      <span class="note" style="margin-right:auto">${nombres.length} cuentas · ${sinT.length} por asignar</span>${sinT.length ? `<button class="btn sm pri" data-act="ctaSugerir">Asignar tipos sugeridos (${sinT.length})</button>` : ''}</div>
     <div class="cta-ar cta-ah" aria-hidden="true"><span>Cuenta de la app</span><span>Tipo</span><span>Moneda</span><span>Cuenta de pago</span><span>En el total</span><span></span></div>${filas || '<div class="bd note">Ninguna cuenta coincide.</div>'}
     <div class="bd note">Los cambios se guardan solos. La <b>cuenta de pago</b> es para las tarjetas de débito: sus gastos bajan el saldo de ese banco, como en la app. Toca el nombre de una cuenta para ver su saldo y sus movimientos.</div></div>`;
 }
@@ -4783,7 +4790,7 @@ document.addEventListener('click', async e => {
   if (act === 'ctaAdm') { S.ctaAdm = b.dataset.v; return render(); }
   if (act === 'ctaTiposApp') { try { const rows = CTA_TIPOS_APP.filter(([id]) => !ctTipo(id)).map(([id, nombre, clase], k) => ({id, nombre, clase, orden: (k + 1) * 10, incluir_total: true}));
       const d = await q(sb.from('cuenta_tipos').upsert(rows).select(), 'Tipos de cuenta creados'); S.ctT.push(...(d && d.length ? d : rows)); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
-  if (act === 'ctaSugerir') { const sinT = ctaNombres().filter(n => !ctaCfg(n).tipo && ctaTipoSug(n)); let k = 0;
+  if (act === 'ctaSugerir') { const sinT = ctaNombres().filter(n => ctaTipoMal(n) && ctaTipoSug(n)); let k = 0;
     for (const n of sinT) { try { const t = ctaTipoSug(n); await ctaGuardar(n, {tipo: t.id, moneda: ctaCfg(n).moneda || (tjEsUSD(n) ? 'USD' : 'L')}); k++; } catch (er) { break; } }
     toast(`${k} cuentas con tipo sugerido. Revisa las que no sean correctas.`); return render(); }
   if (act === 'cttNuevo') { const nombre = $('#cttN').value.trim(); if (!nombre) return toast('Escribe el nombre del tipo.');
