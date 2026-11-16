@@ -407,6 +407,33 @@ body:has(.tjg-full){overflow:hidden}
 .tjg-full .tjg-big{flex:1;display:flex;flex-direction:column;min-height:260px}
 .tjg-full .tjg-big .tjg-plot{flex:1;height:auto;min-height:220px}
 @media (max-width:760px){.tjg-full{padding-inline:10px}.tjg-fsel .tj-tab{font-size:11.5px;padding:5px 4px}}
+/* Vehículos: filas compactas, gráficos ampliables y pestañas Gráficos / Planes en el teléfono */
+.veh-graf .hd{flex-wrap:nowrap;gap:8px}.veh-graf .hd h2{margin-right:auto}.veh-graf .graf-exp,.veh-graf .graf-x{order:9;flex:none}
+.graf-full .bd{flex:1;display:flex;flex-direction:column;min-height:0}.graf-full .vchart{flex:1;min-height:220px}
+.veh-acc .hico{display:none}
+.vr-f{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;padding:6px 2px;border-bottom:1px solid var(--line);cursor:pointer;-webkit-user-select:none;user-select:none}
+.vr-f.open{background:var(--sunk)}.vr-i{flex:1;min-width:0}.vr-i b{font-size:12px}.vr-i .cat{font-size:10px;line-height:1.35}
+.vr-v{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none}.vr-v .num{font-size:12.5px;font-weight:600}.vr-v .chip{font-size:8.5px;padding:0 5px}
+.vr-a{width:100%;display:flex;justify-content:flex-end;gap:6px;padding-top:4px}
+@media (max-width:760px){
+  .veh-datos{display:none!important}.veh-datos.open{display:flex!important}
+  .veh-top{flex-wrap:nowrap!important;align-items:center!important}.veh-det .bd{padding:6px 10px!important;flex-wrap:nowrap;font-size:12px}
+  .veh-acc{flex-wrap:nowrap}.veh-acc .htx{display:none}.veh-acc .hico{display:block;width:17px;height:17px}
+  .veh-acc .btn{width:34px;height:32px;padding:0!important;display:inline-flex;align-items:center;justify-content:center}
+  .veh-acc .btn.on{background:var(--accent-soft)}
+  .ficha h2{font-size:16px!important}
+  .vsel{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:6px;padding-bottom:2px}.vsel::-webkit-scrollbar{display:none}
+  .vcard{flex:none;padding:4px 10px 4px 4px;gap:8px;border-radius:10px;font-size:12px}.vcard .vph{width:38px;height:28px}.vcard small{font-size:10px}
+  .veh-secs{gap:10px}.veh-listp{order:1}.veh-secs>.grid2,.veh-secs>.veh-plan{order:2}
+  .veh-secs .grid2{gap:10px}
+  .veh-graf,.veh-plan{display:none}
+  .veh-t-graf .veh-graf,.veh-t-plan .veh-plan{display:block}.veh-t-graf .veh-graf.graf-full{display:flex}
+  .veh-t-graf #vehLista,.veh-t-plan #vehLista{display:none}
+  .subtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.subtabs::-webkit-scrollbar{display:none}
+  .subtabs button{white-space:nowrap;flex:none;padding:7px 9px;font-size:12px}
+  #vehLista>.row>.note{display:none}#vehLista>.row{justify-content:flex-end!important}
+  .prox{font-size:12px}
+}
 /* Lista de proyectos */
 .pr-tabs{max-width:360px}
 .pr-f{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
@@ -1885,24 +1912,28 @@ function vVehiculos() {
   const v = vehById(S.vehSel);
   const cards = lista.map(x => { const st = vStats(x); return `<button class="vcard" type="button" data-act="vehSel" data-id="${esc(x.id)}" aria-pressed="${x.id === S.vehSel}"><span class="vph">${fotoVeh(x)}</span><span style="min-width:0"><b>${esc(x.nombre)}</b><small class="mono">${st.odo != null ? nf(st.odo) + ' km' : 'sin lecturas'}${st.prom ? ' · ' + nf(vR(st.prom), 1) + ' ' + vRU() : ''}</small></span></button>`; }).join('');
   return `<div class="stack">
-    <div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px"><div><div class="eyebrow">Vehículos</div><h1>Gestión de vehículos</h1><div class="note">Combustible, kilometraje y mantenimiento, vinculados a los gastos.</div></div>
-      <div class="row" style="gap:10px"><span class="note">Unidad</span><div class="seg" role="group" aria-label="Unidad de volumen"><button data-act="vehUnidad" data-v="L" aria-pressed="${vUnidad() === 'L'}">Litros</button><button data-act="vehUnidad" data-v="G" aria-pressed="${vUnidad() === 'G'}">Galones</button></div></div></div>
-    ${a && det.length ? `<a class="panel" href="#vehiculos" data-act="vehTab" data-t="det" style="text-decoration:none;color:inherit"><div class="bd row" style="gap:10px"><span class="chip warn">${det.length}</span><span><b>${det.length === 1 ? 'Gasto de vehículo detectado' : 'Gastos de vehículos detectados'}</b> en la app sin registrar en este apartado. <u>Revisar</u></span></div></a>` : ''}
+    <div class="row veh-top" style="justify-content:space-between;align-items:flex-end;gap:12px"><div><div class="eyebrow">Vehículos</div><h1>Gestión de vehículos</h1><div class="note solo-pc">Combustible, kilometraje y mantenimiento, vinculados a los gastos.</div></div>
+      <div class="row" style="gap:10px;flex:none"><span class="note solo-pc-il">Unidad</span><div class="seg" role="group" aria-label="Unidad de volumen"><button data-act="vehUnidad" data-v="L" aria-pressed="${vUnidad() === 'L'}">Litros</button><button data-act="vehUnidad" data-v="G" aria-pressed="${vUnidad() === 'G'}">Galones</button></div></div></div>
+    ${a && det.length ? `<a class="panel veh-det" href="#vehiculos" data-act="vehTab" data-t="det" style="text-decoration:none;color:inherit"><div class="bd row" style="gap:10px"><span class="chip warn">${det.length}</span><span><b>${det.length === 1 ? 'Gasto de vehículo detectado' : 'Gastos de vehículos detectados'}</b><span class="solo-pc-il"> en la app sin registrar en este apartado.</span> <u>Revisar</u></span></div></a>` : ''}
     <div class="vsel">${cards}${a ? `<button class="vcard vnew" type="button" data-act="vehForm"><span style="font-size:22px;line-height:1">+</span><span>Agregar vehículo</span></button>` : ''}</div>
     ${v ? vFicha(v) : `<div class="panel"><div class="bd note">${a ? 'Agrega tu primer vehículo con "Agregar vehículo". En "Texto en la app" escribe cómo lo nombras en el detalle de Registro Contable (por ejemplo FORD FOCUS 2016) para que la plataforma reconozca sus gastos.' : 'No tienes vehículos asignados.'}</div></div>`}
   </div>`;
 }
 // vFicha: Ficha de un vehículo: indicadores, gráficos, planes y listados.
 function vFicha(v) {
-  const a = esAdmin(); const st = vStats(v); const c = v.control && ctrlById(v.control); const px = vProximos(v); const tab = ['comb', 'mant', 'rec', 'det'].includes(S.vehTab) ? S.vehTab : 'comb';
+  const a = esAdmin(); const st = vStats(v); const c = v.control && ctrlById(v.control); const px = vProximos(v); let tab = ['comb', 'mant', 'rec', 'det', 'graf', 'plan'].includes(S.vehTab) ? S.vehTab : 'comb';
+  if (!esTelefono() && (tab === 'graf' || tab === 'plan')) tab = 'comb';   // Gráficos y Planes son pestañas solo en el teléfono; en computadora siempre están a la vista
+  const AMPV = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+  const gHd = k => S.vchartFull === k ? `<button class="btn sm ghost graf-x" data-act="vchartFull" data-v="" title="Cerrar (Esc)" aria-label="Cerrar pantalla completa">✕</button>` : `<button class="btn sm ghost graf-exp" data-act="vchartFull" data-v="${k}" title="Pantalla completa" aria-label="Ver el gráfico a pantalla completa">${AMPV}</button>`;
+  const gCl = k => `panel veh-graf ${S.vchartFull === k ? 'graf-full' : ''}`;
   const urg = px.filter(p => p.pct >= 0.85); const sinV = [...st.rc, ...st.mants].filter(r => !r.tx_id && !r.mov_id && r.costo == null).length;
   const ultRc = st.rc[st.rc.length - 1];
   return `<div class="panel"><div class="bd"><div class="ficha">
-      <div class="stack" style="gap:10px"><div class="vfoto">${fotoVeh(v)}</div>
+      <div class="stack veh-datos ${S.vehDatos ? 'open' : ''}" style="gap:10px"><div class="vfoto">${fotoVeh(v)}</div>
         <dl class="datos">${[['Marca', v.marca], ['Modelo', v.modelo], ['Año', v.anio], ['Placa', v.placa], ['VIN', v.vin], ['Tanque', v.tanque_l ? `${nf(vVol(+v.tanque_l), vUnidad() === 'L' ? 0 : 1)} ${vU()}` : ''], ['Combustible', v.combustible], ['Control', c ? c.nombre : ''], ['Texto en la app', v.alias]].filter(x => x[1] !== '' && x[1] != null).map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('')}</dl></div>
       <div class="stack" style="gap:12px;min-width:0">
         <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div><span class="eyebrow">Ficha del vehículo</span><h2 style="font-size:22px">${esc(v.nombre)}</h2></div>
-          ${a ? `<div class="row" style="gap:6px"><button class="btn sm" data-act="vregNuevo" data-tipo="combustible">Registrar recarga</button><button class="btn sm" data-act="vregNuevo" data-tipo="mantenimiento">Registrar mantenimiento</button><button class="btn sm" data-act="vregNuevo" data-tipo="recorrido">Registrar recorrido</button><button class="btn sm ghost" data-act="vehForm" data-id="${esc(v.id)}">Editar</button></div>` : ''}</div>
+          <div class="row veh-acc" style="gap:6px">${a ? `<button class="btn sm pri" data-act="vregNuevo" data-tipo="combustible" title="Registrar recarga" aria-label="Registrar recarga"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14M3 20h12M6 9h6"/><path d="M14 11h2a2 2 0 0 1 2 2v3a1.5 1.5 0 0 0 3 0V9l-3-3"/></svg><span class="htx">Registrar recarga</span></button><button class="btn sm" data-act="vregNuevo" data-tipo="mantenimiento" title="Registrar mantenimiento" aria-label="Registrar mantenimiento"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6.5a4 4 0 0 0 5 5L11 20a2.1 2.1 0 0 1-3-3l8.5-8.5Z" transform="translate(-2 -2)"/><path d="M15 5l4 4"/></svg><span class="htx">Registrar mantenimiento</span></button><button class="btn sm" data-act="vregNuevo" data-tipo="recorrido" title="Registrar recorrido" aria-label="Registrar recorrido"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H14a3.5 3.5 0 0 0 0-7h-4a3.5 3.5 0 0 1 0-7h5.5"/></svg><span class="htx">Registrar recorrido</span></button><button class="btn sm ghost" data-act="vehForm" data-id="${esc(v.id)}" title="Editar vehículo" aria-label="Editar vehículo"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg><span class="htx">Editar</span></button>` : ''}<span class="solo-tel-il"><button class="btn sm ghost ${S.vehDatos ? 'on' : ''}" data-act="vehDatos" title="Datos del vehículo" aria-label="Datos del vehículo" aria-expanded="${!!S.vehDatos}"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></button></span></div></div>
         <div class="kpis">
           <div class="kpi"><div class="eyebrow">Odómetro</div><div class="v">${st.odo != null ? nf(st.odo) : '—'}</div><div class="note">km · última lectura</div></div>
           <div class="kpi"><div class="eyebrow">Rendimiento</div><div class="v">${st.prom ? nf(vR(st.prom), 1) : '—'}</div><div class="note">${vRU()} promedio</div></div>
@@ -1912,15 +1943,15 @@ function vFicha(v) {
         </div>
         <div class="row" style="gap:6px">${urg.map(p => `<span class="chip ${p.pct >= 1 ? 'bad' : 'warn'}">${esc(p.p.servicio)}: ${p.pct >= 1 ? vencTxt(p).toLowerCase() : p.porTiempo || p.faltaKm == null ? `en ${nf(Math.max(0, p.faltaM))} meses` : `faltan ${nf(p.faltaKm)} km`}</span>`).join('')}${sinV ? `<span class="chip warn">${sinV} sin gasto vinculado</span>` : ''}${ultRc && ultRc.rend && st.prom && ultRc.rend < st.prom * 0.85 && !ultRc.estimado ? '<span class="chip bad">Última recarga con rendimiento bajo</span>' : ''}</div>
       </div></div></div></div>
-    ${st.rc.length || st.mants.length ? `<div class="grid2">
-      <div class="panel"><div class="hd"><h2>Rendimiento por recarga</h2><span class="note">${st.rc.filter(r => r.rend).length} recargas${st.prom ? ` · promedio ${nf(vR(st.prom), 1)} ${vRU()}` : ''}</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca);height:3px"></i>${vRU()} por recarga</span><span><i style="background:var(--bad);border-radius:50%"></i>15% bajo el promedio</span><span><i style="background:var(--muted);border-radius:50%;opacity:.5"></i>estimado (tanque no lleno)</span></div><div class="vchart" data-vchart="rend"></div></div></div>
-      <div class="panel"><div class="hd"><h2>Gasto por mes</h2><span class="note">últimos 12 meses</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca)"></i>Combustible</span><span><i style="background:var(--cc)"></i>Mantenimiento</span></div><div class="vchart" data-vchart="gasto"></div></div></div>
-      <div class="panel"><div class="hd"><h2>Kilómetros por mes</h2><span class="note">${nf(st.recorrido)} km registrados</span></div><div class="bd"><div class="vchart" data-vchart="km"></div></div></div>
+    <div class="stack veh-secs veh-t-${tab}">${st.rc.length || st.mants.length ? `<div class="grid2">
+      <div class="${gCl('rend')}"><div class="hd"><h2>Rendimiento por recarga</h2>${gHd('rend')}<span class="note">${st.rc.filter(r => r.rend).length} recargas${st.prom ? ` · promedio ${nf(vR(st.prom), 1)} ${vRU()}` : ''}</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca);height:3px"></i>${vRU()} por recarga</span><span><i style="background:var(--bad);border-radius:50%"></i>15% bajo el promedio</span><span><i style="background:var(--muted);border-radius:50%;opacity:.5"></i>estimado (tanque no lleno)</span></div><div class="vchart" data-vchart="rend"></div></div></div>
+      <div class="${gCl('gasto')}"><div class="hd"><h2>Gasto por mes</h2>${gHd('gasto')}<span class="note">últimos 12 meses</span></div><div class="bd"><div class="leg"><span><i style="background:var(--ca)"></i>Combustible</span><span><i style="background:var(--cc)"></i>Mantenimiento</span></div><div class="vchart" data-vchart="gasto"></div></div></div>
+      <div class="${gCl('km')}"><div class="hd"><h2>Kilómetros por mes</h2>${gHd('km')}<span class="note">${nf(st.recorrido)} km registrados</span></div><div class="bd"><div class="vchart" data-vchart="km"></div></div></div>
       ${vPanelPlanes(v, px)}
     </div>` : vPanelPlanes(v, px)}
-    <div class="panel"><div class="hd" style="padding-bottom:0;border-bottom:0"><div class="subtabs" role="tablist">
-      ${[['comb', 'Combustible'], ['mant', 'Mantenimiento'], ['rec', 'Recorridos'], ...(a ? [['det', `Detectados${detectados().filter(d => d.v.id === v.id).length ? ` <span class="count warn-bg">${detectados().filter(d => d.v.id === v.id).length}</span>` : ''}`]] : [])].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-act="vehTab" data-t="${k}">${l}</button>`).join('')}
-    </div></div><div class="bd" id="vehLista">${vVehLista(v, tab)}</div></div>`;
+    <div class="panel veh-listp"><div class="hd" style="padding-bottom:0;border-bottom:0"><div class="subtabs" role="tablist">
+      ${[['comb', 'Combustible'], ['mant', 'Mantenimiento'], ['rec', 'Recorridos'], ...(a ? [['det', `Detectados${detectados().filter(d => d.v.id === v.id).length ? ` <span class="count warn-bg">${detectados().filter(d => d.v.id === v.id).length}</span>` : ''}`]] : [])].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-act="vehTab" data-t="${k}">${l}</button>`).join('')}<span class="solo-tel-il">${[['graf', 'Gráficos'], ['plan', `Planes${urg.length ? ` <span class="count warn-bg">${urg.length}</span>` : ''}`]].map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-act="vehTab" data-t="${k}">${l}</button>`).join('')}</span>
+    </div></div><div class="bd" id="vehLista">${vVehLista(v, tab === 'graf' || tab === 'plan' ? 'comb' : tab)}</div></div></div>`;
 }
 // vencTxt: Texto de vencimiento de un mantenimiento ("Vencido por X km / meses / días").
 function vencTxt(x) {
@@ -1933,25 +1964,29 @@ function vencTxt(x) {
 // vPanelPlanes: Panel de planes de mantenimiento.
 function vPanelPlanes(v, px) {
   const a = esAdmin(); const odo = vStats(v).odo;
-  return `<div class="panel"><div class="hd"><h2>Próximos mantenimientos</h2>${odo != null ? `<span class="note">odómetro ${nf(odo)} km</span>` : ''}</div><div class="bd">
+  return `<div class="panel veh-plan"><div class="hd"><h2 style="margin-right:auto">Próximos mantenimientos</h2>${odo != null ? `<span class="note">odómetro ${nf(odo)} km</span>` : ''}${a ? `<button class="btn sm ${S.vplanOpen ? '' : 'pri'}" data-act="vplanTog" aria-expanded="${!!S.vplanOpen}">${S.vplanOpen ? 'Cancelar' : '+ Plan'}</button>` : ''}</div><div class="bd">
     ${px.length ? px.map(x => { const pc = Math.min(1, x.pct); const col = x.pct >= 1 ? 'var(--bad)' : x.pct >= 0.85 ? 'var(--warn)' : 'var(--ca)';
       const txt = x.sinDatos ? 'sin último servicio' : x.pct >= 1 ? vencTxt(x) : x.porTiempo || x.faltaKm == null ? `en ${nf(Math.max(0, x.faltaM))} meses` : `faltan ${nf(x.faltaKm)} km`;
       return `<div class="prox"><b>${esc(x.p.servicio)}</b><span class="mono" style="color:${col};font-size:12.5px">${txt}</span><div class="pbar" style="grid-column:1/-1"><span style="width:${pc * 100}%;background:${col}"></span></div><span class="note" style="grid-column:1/-1">Cada ${[x.p.cada_km ? nf(x.p.cada_km) + ' km' : '', x.p.cada_meses ? x.p.cada_meses + ' meses' : ''].filter(Boolean).join(' o ')}${x.uf ? ` · último ${fFecha(x.uf)}` : ''}${x.uo != null ? ` a ${nf(x.uo)} km` : ''}${a ? ` · <button class="linkish" data-act="vplanBorrar" data-id="${esc(x.p.id)}"><u>${S.confirmPlan === x.p.id ? '¿Quitar? Sí' : 'Quitar'}</u></button>` : ''}</span></div>`; }).join('') : '<div class="note">Sin planes de mantenimiento. Agrega uno para recibir avisos (por ejemplo, aceite cada 5,000 km o 6 meses).</div>'}
-    ${a ? `<div class="form" style="border-top:1px solid var(--line);padding-top:10px"><label>Servicio<input id="vpServ" list="vpServs" placeholder="Aceite y filtro"><datalist id="vpServs">${['Aceite y filtro', 'Rotación de llantas', 'Frenos', 'Batería', 'Alineación y balanceo', 'Filtro de aire', 'Servicio mayor'].map(x => `<option value="${x}">`).join('')}</datalist></label><label>Cada (km)<input id="vpKm" inputmode="numeric" placeholder="5000"></label><label>Cada (meses)<input id="vpMes" inputmode="numeric" placeholder="6"></label><label>Último servicio (si no está registrado)<input id="vpUlt" type="date"></label><label>Odómetro de ese servicio<input id="vpUltOdo" inputmode="numeric"></label><label style="justify-content:flex-end"><button class="btn sm pri" data-act="vplanNuevo" data-id="${esc(v.id)}">Agregar plan</button></label></div><div class="note">El último servicio se toma solo de los mantenimientos registrados con el mismo tipo.</div>` : ''}
+    ${a && S.vplanOpen ? `<div class="form" style="border-top:1px solid var(--line);padding-top:10px"><label>Servicio<input id="vpServ" list="vpServs" placeholder="Aceite y filtro"><datalist id="vpServs">${['Aceite y filtro', 'Rotación de llantas', 'Frenos', 'Batería', 'Alineación y balanceo', 'Filtro de aire', 'Servicio mayor'].map(x => `<option value="${x}">`).join('')}</datalist></label><label>Cada (km)<input id="vpKm" inputmode="numeric" placeholder="5000"></label><label>Cada (meses)<input id="vpMes" inputmode="numeric" placeholder="6"></label><label>Último servicio (si no está registrado)<input id="vpUlt" type="date"></label><label>Odómetro de ese servicio<input id="vpUltOdo" inputmode="numeric"></label><label style="justify-content:flex-end"><button class="btn sm pri" data-act="vplanNuevo" data-id="${esc(v.id)}">Agregar plan</button></label></div><div class="note">El último servicio se toma solo de los mantenimientos registrados con el mismo tipo.</div>` : ''}
   </div></div>`;
 }
+// vrFila: fila compacta para el teléfono (dos líneas: principal + detalle; valor a la derecha). Tocar la fila muestra sus acciones.
+const vrFila = (id, tit, det, val, sub, acc) => `<div class="vr-f ${S.vrOpen === id ? 'open' : ''}" data-act="vrOpen" data-id="${esc(id)}"><div class="vr-i"><b>${tit}</b><div class="cat">${det}</div></div><div class="vr-v"><span class="num">${val}</span>${sub || ''}</div>${acc && S.vrOpen === id ? `<div class="vr-a">${acc}</div>` : ''}</div>`;
 // vVehLista: Listados de combustible, mantenimiento y recorridos.
 function vVehLista(v, tab) {
   const a = esAdmin(); const st = vStats(v);
   if (tab === 'comb') {
     const rc = [...st.rc].reverse();
-    return (a ? `<div class="row" style="justify-content:space-between;gap:10px"><span class="note">Recargas de combustible, del más reciente al más antiguo.</span><button class="btn sm pri" data-act="vregNuevo" data-tipo="combustible">+ Nueva recarga</button></div>` : '') + (rc.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Gasolinera</th><th class="num">Odómetro</th><th class="num">Km desde la última</th><th>Combustible</th><th class="num">${vUnidad() === 'L' ? 'Litros' : 'Galones'}</th><th>Tanque</th><th class="num">${vRU()}</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
+    return (a ? `<div class="row" style="justify-content:space-between;gap:10px"><span class="note">Recargas de combustible, del más reciente al más antiguo.</span><button class="btn sm pri" data-act="vregNuevo" data-tipo="combustible">+ Nueva recarga</button></div>` : '') + (rc.length ? `<div class="solo-tel-b vr-l">${rc.map(r => { const bajo = r.rend && st.prom && r.rend < st.prom * 0.85 && !r.estimado;
+      return vrFila(r.id, `${fFecha(r.fecha)} · ${esc(r.proveedor || 'Recarga')}`, [r.odometro != null ? nf(r.odometro) + ' km' : '', r.km != null ? '+' + nf(r.km) + ' km' : '', r.litros != null ? nf(vVol(+r.litros), 1) + ' ' + vU() : '', r.rend ? `<span ${bajo ? 'style="color:var(--bad);font-weight:600"' : ''}>${nf(vR(r.rend), 1)} ${vRU()}${r.estimado ? '*' : ''}</span>` : '', esc(r.combustible || '')].filter(Boolean).join(' · '), L(r.costoV), gastoTxt(r), a ? vRegAcciones(r) : ''); }).join('')}</div><div class="tbl-wrap solo-pc"><table><thead><tr><th>Fecha</th><th>Gasolinera</th><th class="num">Odómetro</th><th class="num">Km desde la última</th><th>Combustible</th><th class="num">${vUnidad() === 'L' ? 'Litros' : 'Galones'}</th><th>Tanque</th><th class="num">${vRU()}</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
       ${rc.map(r => { const bajo = r.rend && st.prom && r.rend < st.prom * 0.85 && !r.estimado; return `<tr><td class="mono small">${fFecha(r.fecha)}</td><td>${esc(r.proveedor)}</td><td class="num">${r.odometro != null ? nf(r.odometro) : '—'}</td><td class="num">${r.km != null ? nf(r.km) : '—'}</td><td>${esc(r.combustible)}</td><td class="num">${r.litros != null ? nf(vVol(+r.litros), 1) : '—'}</td><td>${nivelMini(r.nivel)}</td><td class="num" ${bajo ? 'style="color:var(--bad);font-weight:600"' : ''}>${r.rend ? nf(vR(r.rend), 1) + (r.estimado ? '<span class="muted" title="Estimado: el tanque no quedó lleno">*</span>' : '') : '—'}</td><td class="num">${L(r.costoV)}</td><td>${gastoTxt(r)}</td><td>${a ? vRegAcciones(r) : ''}</td></tr>`; }).join('')}
     </tbody></table></div><p class="note">El costo viene del gasto vinculado. * rendimiento estimado porque el tanque no quedó lleno.</p>` : '<div class="note">Sin recargas registradas.</div>');
   }
   if (tab === 'mant') {
     const ms = [...st.mants].reverse();
-    return (a ? `<div class="row" style="justify-content:space-between;gap:10px"><span class="note">Mantenimientos con sus costos, fotos y facturas.</span><button class="btn sm pri" data-act="vregNuevo" data-tipo="mantenimiento">+ Nuevo mantenimiento</button></div>` : '') + (ms.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Taller</th><th>Descripción</th><th class="num">Odómetro</th><th>Fotos</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
+    return (a ? `<div class="row" style="justify-content:space-between;gap:10px"><span class="note">Mantenimientos con sus costos, fotos y facturas.</span><button class="btn sm pri" data-act="vregNuevo" data-tipo="mantenimiento">+ Nuevo mantenimiento</button></div>` : '') + (ms.length ? `<div class="solo-tel-b vr-l">${ms.map(r => { const n = adjDeReg(r).length;
+      return vrFila(r.id, `${fFecha(r.fecha)} · ${esc(r.mant_tipo || 'Mantenimiento')}`, [esc(r.proveedor || ''), esc(r.descripcion || ''), r.odometro != null ? nf(r.odometro) + ' km' : '', n ? `${n} ${n === 1 ? 'archivo' : 'archivos'}` : ''].filter(Boolean).join(' · '), L(costoReg(r)), gastoTxt(r), `<button class="btn sm ghost" data-act="vregVer" data-id="${esc(r.id)}">Ver</button>${a ? vRegAcciones(r) : ''}`); }).join('')}</div><div class="tbl-wrap solo-pc"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Taller</th><th>Descripción</th><th class="num">Odómetro</th><th>Fotos</th><th class="num">Costo</th><th>Gasto</th><th></th></tr></thead><tbody>
       ${ms.map(r => { const n = adjDeReg(r).length; return `<tr><td class="mono small">${fFecha(r.fecha)}</td><td><b>${esc(r.mant_tipo)}</b></td><td>${esc(r.proveedor)}</td><td class="small">${esc(r.descripcion)}</td><td class="num">${r.odometro != null ? nf(r.odometro) : '—'}</td><td><button class="linkish" data-act="vregVer" data-id="${esc(r.id)}">${n ? `<span class="chip">${n} ${n === 1 ? 'archivo' : 'archivos'}</span>` : '<u>Ver</u>'}</button></td><td class="num">${L(costoReg(r))}${lineasDe(r).length > 1 ? `<div class="cat" style="text-align:right">${lineasDe(r).map(g => `${esc(g.concepto || 'Costo')} ${L(costoLinea(g))}`).join('<br>')}</div>` : ''}</td><td>${gastoTxt(r)}</td><td>${a ? vRegAcciones(r) : ''}</td></tr>`; }).join('')}
     </tbody></table></div>` : '<div class="note">Sin mantenimientos registrados.</div>');
   }
@@ -1959,7 +1994,8 @@ function vVehLista(v, tab) {
     const lec = lecturas(v).reverse().slice(0, 40); const u = lec[0];
     return `${a ? `<div class="row" style="justify-content:space-between;gap:10px"><span class="note">Un recorrido es una lectura del odómetro, sin costo, para llevar el kilometraje entre recargas.</span><button class="btn sm pri" data-act="vregNuevo" data-tipo="recorrido">+ Nuevo recorrido</button></div>` : ''}
       <div class="eyebrow" style="margin-top:10px">Lecturas del odómetro</div>
-      ${lec.length ? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Origen</th><th class="num">Odómetro</th><th class="num">Km desde la lectura anterior</th><th>Motivo</th><th></th></tr></thead><tbody>${lec.map((x, i) => { const r = (S.vreg || []).find(z => z.id === x.id); return `<tr><td class="mono small">${fFecha(x.fecha)}</td><td><span class="chip ${x.tipo === 'recorrido' ? '' : 'app'}">${{recorrido: 'Recorrido', combustible: 'Recarga', mantenimiento: 'Mantenimiento'}[x.tipo]}</span></td><td class="num">${nf(x.odo)}</td><td class="num">${lec[i + 1] ? nf(x.odo - lec[i + 1].odo) : '—'}</td><td class="small">${x.tipo === 'recorrido' ? esc(r.descripcion) : ''}</td><td>${a && x.tipo === 'recorrido' ? vRegAcciones(r, true) : ''}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="note">Sin lecturas todavía.</div>'}`;
+      ${lec.length ? `<div class="solo-tel-b vr-l">${lec.map((x, i) => { const r = (S.vreg || []).find(z => z.id === x.id); const esR = x.tipo === 'recorrido';
+        return vrFila(x.id, `${fFecha(x.fecha)} · ${{recorrido: 'Recorrido', combustible: 'Recarga', mantenimiento: 'Mantenimiento'}[x.tipo]}`, [lec[i + 1] ? '+' + nf(x.odo - lec[i + 1].odo) + ' km desde la anterior' : 'primera lectura', esR && r ? esc(r.descripcion || '') : ''].filter(Boolean).join(' · '), nf(x.odo) + ' km', '', a && esR && r ? vRegAcciones(r, true) : ''); }).join('')}</div><div class="tbl-wrap solo-pc"><table><thead><tr><th>Fecha</th><th>Origen</th><th class="num">Odómetro</th><th class="num">Km desde la lectura anterior</th><th>Motivo</th><th></th></tr></thead><tbody>${lec.map((x, i) => { const r = (S.vreg || []).find(z => z.id === x.id); return `<tr><td class="mono small">${fFecha(x.fecha)}</td><td><span class="chip ${x.tipo === 'recorrido' ? '' : 'app'}">${{recorrido: 'Recorrido', combustible: 'Recarga', mantenimiento: 'Mantenimiento'}[x.tipo]}</span></td><td class="num">${nf(x.odo)}</td><td class="num">${lec[i + 1] ? nf(x.odo - lec[i + 1].odo) : '—'}</td><td class="small">${x.tipo === 'recorrido' ? esc(r.descripcion) : ''}</td><td>${a && x.tipo === 'recorrido' ? vRegAcciones(r, true) : ''}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="note">Sin lecturas todavía.</div>'}`;
   }
   if (tab === 'det') {
     const ds = detectados().filter(d => d.v.id === v.id);
@@ -2141,7 +2177,7 @@ async function guardarReg() {
 /* gráficos */
 // vBarras: Gráfico de barras de gastos del vehículo.
 function vBarras(box, datos, series, fmt) {
-  const W = Math.max(280, box.clientWidth), H = 190, ml = 44, mr = 6, mt = 18, mb = 24; const n = datos.length; if (!n) { box.innerHTML = '<div class="note">Sin datos.</div>'; return; }
+  const W = Math.max(280, box.clientWidth), H = box.closest('.graf-full') ? Math.max(190, box.clientHeight - 6) : 190, ml = 44, mr = 6, mt = 18, mb = 24; const n = datos.length; if (!n) { box.innerHTML = '<div class="note">Sin datos.</div>'; return; }
   const tot = datos.map(d => series.reduce((a, s) => a + d[s.k], 0)); const mx = Math.max(1, ...tot); const raw = mx * 1.08 / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), fr = raw / e, st = (fr <= 1 ? 1 : fr <= 2 ? 2 : fr <= 5 ? 5 : 10) * e; const hi = Math.ceil(mx * 1.08 / st) * st;
   const tk = []; for (let x = 0; x <= hi + st / 2; x += st) tk.push(x);
   const bw = (W - ml - mr) / n; const Y = v => mt + (hi - v) / hi * (H - mt - mb);
@@ -2158,7 +2194,7 @@ function vBarras(box, datos, series, fmt) {
 // vRend: Gráfico de rendimiento del vehículo.
 function vRend(box, v) {
   const st = vStats(v); const r = st.rc.filter(x => x.rend); if (r.length < 2) { box.innerHTML = '<div class="note">Hacen falta al menos dos recargas con odómetro y litros para calcular el rendimiento.</div>'; return; }
-  const W = Math.max(280, box.clientWidth), H = 190, ml = 38, mr = 10, mt = 10, mb = 24; const vals = r.map(x => vR(x.rend)); const prom = vR(st.prom);
+  const W = Math.max(280, box.clientWidth), H = box.closest('.graf-full') ? Math.max(190, box.clientHeight - 6) : 190, ml = 38, mr = 10, mt = 10, mb = 24; const vals = r.map(x => vR(x.rend)); const prom = vR(st.prom);
   let lo = Math.min(...vals, prom) * 0.95, hi = Math.max(...vals, prom) * 1.03; const raw = (hi - lo) / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), fr = raw / e, stp = (fr <= 1 ? 1 : fr <= 2 ? 2 : fr <= 5 ? 5 : 10) * e; lo = Math.floor(lo / stp) * stp; hi = Math.ceil(hi / stp) * stp;
   const tk = []; for (let x = lo; x <= hi + stp / 2; x += stp) tk.push(x);
   const X = i => ml + i * (W - ml - mr) / (r.length - 1), Y = val => mt + (hi - val) / (hi - lo) * (H - mt - mb); const pts = vals.map((val, i) => [X(i), Y(val)]);
@@ -4400,7 +4436,11 @@ document.addEventListener('click', async e => {
   }
   if (act === 'unificar') { const de = b.dataset.n; const a = ($('#unif-' + b.dataset.i).value || ''); if (S.confirmUnif !== de) { if (!a.trim()) return toast('Escribe el nombre correcto.'); S.confirmUnif = de; b.textContent = '¿Seguro? Unificar'; return; } S.confirmUnif = null; return unificarNombre(de, a); }
   if (act === 'vehSel') { S.vehSel = b.dataset.id; S.vehTab = 'comb'; S.vehEdit = null; S.vehDraft = null; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } return render(); }
-  if (act === 'vehTab') { e.preventDefault(); S.vehTab = b.dataset.t; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } render(); const el = $('#vehLista'); if (el && !['comb', 'mant', 'rec'].includes(b.dataset.t)) el.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'vehTab') { e.preventDefault(); S.vehTab = b.dataset.t; if (location.hash !== '#vehiculos') { location.hash = 'vehiculos'; return; } render(); const el = $('#vehLista'); if (el && !['comb', 'mant', 'rec', 'graf', 'plan'].includes(b.dataset.t)) el.scrollIntoView({behavior: 'smooth', block: 'start'}); return; }
+  if (act === 'vrOpen') { S.vrOpen = S.vrOpen === b.dataset.id ? null : b.dataset.id; S.confirmVreg = null; return render(); }
+  if (act === 'vehDatos') { S.vehDatos = !S.vehDatos; return render(); }
+  if (act === 'vplanTog') { S.vplanOpen = !S.vplanOpen; render(); const el = $('#vpServ'); if (el) el.focus({preventScroll: true}); return; }
+  if (act === 'vchartFull') { S.vchartFull = b.dataset.v || null; return render(); }
   if (act === 'vehUnidad') { lsSet('veh-unidad', b.dataset.v); return render(); }
   if (act === 'vehForm') return abrirVehForm(b.dataset.id);
   if (act === 'vehGuardar') return guardarVeh();
@@ -4411,7 +4451,7 @@ document.addEventListener('click', async e => {
   if (act === 'vregBorrar') { const id = b.dataset.id; if (S.confirmVreg !== id) { S.confirmVreg = id; b.textContent = '¿Borrar? Sí'; return; } S.confirmVreg = null; try { await q(sb.from('veh_registros').delete().eq('id', id), 'Registro borrado'); S.vreg = S.vreg.filter(x => x.id !== id); } catch (e) {} return render(); }
   if (act === 'vrGuardar') { const odo = parseFloat(($('#vrOdo').value || '').replace(/,/g, '')); if (!isFinite(odo)) return toast('Escribe el odómetro.'); try { const d = await q(sb.from('veh_registros').insert({vehiculo: b.dataset.id, tipo: 'recorrido', fecha: $('#vrFecha').value || hoy(), odometro: odo, descripcion: $('#vrNota').value.trim()}).select(), 'Recorrido registrado'); if (d && d[0]) S.vreg.push(d[0]); } catch (e) { return; } $('#modalRoot').innerHTML = ''; S.vehTab = 'rec'; return render(); }
   if (act === 'vplanNuevo') { const serv = $('#vpServ').value.trim(); const km = parseFloat(($('#vpKm').value || '').replace(/,/g, '')), ms = parseInt($('#vpMes').value, 10); if (!serv) return toast('Escribe el servicio.'); if (!isFinite(km) && !isFinite(ms)) return toast('Escribe cada cuántos km o meses.'); const uo = parseFloat(($('#vpUltOdo').value || '').replace(/,/g, ''));
-    try { const d = await q(sb.from('veh_planes').insert({vehiculo: b.dataset.id, servicio: serv, cada_km: isFinite(km) ? km : null, cada_meses: isFinite(ms) ? ms : null, ultimo_fecha: $('#vpUlt').value || null, ultimo_odo: isFinite(uo) ? uo : null}).select(), 'Plan agregado'); if (d && d[0]) S.vplan.push(d[0]); } catch (e) {} return render(); }
+    try { const d = await q(sb.from('veh_planes').insert({vehiculo: b.dataset.id, servicio: serv, cada_km: isFinite(km) ? km : null, cada_meses: isFinite(ms) ? ms : null, ultimo_fecha: $('#vpUlt').value || null, ultimo_odo: isFinite(uo) ? uo : null}).select(), 'Plan agregado'); if (d && d[0]) { S.vplan.push(d[0]); S.vplanOpen = false; } } catch (e) {} return render(); }
   if (act === 'vplanBorrar') { const id = b.dataset.id; if (S.confirmPlan !== id) { S.confirmPlan = id; return render(); } S.confirmPlan = null; try { await q(sb.from('veh_planes').delete().eq('id', id), 'Plan quitado'); S.vplan = S.vplan.filter(x => x.id !== id); } catch (e) {} return render(); }
   if (act === 'detConfirmar' || act === 'detMant') { const d = detectados().find(x => x.t.id === b.dataset.id); if (!d) return;
     if (act === 'detMant') { S.vehSel = d.v.id; S.vehDraft = {tx_id: d.t.id, gastos: [{concepto: '', tx_id: d.t.id, costo: null}], fecha: d.t.fecha, odometro: d.odo, proveedor: d.prov, descripcion: d.t.det}; return abrirRegModal('mantenimiento'); }
@@ -4623,6 +4663,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button]')) { e.preventDefault(); e.target.click(); return; }
+  if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.vchartFull) { S.vchartFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.grafFull) { S.grafFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.tjDashFull) { S.tjDashFull = null; return render(); }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) cerrarCapa();
@@ -4743,7 +4784,7 @@ function tablasTelefono(root) {
   matchMedia('(max-width:760px)').addEventListener('change', correr);
 })();
 
-{ let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (document.querySelector('.graf-full')) dibujarGraficos(); }, 150); }); }
+{ let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (document.querySelector('.graf-full')) { dibujarGraficos(); dibujarVeh(); } }, 150); }); }
 aplicarTema();
 init().catch(e => fatal(e && e.message || String(e)));
 })();
