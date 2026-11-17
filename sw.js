@@ -3,7 +3,7 @@
    - Las lecturas de la base de datos van primero a internet; si no hay, se usa la última copia guardada de cada consulta.
    - Lo que se registra sin conexión lo guarda la app en una cola y lo envía al volver internet (no pasa por aquí).
    Cambia VERSION cuando cambie esta lista para que el teléfono tome la nueva. */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const APP = 'cg-app-' + VERSION, LIB = 'cg-lib', DATOS = 'cg-datos';
 const PRE = ['./', 'index.html', 'config.js', 'guia.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
