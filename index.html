@@ -701,6 +701,14 @@ body:has(.graf-full){overflow:hidden}
 .sheet{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);z-index:61;display:grid;gap:10px;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.3);max-height:85vh;overflow:auto}
 .sheet-l{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}.sheet-l button{border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;font-size:17px;text-align:left;padding:16px;cursor:pointer}.sheet-l button:last-child{border-bottom:0}.sheet-l button:active{background:var(--sunk)}
 .sheet-t{font-size:17px;font-weight:600;padding:4px 2px}.sheet-in{width:100%!important;max-width:none!important;font-size:16px!important;padding:10px!important;border-radius:10px!important}.sheet-b{min-height:48px;font-size:16px}
+@media (min-width:900px){
+  .cta-mat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+  .cta-mat>.cta-g{margin:0;min-width:0}
+  .cta-mat .cta-g[data-tipo]:not([data-tipo=""])>.cta-gh{cursor:grab}
+  body.ordenando .cta-mat .cta-gh{cursor:grabbing}
+  .cta-mat .cta-g.arrastrando{opacity:.85;outline:2px dashed var(--accent);outline-offset:2px;box-shadow:0 10px 26px rgba(0,0,0,.25)}
+}
+@media (max-width:899px){.cta-mat{display:grid;gap:12px}}
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
@@ -5164,7 +5172,20 @@ function ctaOrdCmp(a, b) { const o = (S.aj && S.aj.ctaOrden) || []; const ia = o
   return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || a.n.localeCompare(b.n, 'es', {numeric: true}); }
 /* Ordenar arrastrando (sirve con dedo en el iPhone y con mouse): se toma el ≡, se arrastra y al soltar se guarda.
    Se usan eventos de puntero, no el arrastre nativo del navegador, porque en Safari del iPhone el nativo no funciona. */
-let _drag = null;
+let _drag = null, _preDrag = null, _movioTipo = false;
+/* En la computadora el tipo también se mueve sin entrar a "Ordenar": se mantiene presionada su barra y se arrastra con el cursor.
+   Un clic sin mover sigue siendo contraer / expandir. */
+document.addEventListener('pointerdown', e => {
+  _movioTipo = false; if (e.pointerType !== 'mouse' || e.button !== 0 || _drag) return;
+  const gh = e.target.closest('.cta-mat .cta-gh[data-act=ctaGTog]'); const g = gh && gh.closest('.cta-g'); if (!g || !g.dataset.tipo || e.target.closest('[data-drag]')) return;
+  _preDrag = {g, x: e.clientX, y: e.clientY, id: e.pointerId};
+});
+document.addEventListener('pointermove', e => {
+  if (!_preDrag || _drag || e.pointerId !== _preDrag.id) return; if (Math.hypot(e.clientX - _preDrag.x, e.clientY - _preDrag.y) < 6) return;
+  const g = _preDrag.g; _preDrag = null; _movioTipo = true; document.getSelection && document.getSelection().removeAllRanges();
+  _drag = {tipo: 'tipo', item: g, sel: '.cta-g[data-tipo]:not([data-tipo=""])', cont: g.parentElement, y0: e.clientY, id: e.pointerId}; g.classList.add('arrastrando'); document.body.classList.add('ordenando');
+});
+document.addEventListener('pointerup', () => { _preDrag = null; });
 document.addEventListener('pointerdown', e => {
   const h = e.target.closest('[data-drag]'); if (!h) return; e.preventDefault();
   const tipo = h.dataset.drag; const item = h.closest(tipo === 'tipo' ? '.cta-g' : '.cta-r'); if (!item) return;
@@ -5174,6 +5195,10 @@ document.addEventListener('pointerdown', e => {
 });
 document.addEventListener('pointermove', e => {
   if (!_drag || e.pointerId !== _drag.id) return; e.preventDefault(); const {item, sel, cont} = _drag; const y = e.clientY;
+  if (cont.classList.contains('cta-mat') && getComputedStyle(cont).display === 'grid') {   // matriz de 2 columnas: el lugar es el cuadro bajo el cursor
+    const todos = [...cont.querySelectorAll(':scope > ' + sel)]; const obj = todos.find(x => { if (x === item) return false; const r = x.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && y >= r.top && y <= r.bottom; });
+    if (obj) { if (todos.indexOf(item) < todos.indexOf(obj)) obj.after(item); else cont.insertBefore(item, obj); }
+    if (y < 90) window.scrollBy(0, -12); else if (y > window.innerHeight - 60) window.scrollBy(0, 12); return; }
   const hermanos = [...cont.querySelectorAll(':scope > ' + sel)].filter(x => x !== item);
   const antes = hermanos.find(x => { const r = x.getBoundingClientRect(); return y < r.top + r.height / 2; });
   if (antes) { if (item.nextElementSibling !== antes) cont.insertBefore(item, antes); } else if (hermanos.length) { const ult = hermanos[hermanos.length - 1]; if (ult.nextElementSibling !== item) ult.after(item); }
@@ -5231,18 +5256,18 @@ function vCtaLista(tab) {
   const bloques = claves.map(k => { const l = grupos.get(k); const tp = ctTipo(k); const tot = ctaTotales(l);
     const tt = tp && CTA_DEUDA.has(tp.clase) ? [tot.debL, tot.debU] : [tot.capL, tot.capU];
     const ck = tp ? tp.id : '_'; const cerr = ctaCol().has(ck);
-    return `<div class="panel cta-g ${ord ? 'cta-ord' : ''} ${cerr ? 'cta-cerr' : ''}" data-tipo="${esc(tp ? tp.id : '')}"><div class="cta-gh" data-act="ctaGTog" data-k="${esc(ck)}" role="button" tabindex="0" aria-expanded="${!cerr}" title="${cerr ? 'Expandir' : 'Contraer'}">${tp ? asa('tipo', tp.id) : ''}<span class="cta-chev" aria-hidden="true">›</span>${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${cerr ? '' : l.map(fila).join('')}</div>`; }).join('');
+    return `<div class="panel cta-g ${ord ? 'cta-ord' : ''} ${cerr ? 'cta-cerr' : ''}" data-tipo="${esc(tp ? tp.id : '')}"><div class="cta-gh" data-act="ctaGTog" data-k="${esc(ck)}" role="button" tabindex="0" aria-expanded="${!cerr}" title="${cerr ? 'Expandir' : 'Contraer'}${tp ? ' · en la computadora: mantén presionado y arrastra para moverlo' : ''}">${tp ? asa('tipo', tp.id) : ''}<span class="cta-chev" aria-hidden="true">›</span>${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${cerr ? '' : l.map(fila).join('')}</div>`; }).join('');
   const nCerr = claves.filter(k => ctaCol().has(k || '_')).length;
   const barraCol = claves.length > 1 ? `<div class="row cta-colbar"><button class="btn sm ghost" data-act="ctaGTodos" data-v="${nCerr === claves.length ? 'abrir' : 'cerrar'}">${nCerr === claves.length ? '⊞ Expandir todos' : '⊟ Contraer todos'}</button></div>` : '';
   const ayuda = ord ? `<div class="tj-aviso cta-ordav"><span>Arrastra <b>≡</b> para mover: el de la barra de cada tipo mueve el tipo con sus cuentas; el de cada cuenta la mueve dentro de su tipo. Se guarda al soltar.</span><button class="btn sm pri" data-act="ctaOrdenar">Listo</button></div>` : '';
-  return `${ord ? '' : kpis}${ord ? ayuda : avisos}${bloques ? barraCol : ''}${bloques || `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
+  return `${ord ? '' : kpis}${ord ? ayuda : avisos}${bloques ? barraCol + `<div class="cta-mat">${bloques}</div>` : ''}${bloques ? '' : `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
     ${nOc ? `<button class="btn sm ghost" data-act="ctaVerOc" style="align-self:flex-start">${S.ctaVerOc ? 'Esconder' : 'Mostrar'} ${nOc} ${nOc === 1 ? 'cuenta inhabilitada' : 'cuentas inhabilitadas'}</button>` : ''}`;
 }
 // ctaCol: tipos contraídos en Cuentas (se recuerda en este navegador; si no se puede guardar, dura mientras la página esté abierta).
 function ctaCol() { if (!S.ctaCol) { let l = []; try { l = JSON.parse(localStorage.getItem('cg_ctaCol') || '[]'); } catch (e) {} S.ctaCol = new Set(Array.isArray(l) ? l : []); } return S.ctaCol; }
 function ctaColGuardar() { try { localStorage.setItem('cg_ctaCol', JSON.stringify([...ctaCol()])); } catch (e) {} }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-act=ctaGTog],[data-act=ctaGTodos]'); if (!b || e.target.closest('[data-drag]')) return;
+  const b = e.target.closest('[data-act=ctaGTog],[data-act=ctaGTodos]'); if (!b || e.target.closest('[data-drag]')) return; if (_movioTipo) { _movioTipo = false; return; }
   const c = ctaCol();
   if (b.dataset.act === 'ctaGTog') { const k = b.dataset.k; c.has(k) ? c.delete(k) : c.add(k); }
   else { const ks = [...document.querySelectorAll('.cta-g [data-act=ctaGTog]')].map(x => x.dataset.k); ks.forEach(k => b.dataset.v === 'cerrar' ? c.add(k) : c.delete(k)); }
