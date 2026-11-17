@@ -612,6 +612,10 @@ body:has(.graf-full){overflow:hidden}
 /* ===== Registro directo (fase 3) ===== */
 .rg-fab{--rc-r:var(--bad);position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:35;width:56px;height:56px;border-radius:50%;border:0;background:var(--rc-r);color:#fff;font-size:30px;line-height:1;font-weight:400;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;display:grid;place-items:center;padding:0 0 3px}
 .rg-fab:active{transform:scale(.94)}
+/* Botón + con la paleta (azul de la barra; en modo oscuro, claro) y casi transparente mientras la página se mueve, para dejar ver los datos. */
+.rg-fab{background:var(--accent)!important;color:var(--accent-ink)!important;box-shadow:0 6px 18px rgba(5,38,89,.35)!important;transition:opacity .25s ease,transform .25s ease,box-shadow .25s ease}
+.rg-fab.moviendo{opacity:.28;transform:scale(.88);box-shadow:none!important}
+@media (prefers-reduced-motion:reduce){.rg-fab{transition:none}.rg-fab.moviendo{transform:none}}
 .rg-modal{max-width:560px!important;--rc-d:var(--azul);--rc-r:var(--bad)}
 .rg-it,.rg-apr,.rg-dup{--rc-d:var(--azul);--rc-r:var(--bad)}
 .rg-bd{display:grid;gap:12px}
@@ -5164,6 +5168,9 @@ document.addEventListener('input', e => {
 
 const regPendientes = () => esAdmin() && S.reg ? S.reg.filter(r => r.estado === 'pendiente') : [];
 // regFab: botón + para registrar (iPhone: abajo a la derecha, fuera de la barra de inicio).
+// Mientras se desplaza la página el botón + se transparenta; vuelve a verse al detenerse.
+let _fabT = null; const fabMov = () => { const f = document.querySelector('.rg-fab'); if (!f) return; f.classList.add('moviendo'); clearTimeout(_fabT); _fabT = setTimeout(() => { const g = document.querySelector('.rg-fab'); if (g) g.classList.remove('moviendo'); }, 650); };
+document.addEventListener('scroll', fabMov, {passive: true, capture: true}); document.addEventListener('touchmove', fabMov, {passive: true});
 const regFab = () => S.me && S.me.activo ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
 // regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
 function regDetalleHtml(t) {
