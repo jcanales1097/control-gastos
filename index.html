@@ -631,6 +631,12 @@ table.cta-adm td{vertical-align:middle}table.cta-adm .in{min-width:0;width:100%;
 .cta-subs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.cta-subs .chip{font-size:10px;font-weight:400}
 .cta-cx{width:22px;height:22px;padding:0;margin-right:4px}.cta-oc td{opacity:.6}
 .cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}@media (max-width:760px){.cta-lst .cta-it{flex-wrap:wrap;row-gap:4px}.cta-lst .cta-it>div:first-child{flex:1 1 100%!important}.cta-lst .cta-it>.num{margin-right:auto}}.aj-seg{flex:none}
+/* Ordenar arrastrando */
+.cta-head{align-items:flex-end;gap:10px}.cta-ordav{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ct-asa{flex:none;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:-6px 4px -6px -4px;font-size:20px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;border-radius:8px}
+.ct-asa:active{cursor:grabbing;background:var(--sunk)}.cta-ord .cta-gh{padding-block:4px}.cta-r.cta-ord{cursor:default}.cta-ord .pr-ir{visibility:hidden}
+.arrastrando{position:relative;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:.95;outline:2px solid var(--azul)}.cta-r.arrastrando{background:var(--panel)}
+body.ordenando{user-select:none;-webkit-user-select:none;touch-action:none}
 /* Catálogo de 3 niveles */
 .ct-form{overflow:hidden}.ct-fhd{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;padding:12px 14px;font:inherit;color:inherit;cursor:pointer;text-align:left}.ct-fhd b{font-size:14px}.ct-fx{margin-left:auto;color:var(--muted)}
 .ct-fbd{display:grid!important;grid-template-columns:minmax(220px,1.3fr) minmax(200px,1.3fr) minmax(150px,.8fr) auto;gap:10px;align-items:end;border-top:1px solid var(--line)}.ct-fbd label{display:grid;gap:3px;font-size:11.5px;color:var(--muted)}
@@ -4686,6 +4692,42 @@ function ctaTotales(infos) {
   infos.forEach(i => { if (!i.incl || i.elim || i.pago) return;   /* una inhabilitada sigue contando (su dinero existe); una eliminada no */ const d = ctaDatos(i.n); const k = (i.deuda ? 'deb' : 'cap') + (i.mon === 'USD' ? 'U' : 'L'); T[k] = crR2(T[k] + d.saldo); T.n++; });
   const tasa = tasaUSD(); T.cap = crR2(T.capL + T.capU * tasa); T.deb = crR2(T.debL + T.debU * tasa); T.bal = crR2(T.cap + T.deb); return T;
 }
+// ctaOrdCmp: orden elegido por el administrador (ajuste ctaOrden: lista de nombres); las que no están, después, por nombre.
+function ctaOrdCmp(a, b) { const o = (S.aj && S.aj.ctaOrden) || []; const ia = o.indexOf(a.n), ib = o.indexOf(b.n);
+  return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || a.n.localeCompare(b.n, 'es', {numeric: true}); }
+/* Ordenar arrastrando (sirve con dedo en el iPhone y con mouse): se toma el ≡, se arrastra y al soltar se guarda.
+   Se usan eventos de puntero, no el arrastre nativo del navegador, porque en Safari del iPhone el nativo no funciona. */
+let _drag = null;
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest('[data-drag]'); if (!h) return; e.preventDefault();
+  const tipo = h.dataset.drag; const item = h.closest(tipo === 'tipo' ? '.cta-g' : '.cta-r'); if (!item) return;
+  const sel = tipo === 'tipo' ? '.cta-g[data-tipo]:not([data-tipo=""])' : '.cta-r'; const cont = item.parentElement;
+  _drag = {tipo, item, sel, cont, y0: e.clientY, id: e.pointerId}; item.classList.add('arrastrando'); document.body.classList.add('ordenando');
+  try { h.setPointerCapture(e.pointerId); } catch (_) {}
+});
+document.addEventListener('pointermove', e => {
+  if (!_drag || e.pointerId !== _drag.id) return; e.preventDefault(); const {item, sel, cont} = _drag; const y = e.clientY;
+  const hermanos = [...cont.querySelectorAll(':scope > ' + sel)].filter(x => x !== item);
+  const antes = hermanos.find(x => { const r = x.getBoundingClientRect(); return y < r.top + r.height / 2; });
+  if (antes) { if (item.nextElementSibling !== antes) cont.insertBefore(item, antes); } else if (hermanos.length) { const ult = hermanos[hermanos.length - 1]; if (ult.nextElementSibling !== item) ult.after(item); }
+  if (y < 90) window.scrollBy(0, -12); else if (y > window.innerHeight - 60) window.scrollBy(0, 12);   // desplaza la página cerca de los bordes
+}, {passive: false});
+async function soltarDrag(e) {
+  if (!_drag || (e && e.pointerId !== _drag.id)) return; const {tipo, item, sel, cont} = _drag; _drag = null; item.classList.remove('arrastrando'); document.body.classList.remove('ordenando');
+  const vis = [...cont.querySelectorAll(':scope > ' + sel)].map(x => tipo === 'tipo' ? x.dataset.tipo : x.dataset.n);
+  // Los que no se ven en esta pestaña conservan su lugar: los visibles se reacomodan en los mismos huecos.
+  const encajar = (todos, visibles) => { const set = new Set(visibles); const out = [...todos]; let k = 0; out.forEach((x, i) => { if (set.has(x)) out[i] = visibles[k++]; }); return out; };
+  try {
+    if (tipo === 'tipo') { const todos = ctTipos().map(t => t.id); const nuevo = encajar(todos, vis); let n = 0;
+      for (let i = 0; i < nuevo.length; i++) { const t = ctTipo(nuevo[i]); const o = (i + 1) * 10; if (t && +t.orden !== o) { const d = await q(sb.from('cuenta_tipos').update({orden: o}).eq('id', t.id).select()); Object.assign(t, d && d[0] ? d[0] : {orden: o}); n++; } }
+      if (n) toast('Orden de los tipos guardado'); }
+    else { const todos = ctaNombres().map(ctaInfo).sort(ctaOrdCmp).map(i => i.n); const nuevo = encajar(todos, vis);
+      if (nuevo.join('|') !== todos.join('|') || !(S.aj.ctaOrden || []).length) { await guardarAjuste('ctaOrden', nuevo); toast('Orden de las cuentas guardado'); } }
+    S._ctaVer = (S._ctaVer || 0) + 1;
+  } catch (er) {}
+  render();
+}
+document.addEventListener('pointerup', soltarDrag); document.addEventListener('pointercancel', soltarDrag);
 // vCuentas: VISTA CUENTAS (admin): pestañas Resumen, por clase, Tarjetas de crédito (el módulo de tarjetas) y Administración.
 function vCuentas() {
   const tab = S.ctaTab || 'res';
@@ -4693,14 +4735,15 @@ function vCuentas() {
   const bar = `<div class="cta-tabs" role="tablist">${CTA_TABS.map(([k, t]) => `<button class="tj-tab ${tab === k ? 'on' : ''}" role="tab" aria-selected="${tab === k}" data-act="ctaTab" data-v="${k}">${t}${nv[k] ? ` <span class="count bad-bg">${nv[k]}</span>` : ''}</button>`).join('')}</div>`;
   if (tab === 'tc') return `<div class="stack">${bar}${vTarjetas()}</div>`;
   if (tab === 'pre') return `<div class="stack">${bar}${vCreditos()}</div>`;
-  const head = `<div><div class="eyebrow">Cuentas</div><h1>${tab === 'adm' ? 'Administración de cuentas y categorías' : 'Saldos de tus cuentas'}</h1></div>`;
+  const head = `<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>${tab === 'adm' ? 'Administración de cuentas y categorías' : 'Saldos de tus cuentas'}</h1></div>${tab === 'adm' || S.cta === null ? '' : `<button class="btn sm ${S.ctaOrdenar ? 'pri' : 'ghost'}" data-act="ctaOrdenar" aria-pressed="${!!S.ctaOrdenar}"><span aria-hidden="true">⇅</span> ${S.ctaOrdenar ? 'Listo' : 'Ordenar'}</button>`}</div>`;
   if (S.cta === null) return `<div class="stack">${bar}${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de cuentas (<b>cuentas.sql</b>). Las pestañas Tarjetas de crédito y Préstamos ya funcionan.</div></div></div>`;
   return `<div class="stack">${bar}${head}${tab === 'adm' ? vCtaAdm() : vCtaLista(tab)}</div>`;
 }
 function vCtaLista(tab) {
   obtenerTasa(); const tasa = tasaUSD(); const clases = CTA_TAB_CLASES[tab];
   const todas = ctaNombres().map(ctaInfo); const enTab = todas.filter(i => !clases || clases.includes(i.clase) || (tab === 'ban' && !i.clase));
-  const lista = enTab.filter(i => !i.elim && (!i.oculta || S.ctaVerOc)); const nOc = enTab.filter(i => i.estado === 'inhabilitada').length;
+  const lista = enTab.filter(i => !i.elim && (!i.oculta || S.ctaVerOc)).sort(ctaOrdCmp); const nOc = enTab.filter(i => i.estado === 'inhabilitada').length; const ord = !!S.ctaOrdenar;
+  const asa = (tipo, v) => ord ? `<span class="ct-asa" data-drag="${tipo}" data-v="${esc(v)}" role="button" aria-label="Arrastrar para mover" title="Arrastrar para mover">≡</span>` : '';
   const T = ctaTotales(enTab); const sinTipo = todas.filter(i => !i.clase && !i.elim).length;
   const mixto = (l, u) => `${L(l)}${u ? ' · ' + tjU(u) : ''}`;
   const kpis = `<div class="kpis cta-kpis">
@@ -4716,11 +4759,12 @@ function vCtaLista(tab) {
   const fila = i => { const d = ctaDatos(i.n); const mesN = d.filas.filter(f => f.t.mes === hoy().slice(0, 7)).length;
     const sub = [i.cfg.alias ? esc(i.n) : '', i.mon === 'USD' ? 'dólares' : '', i.pago ? 'se descuenta de ' + esc(i.pago) : '', mesN ? mesN + ' mov. este mes' : '', i.oculta ? '<span class="chip">inhabilitada</span>' : '', i.incl ? '' : 'fuera del total'].filter(Boolean).join(' · ');
     const val = i.pago ? `<span class="note">en ${esc(ctaInfo(i.pago).nom)}</span>` : `<span class="num ${d.saldo < -0.004 ? 'neg' : ''}">${d.est && i.mon === 'USD' ? '≈ ' : ''}${ctaFmt(d.saldo, i.mon)}</span>${i.mon === 'USD' && tasa ? `<span class="cat num">≈ ${L(crR2(d.saldo * tasa))}</span>` : ''}`;
-    return `<div class="pr-f cta-r" data-act="ctaSel" data-n="${esc(i.n)}" role="button" tabindex="0">${ctaClsIco(i.clase)}<div class="pr-i"><b>${esc(i.nom)}</b><div class="cat">${sub}</div></div><div class="pr-v">${val}</div><span class="pr-ir" aria-hidden="true">›</span></div>`; };
+    return `<div class="pr-f cta-r ${ord ? 'cta-ord' : ''}" ${ord ? '' : 'data-act="ctaSel" role="button" tabindex="0"'} data-n="${esc(i.n)}">${asa('cta', i.n)}${ctaClsIco(i.clase)}<div class="pr-i"><b>${esc(i.nom)}</b><div class="cat">${sub}</div></div><div class="pr-v">${val}</div><span class="pr-ir" aria-hidden="true">›</span></div>`; };
   const bloques = claves.map(k => { const l = grupos.get(k); const tp = ctTipo(k); const tot = ctaTotales(l);
     const tt = tp && CTA_DEUDA.has(tp.clase) ? [tot.debL, tot.debU] : [tot.capL, tot.capU];
-    return `<div class="panel cta-g"><div class="cta-gh">${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${l.map(fila).join('')}</div>`; }).join('');
-  return `${kpis}${avisos}${bloques || `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
+    return `<div class="panel cta-g ${ord ? 'cta-ord' : ''}" data-tipo="${esc(tp ? tp.id : '')}"><div class="cta-gh">${tp ? asa('tipo', tp.id) : ''}${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${l.map(fila).join('')}</div>`; }).join('');
+  const ayuda = ord ? `<div class="tj-aviso cta-ordav"><span>Arrastra <b>≡</b> para mover: el de la barra de cada tipo mueve el tipo con sus cuentas; el de cada cuenta la mueve dentro de su tipo. Se guarda al soltar.</span><button class="btn sm pri" data-act="ctaOrdenar">Listo</button></div>` : '';
+  return `${ord ? '' : kpis}${ord ? ayuda : avisos}${bloques || `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
     ${nOc ? `<button class="btn sm ghost" data-act="ctaVerOc" style="align-self:flex-start">${S.ctaVerOc ? 'Esconder' : 'Mostrar'} ${nOc} ${nOc === 1 ? 'cuenta inhabilitada' : 'cuentas inhabilitadas'}</button>` : ''}`;
 }
 // pintarCtaFicha: detalle de una cuenta en ventana emergente (pantalla completa en el teléfono): saldo y movimientos por día.
@@ -4917,7 +4961,7 @@ function vCtaAdm() {
 function vCtaAdmCuentas() {
   const tipos = ctTipos(); const nombres = ctaNombres(); const qq = (S.ctaAdmQ || '').trim().toUpperCase();
   if (!tipos.length) return `<div class="panel"><div class="bd" style="gap:10px"><b>Primero los tipos de cuenta</b><div class="note">Crea los mismos tipos que tienes en Registro Contable (Dinero en efectivo, Banco, Tarjetas de débito, TC BAC AMEX, TC BAC VISA, Tarjetas de crédito, 5. Activos, Pago electrónico, Inversión, Línea de crédito, Préstamo, Seguro, Otros) y luego asigna uno a cada cuenta.</div><div><button class="btn pri" data-act="ctaTiposApp">Crear los tipos de Registro Contable</button></div></div></div>`;
-  const infos = nombres.map(ctaInfo); const grupo = {activas: infos.filter(i => i.estado === 'activa'), inhab: infos.filter(i => i.estado === 'inhabilitada'), elim: infos.filter(i => i.elim), porval: infos.filter(i => !i.validada && !i.elim)};
+  const infos = nombres.map(ctaInfo).sort(ctaOrdCmp); const grupo = {activas: infos.filter(i => i.estado === 'activa'), inhab: infos.filter(i => i.estado === 'inhabilitada'), elim: infos.filter(i => i.elim), porval: infos.filter(i => !i.validada && !i.elim)};
   const ver = S.ctaAdmVer || 'activas'; const sinT = nombres.filter(n => ctaTipoMal(n) && !ctaInfo(n).elim);
   const bancos = nombres.filter(o => !['debito', 'credito'].includes(ctaInfo(o).clase) && !ctaInfo(o).elim);
   const por = ctaIdx(); const vis = grupo[ver].filter(i => !qq || (i.n + ' ' + (i.cfg.alias || '') + ' ' + ((i.tipo || {}).nombre || '')).toUpperCase().includes(qq));
@@ -5133,6 +5177,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
   if (act === 'ctaTab') { S.ctaTab = b.dataset.v; const h = S.ctaTab === 'tc' ? '#tarjetas' : S.ctaTab === 'pre' ? '#creditos' : '#cuentas'; if (location.hash !== h) history.replaceState(null, '', h); render(); return window.scrollTo(0, 0); }
   if (act === 'ctaVerOc') { S.ctaVerOc = !S.ctaVerOc; return render(); }
+  if (act === 'ctaOrdenar') { S.ctaOrdenar = !S.ctaOrdenar; return render(); }
   if (act === 'ctaMov') { const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.ctaVolver = S.ctaFicha; return abrirDetalleTx(b.dataset.id); }
   if (act === 'ctaSel') { S.ctaVolver = null; S.ctaFicha = b.dataset.n; S.ctaMes = null; S.ctaAnio = null; S.ctaVista = 'd'; S.ctaQ = ''; S.ctaBus = false; S.ctaEdit = false; return pintarCtaFicha(); }
   if (act === 'ctaVista') { S.ctaVista = b.dataset.v; S.ctaQ = ''; return pintarCtaFicha(); }
