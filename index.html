@@ -630,7 +630,17 @@ table.cta-adm td{vertical-align:middle}table.cta-adm .in{min-width:0;width:100%;
 .cta-chx{border:0;background:none;color:inherit;cursor:pointer;padding:0 0 0 2px;font-size:13px;line-height:1}
 .cta-subs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.cta-subs .chip{font-size:10px;font-weight:400}
 .cta-cx{width:22px;height:22px;padding:0;margin-right:4px}.cta-oc td{opacity:.6}
-.cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}@media (max-width:760px){.cta-lst .cta-it{flex-wrap:wrap;row-gap:4px}.cta-lst .cta-it>div:first-child{flex:1 1 100%!important}.cta-lst .cta-it>.num{margin-right:auto}}.aj-seg{flex:none}.aj-seg button{padding:3px 9px;font-size:11.5px}.cta-tfix{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.cta-tfix .in{width:auto;max-width:260px;padding:3px 6px;font-size:12px}.cta-atabs{grid-template-columns:repeat(5,1fr);max-width:720px}
+.cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}@media (max-width:760px){.cta-lst .cta-it{flex-wrap:wrap;row-gap:4px}.cta-lst .cta-it>div:first-child{flex:1 1 100%!important}.cta-lst .cta-it>.num{margin-right:auto}}.aj-seg{flex:none}
+.cta-adbar{gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.cta-vtabs{grid-template-columns:repeat(4,1fr);max-width:620px;flex:1}
+.cta-chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:3px}.cta-chips .chip{font-size:10px;padding:0 6px}
+.cta-arel{grid-template-columns:1fr auto!important}.cta-elacc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.cta-ren{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}.cta-ren .in{width:auto;min-width:200px;padding:4px 8px;font-size:13px}
+.cta-cr{grid-template-columns:minmax(240px,1.6fr) minmax(180px,1.1fr) minmax(160px,1fr) auto!important}
+.cta-cacc,.cta-sacc{display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.cta-mv{width:26px;padding:0}
+.cta-subs2{grid-column:1/-1;border-left:2px solid var(--line);margin-left:12px;display:grid}
+.cta-sr{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:5px 10px;border-bottom:1px dashed var(--line)}.cta-sr .chip{font-size:10px;padding:0 6px}
+.cta-snew{justify-content:flex-start}.cta-snew .in{width:auto;min-width:220px;padding:4px 8px;font-size:12.5px}
+@media (max-width:760px){.cta-vtabs{max-width:none}.cta-ren .in,.cta-snew .in{min-width:0;flex:1}.cta-cacc{grid-column:1/-1;justify-content:flex-start}.cta-adbar>.cta-ren{width:100%}}.aj-seg button{padding:3px 9px;font-size:11.5px}.cta-tfix{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.cta-tfix .in{width:auto;max-width:260px;padding:3px 6px;font-size:12px}.cta-atabs{grid-template-columns:repeat(5,1fr);max-width:720px}
 .cta-ar,.cta-cr{display:grid;gap:8px 12px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line)}
 .cta-ar{grid-template-columns:minmax(200px,1.5fr) minmax(150px,1fr) 64px minmax(150px,1fr) 115px 80px}
 .cta-cr{grid-template-columns:minmax(240px,1.6fr) minmax(200px,1.2fr) minmax(170px,1fr) 80px}
@@ -1150,7 +1160,8 @@ async function cargarTodo() {
     try { const [tj, tp, tg] = await Promise.all([todo('tarjetas', 'banco'), todo('tarjeta_periodos', 'corte'), todo('tarjeta_pagos')]); S.tj = tj; S.tjp = tp; S.tjpg = tg; } catch (e) { S.tj = null; S.tjp = []; S.tjpg = []; }
     // Cuentas: tipos, configuración de cada cuenta y ajustes de categorías (si aún no se corrió cuentas.sql quedan en null y la pestaña lo avisa).
     try { const [ct, cu, ca] = await Promise.all([todo('cuenta_tipos', 'orden'), todo('cuentas'), todo('categoria_ajustes')]); S.ctT = ct; S.cta = new Map(cu.map(x => [x.nombre, x])); S.catAj = new Map(ca.map(x => [x.cat, x])); } catch (e) { S.ctT = []; S.cta = null; S.catAj = null; }
-    S._ctaVer = (S._ctaVer || 0) + 1;
+    try { S.cats = await todo('categorias', 'orden'); } catch (e) { S.cats = null; }   // catálogo de categorías (fase2.sql)
+    S._ctaVer = (S._ctaVer || 0) + 1; catMapas();
   } else {
     S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
@@ -4540,8 +4551,15 @@ const ctTipo = id => (S.ctT || []).find(x => x.id === id);
 const ctaCfg = n => (S.cta && S.cta.get(n)) || {};
 // Categorías: grupo (unir duplicados) y ocultas, guardados en categoria_ajustes.
 const catAj = c => S.catAj && S.catAj.get(String(c || '').trim());
-const catG = c => { const a = catAj(c); return a && a.grupo ? a.grupo : (c || ''); };
-const catOc = c => { const a = catAj(c); return !!(a && a.oculta); };
+// Catálogo (tabla categorias): nombre que se muestra por cada nombre de la app, y categorías desactivadas.
+let _catNom = new Map(), _subNom = new Map(), _catInact = new Set();
+function catMapas() { _catNom = new Map(); _subNom = new Map(); _catInact = new Set(); const rows = S.cats || []; const byId = new Map(rows.map(r => [r.id, r]));
+  rows.forEach(r => { if (!r.padre) { if (r.app_nombre) { if (r.nombre && r.nombre !== r.app_nombre) _catNom.set(r.app_nombre, r.nombre); if (r.activa === false) _catInact.add(r.app_nombre); } }
+    else { const pa = byId.get(r.padre); if (pa && pa.app_nombre && r.app_nombre && r.nombre && r.nombre !== r.app_nombre) _subNom.set(pa.app_nombre + '|' + r.app_nombre, r.nombre); } }); }
+const catNom = c => _catNom.get(c) || c;
+const subG = (c, sb2) => _subNom.get(String(c || '').trim() + '|' + String(sb2 || '').trim()) || sb2 || '';
+const catG = c => { const a = catAj(c); return catNom(a && a.grupo ? a.grupo : (c || '')); };
+const catOc = c => { const a = catAj(c); return !!(a && a.oculta) || _catInact.has(String(c || '').trim()); };
 // ctaClaseSug: clase que sugiere el nombre de la cuenta (solo para "Asignar tipos sugeridos"; se puede cambiar).
 function ctaClaseSug(n) {
   const u = String(n).toUpperCase();
@@ -4571,7 +4589,9 @@ function ctaInfo(n) {
   const incl = cfg.incluir_total != null ? !!cfg.incluir_total : tipo ? tipo.incluir_total !== false : true;
   const pago = clase === 'debito' && cfg.cuenta_pago ? cfg.cuenta_pago : '';
   const mx = (S.aj && S.aj.ctaMoneda || {})[n];
-  return {n, cfg, tj, tipo, clase, mon: cfg.moneda || (mx ? (mx === 'L' ? 'L' : 'USD') : tjEsUSD(n) ? 'USD' : 'L'), nom: cfg.alias || n, incl, oculta: !!cfg.oculta, pago, deuda: CTA_DEUDA.has(clase)};
+  // estado: activa · inhabilitada (no se usa para registros nuevos, sigue con su saldo e historial) · eliminada (borrado lógico: fuera de listas y totales, se puede restaurar).
+  const estado = cfg.estado && cfg.estado !== 'activa' ? cfg.estado : cfg.oculta ? 'inhabilitada' : 'activa';
+  return {n, cfg, tj, tipo, clase, mon: cfg.moneda || (mx ? (mx === 'L' ? 'L' : 'USD') : tjEsUSD(n) ? 'USD' : 'L'), nom: cfg.alias || n, incl, estado, oculta: estado !== 'activa', elim: estado === 'eliminada', validada: !!cfg.validada, web: cfg.origen === 'web', pago, deuda: CTA_DEUDA.has(clase)};
 }
 // ctaSigno: +1 si el dinero entra a la cuenta del registro, −1 si sale.
 function ctaSigno(t) {
@@ -4607,7 +4627,7 @@ function ctaDatos(n) {
     const neg = o.t.neg && !tjEsTras(o.t) ? -1 : 1; filas.push({t: o.t, v: crR2(o.s * m.v * neg), lado: o.s > 0 ? 'd' : 'r', est: !!m.est, via, propia: o.propia}); }));
   const fh = t => t.fecha + ' ' + ((trasX(t) || [])[2] || '');   // fecha y hora (la hora viene del Excel de la app)
   filas.sort((a, b) => fh(a.t).localeCompare(fh(b.t)));
-  const base = 0;   // el saldo es la suma de las transacciones
+  const base = crR2(+i.cfg.saldo_inicial || 0);   // saldo con que se abrió la cuenta (0 si no se indicó) + la suma de las transacciones
   let acc = base; filas.forEach(f => { acc = crR2(acc + f.v); f.saldo = acc; });
   const hasta = filas.filter(f => f.t.fecha <= hoyD); const saldo = hasta.length ? hasta[hasta.length - 1].saldo : base;
   const desde = filas.length ? filas[0].t.fecha : ''; const r = {i, filas, base, saldo, desde, est: filas.some(f => f.est), prog: filas.length - hasta.length, ult: filas.length ? filas[filas.length - 1].t.fecha : ''};
@@ -4618,7 +4638,7 @@ const ctaClsIco = cl => `<span class="cta-ico cta-${cl || 'x'}" aria-hidden="tru
 // ctaTotales: Capital (lo que se tiene), A deber (tarjetas y préstamos) y Balance, en L y en $; equivalente en lempiras a la tasa del día.
 function ctaTotales(infos) {
   const T = {capL: 0, capU: 0, debL: 0, debU: 0, n: 0};
-  infos.forEach(i => { if (!i.incl || i.oculta || i.pago) return; const d = ctaDatos(i.n); const k = (i.deuda ? 'deb' : 'cap') + (i.mon === 'USD' ? 'U' : 'L'); T[k] = crR2(T[k] + d.saldo); T.n++; });
+  infos.forEach(i => { if (!i.incl || i.elim || i.pago) return;   /* una inhabilitada sigue contando (su dinero existe); una eliminada no */ const d = ctaDatos(i.n); const k = (i.deuda ? 'deb' : 'cap') + (i.mon === 'USD' ? 'U' : 'L'); T[k] = crR2(T[k] + d.saldo); T.n++; });
   const tasa = tasaUSD(); T.cap = crR2(T.capL + T.capU * tasa); T.deb = crR2(T.debL + T.debU * tasa); T.bal = crR2(T.cap + T.deb); return T;
 }
 // vCuentas: VISTA CUENTAS (admin): pestañas Resumen, por clase, Tarjetas de crédito (el módulo de tarjetas) y Administración.
@@ -4635,8 +4655,8 @@ function vCuentas() {
 function vCtaLista(tab) {
   obtenerTasa(); const tasa = tasaUSD(); const clases = CTA_TAB_CLASES[tab];
   const todas = ctaNombres().map(ctaInfo); const enTab = todas.filter(i => !clases || clases.includes(i.clase) || (tab === 'ban' && !i.clase));
-  const lista = enTab.filter(i => !i.oculta || S.ctaVerOc); const nOc = enTab.filter(i => i.oculta).length;
-  const T = ctaTotales(enTab); const sinTipo = todas.filter(i => !i.clase).length;
+  const lista = enTab.filter(i => !i.elim && (!i.oculta || S.ctaVerOc)); const nOc = enTab.filter(i => i.estado === 'inhabilitada').length;
+  const T = ctaTotales(enTab); const sinTipo = todas.filter(i => !i.clase && !i.elim).length;
   const mixto = (l, u) => `${L(l)}${u ? ' · ' + tjU(u) : ''}`;
   const kpis = `<div class="kpis cta-kpis">
     <div class="kpi"><div class="eyebrow">Capital</div><div class="v ${T.cap < -0.004 ? 'neg' : ''}">${L(T.cap)}</div><div class="note">${mixto(T.capL, T.capU)}</div></div>
@@ -4649,14 +4669,14 @@ function vCtaLista(tab) {
   lista.forEach(i => { const k = i.tipo ? i.tipo.id : ''; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(i); });
   const claves = [...grupos.keys()].sort((a, b) => (a === '' ? 1e6 : orden.indexOf(a)) - (b === '' ? 1e6 : orden.indexOf(b)));
   const fila = i => { const d = ctaDatos(i.n); const mesN = d.filas.filter(f => f.t.mes === hoy().slice(0, 7)).length;
-    const sub = [i.cfg.alias ? esc(i.n) : '', i.mon === 'USD' ? 'dólares' : '', i.pago ? 'se descuenta de ' + esc(i.pago) : '', mesN ? mesN + ' mov. este mes' : '', i.oculta ? 'oculta' : '', i.incl ? '' : 'fuera del total'].filter(Boolean).join(' · ');
+    const sub = [i.cfg.alias ? esc(i.n) : '', i.mon === 'USD' ? 'dólares' : '', i.pago ? 'se descuenta de ' + esc(i.pago) : '', mesN ? mesN + ' mov. este mes' : '', i.oculta ? '<span class="chip">inhabilitada</span>' : '', i.incl ? '' : 'fuera del total'].filter(Boolean).join(' · ');
     const val = i.pago ? `<span class="note">en ${esc(ctaInfo(i.pago).nom)}</span>` : `<span class="num ${d.saldo < -0.004 ? 'neg' : ''}">${d.est && i.mon === 'USD' ? '≈ ' : ''}${ctaFmt(d.saldo, i.mon)}</span>${i.mon === 'USD' && tasa ? `<span class="cat num">≈ ${L(crR2(d.saldo * tasa))}</span>` : ''}`;
     return `<div class="pr-f cta-r" data-act="ctaSel" data-n="${esc(i.n)}" role="button" tabindex="0">${ctaClsIco(i.clase)}<div class="pr-i"><b>${esc(i.nom)}</b><div class="cat">${sub}</div></div><div class="pr-v">${val}</div><span class="pr-ir" aria-hidden="true">›</span></div>`; };
   const bloques = claves.map(k => { const l = grupos.get(k); const tp = ctTipo(k); const tot = ctaTotales(l);
     const tt = tp && CTA_DEUDA.has(tp.clase) ? [tot.debL, tot.debU] : [tot.capL, tot.capU];
     return `<div class="panel cta-g"><div class="cta-gh">${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${l.map(fila).join('')}</div>`; }).join('');
   return `${kpis}${avisos}${bloques || `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
-    ${nOc ? `<button class="btn sm ghost" data-act="ctaVerOc" style="align-self:flex-start">${S.ctaVerOc ? 'Esconder' : 'Mostrar'} ${nOc} ${nOc === 1 ? 'cuenta oculta' : 'cuentas ocultas'}</button>` : ''}`;
+    ${nOc ? `<button class="btn sm ghost" data-act="ctaVerOc" style="align-self:flex-start">${S.ctaVerOc ? 'Esconder' : 'Mostrar'} ${nOc} ${nOc === 1 ? 'cuenta inhabilitada' : 'cuentas inhabilitadas'}</button>` : ''}`;
 }
 // pintarCtaFicha: detalle de una cuenta en ventana emergente (pantalla completa en el teléfono): saldo y movimientos por día.
 function pintarCtaFicha() {
@@ -4684,7 +4704,7 @@ function pintarCtaFicha() {
     const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); });
     const rev = ctaTrasRev();
     const fila = f => { const t = f.t; const tras = tjEsTras(t);
-      const izq = tras ? 'Transferencia' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(t.sub) : ''}`;
+      const izq = tras ? 'Transferencia' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(subG(t.cat, t.sub)) : ''}`;
       const tit = t.nota || (tras ? 'Traslado' : t.sub || t.cat || 'Registro');
       const hx = (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
@@ -4722,21 +4742,26 @@ function pintarCtaFicha() {
 }
 // ctaForm: editar la configuración de una cuenta (tipo, moneda, nombre corto, cuenta de pago, total, oculta).
 function ctaForm(i) {
-  const tipos = ctTipos(); const bancos = ctaNombres().filter(o => o !== i.n && !['debito', 'credito'].includes(ctaInfo(o).clase));
-  const tsel = ctTipo($('#ctaFT') ? $('#ctaFT').value : i.cfg.tipo); const esDeb = (tsel ? tsel.clase : i.clase) === 'debito';
+  const tipos = ctTipos(); const bancos = ctaNombres().filter(o => o !== i.n && !['debito', 'credito'].includes(ctaInfo(o).clase) && !ctaInfo(o).elim);
+  const tsel = ctTipo($('#ctaFT') ? $('#ctaFT').value : i.cfg.tipo); const cl = tsel ? tsel.clase : i.clase;
   return `<div class="panel cta-form"><div class="bd" style="gap:10px">
-    <div class="cta-f2"><label>Tipo<select class="in" id="ctaFT"><option value="">Sin tipo</option>${tipos.map(t => `<option value="${esc(t.id)}" ${i.cfg.tipo === t.id ? 'selected' : ''}>${esc(t.nombre)} · ${CTA_CLASES[t.clase] || t.clase}</option>`).join('')}</select></label>
+    <div class="cta-f2"><label>Tipo<select class="in" id="ctaFT"><option value="">Sin tipo</option>${tipos.map(t => `<option value="${esc(t.id)}" ${(i.tipo && i.tipo.id) === t.id ? 'selected' : ''}>${esc(t.nombre)} · ${CTA_CLASES[t.clase] || t.clase}</option>`).join('')}</select></label>
+      <label>Nombre que se muestra<input class="in" id="ctaFA" value="${esc(i.cfg.alias || '')}" placeholder="${esc(i.n)}"></label>
       <label>Moneda<select class="in" id="ctaFM"><option value="L" ${i.mon === 'L' ? 'selected' : ''}>Lempiras</option><option value="USD" ${i.mon === 'USD' ? 'selected' : ''}>Dólares</option></select></label>
-      <label>Nombre corto (opcional)<input class="in" id="ctaFA" value="${esc(i.cfg.alias || '')}" placeholder="${esc(i.n)}"></label>
-      <label class="cta-fpago" ${esDeb ? '' : 'hidden'}>Cuenta de pago<select class="in" id="ctaFP"><option value="">Ninguna (saldo propio)</option>${bancos.map(o => `<option value="${esc(o)}" ${i.cfg.cuenta_pago === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>
+      <label>Saldo inicial<input class="in num" id="ctaFS" inputmode="decimal" value="${i.cfg.saldo_inicial != null ? esc(String(i.cfg.saldo_inicial)) : ''}" placeholder="0.00"></label>
+      <label class="cta-fpago" ${['debito', 'credito'].includes(cl) ? '' : 'hidden'}>Cuenta de pago<select class="in" id="ctaFP"><option value="">Ninguna</option>${bancos.map(o => `<option value="${esc(o)}" ${i.cfg.cuenta_pago === o ? 'selected' : ''}>${esc(ctaInfo(o).nom)}</option>`).join('')}</select></label>
+      <label class="cta-fcred" ${cl === 'credito' ? '' : 'hidden'}>Día de corte<input class="in num" id="ctaFC" type="number" min="1" max="31" value="${i.cfg.dia_corte || ''}"></label>
+      <label class="cta-fcred" ${cl === 'credito' ? '' : 'hidden'}>Día de pago<input class="in num" id="ctaFD" type="number" min="1" max="31" value="${i.cfg.dia_pago || ''}"></label>
       <label>Incluir en el total<select class="in" id="ctaFI"><option value="" ${i.cfg.incluir_total == null ? 'selected' : ''}>Según su tipo</option><option value="1" ${i.cfg.incluir_total === true ? 'selected' : ''}>Sí</option><option value="0" ${i.cfg.incluir_total === false ? 'selected' : ''}>No</option></select></label>
-      <label class="cr-ck" style="align-self:end"><input type="checkbox" id="ctaFO" ${i.oculta ? 'checked' : ''}> Ocultar (cuenta cerrada o sin uso)</label></div>
-    <label>Nota<input class="in" id="ctaFN" value="${esc(i.cfg.nota || '')}"></label>
-    <div class="row" style="gap:8px;justify-content:flex-end"><button class="btn sm ghost" data-act="ctaEditar">Cancelar</button><button class="btn sm pri" data-act="ctaGuardarF">Guardar</button></div></div></div>`;
+      <label>Estado<select class="in" id="ctaFE"><option value="activa" ${i.estado === 'activa' ? 'selected' : ''}>Activa</option><option value="inhabilitada" ${i.estado === 'inhabilitada' ? 'selected' : ''}>Inhabilitada</option></select></label></div>
+    <label>Descripción<input class="in" id="ctaFN" value="${esc(i.cfg.nota || '')}"></label>
+    <div class="note">${i.web ? 'Cuenta creada en la plataforma.' : `Viene de Registro Contable con el nombre <b>${esc(i.n)}</b>; ese nombre no cambia porque así se reconocen sus registros.`} Inhabilitada: no se usa para registros nuevos, pero conserva su saldo y su historial.</div>
+    <div class="row" style="gap:8px;justify-content:flex-end;flex-wrap:wrap">${i.elim ? `<button class="btn sm" data-act="ctaRestaurar" data-n="${esc(i.n)}">Restaurar cuenta</button>` : S.ctaConfElim === i.n ? `<button class="btn sm danger" data-act="ctaEliminar" data-n="${esc(i.n)}">¿Eliminar? Sus registros se conservan</button>` : `<button class="btn sm ghost danger" data-act="ctaEliminar" data-n="${esc(i.n)}">Eliminar cuenta</button>`}
+      <span style="flex:1"></span><button class="btn sm ghost" data-act="ctaEditar">Cancelar</button><button class="btn sm pri" data-act="ctaGuardarF">Guardar${i.validada ? '' : ' y validar'}</button></div></div></div>`;
 }
 async function ctaGuardar(n, campos, okMsg) {
   const prev = S.cta.get(n) || {nombre: n}; const row = Object.assign({}, prev, campos, {nombre: n, actualizado_el: new Date().toISOString()});
-  ['tipo', 'alias', 'cuenta_pago', 'nota'].forEach(k => { if (row[k] === '') row[k] = null; });
+  ['tipo', 'alias', 'cuenta_pago', 'nota'].forEach(k => { if (row[k] === '') row[k] = null; }); if ('estado' in campos) row.oculta = campos.estado !== 'activa';
   const d = await q(sb.from('cuentas').upsert(row).select(), okMsg); S.cta.set(n, d && d[0] ? d[0] : row); S._ctaVer = (S._ctaVer || 0) + 1;
 }
 /* --- Traslados: cada traslado debe contar en sus DOS cuentas (sale de una y entra en la otra) ---
@@ -4847,19 +4872,56 @@ function vCtaAdm() {
 function vCtaAdmCuentas() {
   const tipos = ctTipos(); const nombres = ctaNombres(); const qq = (S.ctaAdmQ || '').trim().toUpperCase();
   if (!tipos.length) return `<div class="panel"><div class="bd" style="gap:10px"><b>Primero los tipos de cuenta</b><div class="note">Crea los mismos tipos que tienes en Registro Contable (Dinero en efectivo, Banco, Tarjetas de débito, TC BAC AMEX, TC BAC VISA, Tarjetas de crédito, 5. Activos, Pago electrónico, Inversión, Línea de crédito, Préstamo, Seguro, Otros) y luego asigna uno a cada cuenta.</div><div><button class="btn pri" data-act="ctaTiposApp">Crear los tipos de Registro Contable</button></div></div></div>`;
-  const sinT = nombres.filter(ctaTipoMal); const bancos = nombres.filter(o => !['debito', 'credito'].includes(ctaInfo(o).clase));
-  const por = ctaIdx(); const vis = nombres.filter(n => !qq || (n + ' ' + (ctaCfg(n).alias || '') + ' ' + ((ctTipo(ctaCfg(n).tipo) || {}).nombre || '')).toUpperCase().includes(qq));
-  const filas = vis.map(n => { const i = ctaInfo(n); const l = por.get(n) || []; const ult = l.reduce((m, o) => o.t.fecha > m ? o.t.fecha : m, ''); const sg = ctaTipoMal(n) && ctaTipoSug(n); const tps = i.tj ? tipos.filter(t => t.clase === 'credito') : tipos;
-    return `<div class="cta-ar" data-ctan="${esc(n)}"><div class="cta-a1"><b class="cta-an" data-act="ctaSel" data-n="${esc(n)}" role="button" tabindex="0">${esc(i.nom)}</b><div class="cat">${i.cfg.alias ? esc(n) + ' · ' : ''}${l.length} registros${ult ? ' · último ' + fFecha(ult) : ''}</div></div>
+  const infos = nombres.map(ctaInfo); const grupo = {activas: infos.filter(i => i.estado === 'activa'), inhab: infos.filter(i => i.estado === 'inhabilitada'), elim: infos.filter(i => i.elim), porval: infos.filter(i => !i.validada && !i.elim)};
+  const ver = S.ctaAdmVer || 'activas'; const sinT = nombres.filter(n => ctaTipoMal(n) && !ctaInfo(n).elim);
+  const bancos = nombres.filter(o => !['debito', 'credito'].includes(ctaInfo(o).clase) && !ctaInfo(o).elim);
+  const por = ctaIdx(); const vis = grupo[ver].filter(i => !qq || (i.n + ' ' + (i.cfg.alias || '') + ' ' + ((i.tipo || {}).nombre || '')).toUpperCase().includes(qq));
+  const filas = vis.map(i => { const n = i.n; const l = por.get(n) || []; const ult = l.reduce((m, o) => o.t.fecha > m ? o.t.fecha : m, ''); const sg = ctaTipoMal(n) && ctaTipoSug(n); const tps = i.tj ? tipos.filter(t => t.clase === 'credito') : tipos;
+    const chips = [i.web ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>', i.validada ? '<span class="chip ok">validada</span>' : '<span class="chip warn">por validar</span>'].join(' ');
+    if (i.elim) return `<div class="cta-ar cta-arel" data-ctan="${esc(n)}"><div class="cta-a1"><b>${esc(i.nom)}</b><div class="cat">${chips} · ${l.length} registros conservados · eliminada ${i.cfg.eliminada_el ? fFecha(String(i.cfg.eliminada_el).slice(0, 10)) : ''}</div></div>
+      <div class="cta-elacc"><button class="btn sm" data-act="ctaRestaurar" data-n="${esc(n)}">Restaurar</button>${i.web && !l.length ? (S.ctaConfBorrar === n ? `<button class="btn sm danger" data-act="ctaBorrarDef" data-n="${esc(n)}">¿Borrar para siempre? Sí</button>` : `<button class="btn sm ghost danger" data-act="ctaBorrarDef" data-n="${esc(n)}">Borrar para siempre</button>`) : ''}</div></div>`;
+    return `<div class="cta-ar" data-ctan="${esc(n)}"><div class="cta-a1"><b class="cta-an" data-act="ctaSel" data-n="${esc(n)}" role="button" tabindex="0">${esc(i.nom)}</b><div class="cat">${i.cfg.alias ? esc(n) + ' · ' : ''}${l.length} registros${ult ? ' · último ' + fFecha(ult) : ''}</div><div class="cta-chips">${chips}${i.validada ? '' : ` <button class="linkish" data-act="ctaValidar" data-n="${esc(n)}">Validar</button>`}</div></div>
       <label class="cta-fl"><span>Tipo</span><select class="in" data-ctaf="tipo">${i.tj ? '' : '<option value="">Sin tipo</option>'}${tps.map(t => `<option value="${esc(t.id)}" ${(i.tipo && i.tipo.id) === t.id ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select>${i.tj ? `<i class="cat">de la tarjeta ${esc((i.tj.banco || '') + ' · ' + (i.tj.nombre || ''))}</i>` : sg ? `<i class="cat">sugerido: ${esc(sg.nombre)}</i>` : ''}</label>
       <label class="cta-fl"><span>Moneda</span><select class="in" data-ctaf="moneda"><option value="L" ${i.mon === 'L' ? 'selected' : ''}>L</option><option value="USD" ${i.mon === 'USD' ? 'selected' : ''}>$</option></select></label>
-      <label class="cta-fl ${i.clase === 'debito' ? '' : 'cta-na'}"><span>Cuenta de pago</span>${i.clase === 'debito' ? `<select class="in" data-ctaf="cuenta_pago"><option value="">Ninguna</option>${bancos.filter(o => o !== n).map(o => `<option value="${esc(o)}" ${i.cfg.cuenta_pago === o ? 'selected' : ''}>${esc(ctaInfo(o).nom)}</option>`).join('')}</select>` : '<b class="muted">—</b>'}</label>
+      <label class="cta-fl ${['debito', 'credito'].includes(i.clase) ? '' : 'cta-na'}"><span>Cuenta de pago</span>${['debito', 'credito'].includes(i.clase) ? `<select class="in" data-ctaf="cuenta_pago"><option value="">Ninguna</option>${bancos.filter(o => o !== n).map(o => `<option value="${esc(o)}" ${i.cfg.cuenta_pago === o ? 'selected' : ''}>${esc(ctaInfo(o).nom)}</option>`).join('')}</select>` : '<b class="muted">—</b>'}</label>
       <label class="cta-fl"><span>En el total</span><select class="in" data-ctaf="incluir_total"><option value="" ${i.cfg.incluir_total == null ? 'selected' : ''}>Según tipo</option><option value="1" ${i.cfg.incluir_total === true ? 'selected' : ''}>Sí</option><option value="0" ${i.cfg.incluir_total === false ? 'selected' : ''}>No</option></select></label>
-      <label class="cr-ck cta-ock"><input type="checkbox" data-ctaf="oculta" ${i.oculta ? 'checked' : ''}> Oculta</label></div>`; }).join('');
-  return `<div class="panel"><div class="hd filters"><input type="search" class="in" id="ctaAdmQ" placeholder="Buscar cuenta (ej.: BAC, TC, 5312)" value="${esc(S.ctaAdmQ || '')}" style="max-width:320px">
-      <span class="note" style="margin-right:auto">${nombres.length} cuentas · ${sinT.length} por asignar</span>${sinT.length ? `<button class="btn sm pri" data-act="ctaSugerir">Asignar tipos sugeridos (${sinT.length})</button>` : ''}</div>
-    <div class="cta-ar cta-ah" aria-hidden="true"><span>Cuenta de la app</span><span>Tipo</span><span>Moneda</span><span>Cuenta de pago</span><span>En el total</span><span></span></div>${filas || '<div class="bd note">Ninguna cuenta coincide.</div>'}
-    <div class="bd note">Los cambios se guardan solos. La <b>cuenta de pago</b> es para las tarjetas de débito: sus gastos bajan el saldo de ese banco, como en la app. Toca el nombre de una cuenta para ver su saldo y sus movimientos.</div></div>`;
+      <label class="cta-fl"><span>Estado</span><select class="in" data-ctaf="estado"><option value="activa" ${i.estado === 'activa' ? 'selected' : ''}>Activa</option><option value="inhabilitada" ${i.estado === 'inhabilitada' ? 'selected' : ''}>Inhabilitada</option></select></label></div>`; }).join('');
+  const bt = (v, t) => `<button class="tj-tab ${ver === v ? 'on' : ''}" data-act="ctaAdmVer" data-v="${v}">${t} <span class="tj-tc">${grupo[v].length}</span></button>`;
+  return `<div class="row cta-adbar"><div class="tj-tabs cta-vtabs">${bt('activas', 'Activas')}${bt('inhab', 'Inhabilitadas')}${bt('porval', 'Por validar')}${bt('elim', 'Eliminadas')}</div><button class="btn sm pri" data-act="ctaNueva">+ Nueva cuenta</button></div>
+    <div class="panel"><div class="hd filters"><input type="search" class="in" id="ctaAdmQ" placeholder="Buscar cuenta (ej.: BAC, TC, 5312)" value="${esc(S.ctaAdmQ || '')}" style="max-width:320px">
+      <span class="note" style="margin-right:auto">${nombres.length - grupo.elim.length} cuentas · ${sinT.length} sin tipo · ${grupo.porval.length} por validar</span>${sinT.length ? `<button class="btn sm" data-act="ctaSugerir">Asignar tipos sugeridos (${sinT.length})</button>` : ''}${grupo.porval.length && ver === 'porval' ? `<button class="btn sm pri" data-act="ctaValidarTodas">Validar las ${grupo.porval.length}</button>` : ''}</div>
+    ${ver === 'elim' ? '' : '<div class="cta-ar cta-ah" aria-hidden="true"><span>Cuenta</span><span>Tipo</span><span>Moneda</span><span>Cuenta de pago</span><span>En el total</span><span>Estado</span></div>'}${filas || `<div class="bd note">${ver === 'elim' ? 'No hay cuentas eliminadas.' : 'Ninguna cuenta coincide.'}</div>`}
+    <div class="bd note">Las cuentas que vienen de Registro Contable están vigentes tal como llegaron hasta que las <b>valides</b>. <b>Inhabilitada</b>: no se usa para registros nuevos, pero conserva su saldo e historial y sigue en el total. <b>Eliminar</b> la quita de las listas y de los totales sin borrar sus registros; se puede restaurar. Saldo inicial, descripción y días de corte y pago están en el detalle de cada cuenta (toca su nombre y luego editar).</div></div>`;
+}
+// pintarCtaNueva: crear una cuenta en la plataforma (como el Gestor de cuentas de la app).
+function pintarCtaNueva() {
+  const tipos = ctTipos(); const bancos = ctaNombres().filter(o => !['debito', 'credito'].includes(ctaInfo(o).clase) && !ctaInfo(o).elim);
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cta-form" role="dialog" aria-modal="true" aria-labelledby="ncTit" style="max-width:640px">
+    <div class="hd"><h2 id="ncTit" style="margin-right:auto">Nueva cuenta</h2><button class="btn sm ghost" data-act="cerrarModal">Cancelar</button></div>
+    <div class="bd" style="gap:10px"><div class="cta-f2">
+      <label>Tipo de cuenta<select class="in" id="ncT"><option value="">Elige el tipo</option>${tipos.map(t => `<option value="${esc(t.id)}">${esc(t.nombre)} · ${CTA_CLASES[t.clase] || t.clase}</option>`).join('')}</select></label>
+      <label>Nombre<input class="in" id="ncN" placeholder="ej. BAC Ahorro 1234 L" autocomplete="off"></label>
+      <label>Moneda<select class="in" id="ncM"><option value="L">Lempiras</option><option value="USD">Dólares</option></select></label>
+      <label>Saldo inicial<input class="in num" id="ncS" inputmode="decimal" placeholder="0.00"></label>
+      <label class="cta-fpago" hidden>Cuenta de pago<select class="in" id="ncP"><option value="">Ninguna</option>${bancos.map(o => `<option value="${esc(o)}">${esc(ctaInfo(o).nom)}</option>`).join('')}</select></label>
+      <label class="cta-fcred" hidden>Día de corte<input class="in num" id="ncC" type="number" min="1" max="31"></label>
+      <label class="cta-fcred" hidden>Día de pago<input class="in num" id="ncD" type="number" min="1" max="31"></label>
+      <label>Incluir en el total<select class="in" id="ncI"><option value="">Según su tipo</option><option value="1">Sí</option><option value="0">No</option></select></label></div>
+      <label>Descripción<input class="in" id="ncDesc"></label>
+      <div id="ncMsg" class="note">Las tarjetas de crédito se agrupan y concilian en la pestaña Tarjetas de crédito, donde puedes asociarle esta cuenta.</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="ctaCrear">Crear cuenta</button></div></div></div></div>`;
+  setTimeout(() => { const f = $('#ncT'); if (f) f.focus(); }, 30);
+}
+async function ctaCrear() {
+  const nombre = $('#ncN').value.trim().replace(/\s+/g, ' '); const tipo = $('#ncT').value; const msg = $('#ncMsg');
+  if (!tipo) { msg.innerHTML = '<span class="neg">Elige el tipo de cuenta.</span>'; return $('#ncT').focus(); }
+  if (!nombre) { msg.innerHTML = '<span class="neg">Escribe el nombre de la cuenta.</span>'; return $('#ncN').focus(); }
+  if (ctaNombres().some(o => o.toUpperCase() === nombre.toUpperCase())) { msg.innerHTML = `<span class="neg">Ya existe una cuenta llamada “${esc(nombre)}”${ctaInfo(ctaNombres().find(o => o.toUpperCase() === nombre.toUpperCase())).elim ? ' (está en Eliminadas; puedes restaurarla)' : ''}.</span>`; return $('#ncN').focus(); }
+  const t = ctTipo(tipo); const si = parseFloat(String($('#ncS').value).replace(/[^0-9.\-]/g, '')); const inc = $('#ncI').value;
+  try { await ctaGuardar(nombre, {tipo, moneda: $('#ncM').value, saldo_inicial: isFinite(si) ? si : null, cuenta_pago: ['debito', 'credito'].includes(t.clase) ? $('#ncP').value || null : null,
+      dia_corte: t.clase === 'credito' ? parseInt($('#ncC').value) || null : null, dia_pago: t.clase === 'credito' ? parseInt($('#ncD').value) || null : null,
+      incluir_total: inc === '' ? null : inc === '1', nota: $('#ncDesc').value.trim(), estado: 'activa', origen: 'web', validada: true}, 'Cuenta creada');
+    $('#modalRoot').innerHTML = ''; S.ctaNueva = false; S.ctaAdmVer = 'activas'; render(); } catch (er) {}
 }
 function vCtaTipos() {
   const tipos = ctTipos(); const usos = {}; ctaNombres().forEach(n => { const t = ctaCfg(n).tipo; if (t) usos[t] = (usos[t] || 0) + 1; });
@@ -4872,34 +4934,97 @@ function vCtaTipos() {
       <tr class="cta-nuevo"><td><input class="in" id="cttN" placeholder="Nuevo tipo"></td><td><select class="in" id="cttC">${cls('banco')}</select></td><td></td><td></td><td></td><td><button class="btn sm pri" data-act="cttNuevo">Agregar</button></td></tr></tbody></table></div>
     <div class="bd note">La <b>clase</b> decide cómo se comporta: efectivo, banco y ahorro suman al <b>Capital</b>; tarjetas de crédito y préstamos van en <b>A deber</b>; una tarjeta de débito con cuenta de pago descuenta de su banco.</div></div>`;
 }
-// Categorías: catálogo leído de los registros. Se pueden unir duplicados, ocultar de los filtros y decidir a qué control va cada una.
-// Nada de esto cambia la app: la sincronización solo lee de Registro Contable.
+/* Categorías: catálogo de ingresos y gastos con sus subcategorías.
+   Las que llegaron en los registros de la app son la estructura vigente ("de la app · por validar") hasta que el administrador las valide.
+   Se pueden crear, renombrar, ordenar y desactivar; renombrar no toca los registros (se reconocen por el nombre con que llegaron).
+   Unir con, Oculta y Va al control siguen igual (categoria_ajustes). */
+function catArbol(tipo) {
+  const ing = tipo === 'ingreso'; const ord = (a, b) => a.localeCompare(b, 'es', {numeric: true});
+  const uso = new Map(); D.txs.forEach(t => { if (tjEsTras(t) || tjEsAjuste(t) || t.borradoApp) return; if ((t.code === 0) !== ing) return; const c = String(t.cat || '').trim(); if (!c) return;
+    if (!uso.has(c)) uso.set(c, {n: 0, tot: 0, ult: '', subs: new Map()}); const o = uso.get(c); o.n++; o.tot = crR2(o.tot + (+t.montoApp || 0)); if (t.fecha > o.ult) o.ult = t.fecha;
+    const sb2 = String(t.sub || '').trim(); if (sb2) o.subs.set(sb2, (o.subs.get(sb2) || 0) + 1); });
+  // Orden: primero las que ya tienen un orden fijado (al mover con ↑ ↓), luego el resto por nombre (como en la app).
+  const oo = x => x.row && +x.row.orden > 0 ? +x.row.orden : 0; const porOrden = (a, b) => (oo(a) ? 0 : 1) - (oo(b) ? 0 : 1) || oo(a) - oo(b) || ord(a.nombre, b.nombre);
+  const rows = (S.cats || []).filter(r => r.tipo === tipo); const usados = new Set(); const nodos = [];
+  rows.filter(r => !r.padre).forEach(r => { if (r.app_nombre) usados.add(r.app_nombre); nodos.push({row: r, app: r.app_nombre || '', nombre: r.nombre, u: r.app_nombre ? uso.get(r.app_nombre) : null}); });
+  for (const [app, u] of uso) if (!usados.has(app)) nodos.push({row: null, app, nombre: app, u});
+  nodos.forEach(nd => { nd.key = nd.row ? 'r:' + nd.row.id : 'a:' + nd.app; nd.subs = []; const us = new Set();
+    rows.filter(r => nd.row && r.padre === nd.row.id).forEach(r => { if (r.app_nombre) us.add(r.app_nombre); nd.subs.push({row: r, app: r.app_nombre || '', nombre: r.nombre, n: nd.u && r.app_nombre ? nd.u.subs.get(r.app_nombre) || 0 : 0}); });
+    if (nd.u) for (const [sb2, n] of nd.u.subs) if (!us.has(sb2)) nd.subs.push({row: null, app: sb2, nombre: sb2, n});
+    nd.subs.forEach(x => x.key = x.row ? 'r:' + x.row.id : 'a:' + x.app);
+    nd.subs.sort(porOrden); });
+  nodos.sort(porOrden);
+  return nodos;
+}
+const catNodo = (tipo, key, subKey) => { const nd = catArbol(tipo).find(x => x.key === key); return subKey ? [nd, nd && nd.subs.find(x => x.key === subKey)] : [nd, null]; };
+// catGuardarNodo: guarda (o crea) la fila del catálogo de una categoría o subcategoría; las de la app se guardan la primera vez que se tocan.
+async function catGuardarNodo(tipo, nd, sub, campos) {
+  if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
+  const fila = async (x, padre) => { if (x.row) return x.row; const row = {id: crUid(), tipo, padre: padre ? padre.id : null, nombre: x.nombre, app_nombre: x.app || null, orden: 0, activa: true, origen: 'app', validada: false};
+    const d = await q(sb.from('categorias').insert(row).select()); x.row = d && d[0] ? d[0] : row; S.cats.push(x.row); return x.row; };
+  const padre = await fila(nd, null); const obj = sub ? await fila(sub, padre) : padre;
+  if (campos && Object.keys(campos).length) { const d = await q(sb.from('categorias').update(campos).eq('id', obj.id).select()); Object.assign(obj, d && d[0] ? d[0] : campos); }
+  catMapas(); return obj;
+}
 function vCtaCats() {
-  const tipo = S.catTipo || 'g'; const ord = (a, b) => a.localeCompare(b, 'es', {numeric: true});
-  const cats = new Map(); D.txs.forEach(t => { if (tjEsTras(t) || tjEsAjuste(t) || t.borradoApp) return; if ((t.code === 0) !== (tipo === 'i')) return; const c = t.cat || '(sin categoría)';
-    if (!cats.has(c)) cats.set(c, {n: 0, tot: 0, ult: '', subs: new Map()}); const o = cats.get(c); o.n++; o.tot = crR2(o.tot + (+t.monto || 0)); if (t.fecha > o.ult) o.ult = t.fecha;
-    const s = t.sub || '(sin subcategoría)'; o.subs.set(s, (o.subs.get(s) || 0) + 1); });
-  const nombres = [...cats.keys()].sort(ord);
+  const tipo = S.catTipo === 'i' ? 'ingreso' : 'gasto'; const nodos = catArbol(tipo); const ord = (a, b) => a.localeCompare(b, 'es', {numeric: true});
   const norm = c => c.replace(/^[\d.\s]+/, '').replace(/\(.*?\)/g, '').trim().toLowerCase();
-  const dup = new Map(); nombres.forEach(c => { if (catAj(c) && catAj(c).grupo) return; const k = norm(c); if (!k) return; if (!dup.has(k)) dup.set(k, []); dup.get(k).push(c); });
-  const dups = [...dup.values()].filter(l => l.length > 1).map(l => l.sort((a, b) => cats.get(b).n - cats.get(a).n));
+  const conUso = nodos.filter(nd => nd.app && nd.u); const nombresApp = conUso.map(nd => nd.app).sort(ord);
+  const dup = new Map(); conUso.forEach(nd => { const c = nd.app; if (catAj(c) && catAj(c).grupo) return; const k = norm(c); if (!k) return; if (!dup.has(k)) dup.set(k, []); dup.get(k).push(c); });
+  const dups = [...dup.values()].filter(l => l.length > 1).map(l => l.sort((a, b) => nodos.find(x => x.app === b).u.n - nodos.find(x => x.app === a).u.n));
   const ctrls = familiares(); const vaA = c => ctrls.filter(x => (x.categorias || []).some(p => p && c.startsWith(p)));
-  const filas = nombres.map(c => { const o = cats.get(c); const a = catAj(c) || {}; const van = vaA(c); const abierta = S.catAbierta === c; const otros = ctrls.filter(x => !van.includes(x));
-    return `<div class="cta-cr ${a.oculta ? 'cta-oc' : ''}" data-catr="${esc(c)}"><div class="cta-c1"><button class="btn sm ghost cta-cx" data-act="catAbrir" data-c="${esc(c)}" aria-expanded="${abierta}" title="Ver subcategorías">${abierta ? '▾' : '▸'}</button><div style="min-width:0"><b>${esc(c)}</b><div class="cat">${o.n} registros · ${L(o.tot)}${o.ult ? ' · último ' + fFecha(o.ult) : ''}${a.grupo ? ` · se cuenta como <b>${esc(a.grupo)}</b>` : ''}${a.oculta ? ' · oculta' : ''}</div></div></div>
-      <div class="cta-fl cta-ctl"><span>Va al control</span>${tipo === 'g' ? van.map(x => { const exact = (x.categorias || []).includes(c); const p = (x.categorias || []).find(pp => pp && c.startsWith(pp)); return `<span class="chip" title="${exact ? 'Agregada desde aquí' : 'Regla del control: empieza con “' + esc(p) + '”'}"><span class="dot ${colorClass(x)}"></span>${esc(x.corto || x.nombre)}${exact ? ` <button class="cta-chx" data-act="catQuitarCtl" data-ctl="${esc(x.id)}" data-c="${esc(c)}" aria-label="Quitar de ${esc(x.corto || x.nombre)}">×</button>` : ''}</span>`; }).join('') + (otros.length ? `<select class="in cta-add" data-catctl="${esc(c)}" aria-label="Agregar a un control"><option value="">+ control</option>${otros.map(x => `<option value="${esc(x.id)}">${esc(x.corto || x.nombre)}</option>`).join('')}</select>` : '') : '<b class="muted">—</b>'}</div>
-      <label class="cta-fl"><span>Unir con</span><select class="in" data-catf="grupo"><option value="">—</option>${nombres.filter(x => x !== c).map(x => `<option value="${esc(x)}" ${a.grupo === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
-      <label class="cr-ck cta-ock"><input type="checkbox" data-catf="oculta" ${a.oculta ? 'checked' : ''}> Oculta</label>
-      ${abierta ? `<div class="cta-subs">${[...o.subs.entries()].sort((x, y) => ord(x[0], y[0])).map(([sb2, k]) => `<span class="chip">${esc(sb2)} · ${k}</span>`).join('')}</div>` : ''}</div>`; }).join('');
-  return `<div class="tj-tabs cta-ctabs">${[['g', 'Gastos'], ['i', 'Ingresos']].map(([v, t]) => `<button class="tj-tab ${tipo === v ? 'on' : ''}" data-act="catTipo" data-v="${v}">${t}</button>`).join('')}</div>
-    ${S.catAj === null ? '<div class="tj-aviso">Para guardar uniones y ocultar categorías corre en Supabase el SQL de cuentas (cuentas.sql).</div>' : ''}
-    ${dups.length ? `<div class="tj-aviso cta-dups"><b>Posibles duplicados</b>${dups.map(l => `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">${l.map(x => `<span class="chip">${esc(x)} · ${cats.get(x).n}</span>`).join('')}<button class="btn sm" data-act="catUnir" data-a="${esc(l[0])}" data-l="${esc(JSON.stringify(l.slice(1)))}">Unir en “${esc(l[0])}”</button></div>`).join('')}</div>` : ''}
-    <div class="panel"><div class="cta-cr cta-ah" aria-hidden="true"><span>Categoría de la app</span><span>Va al control</span><span>Unir con</span><span></span></div>${filas || '<div class="bd note">Sin categorías todavía.</div>'}
-    <div class="bd note">Las categorías y subcategorías nuevas o renombradas se hacen en la app. Aquí se ordenan: <b>Unir con</b> hace que los filtros y reportes cuenten una categoría como otra; <b>Oculta</b> la quita de los filtros; <b>Va al control</b> es la regla que usa la Bandeja para sugerir el control (las reglas por prefijo, como “8.”, se cambian en Ajustes).</div></div>`;
+  const porVal = nodos.reduce((k, nd) => k + (nd.row && nd.row.validada ? 0 : 1) + nd.subs.filter(x => !(x.row && x.row.validada)).length, 0);
+  const edit = S.catEdit || ''; const flechas = (k, i, len, sk) => `<button class="btn sm ghost cta-mv" data-act="catMover" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''} data-d="-1" ${i ? '' : 'disabled'} aria-label="Subir">↑</button><button class="btn sm ghost cta-mv" data-act="catMover" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''} data-d="1" ${i < len - 1 ? '' : 'disabled'} aria-label="Bajar">↓</button>`;
+  const estadoChips = x => `${x.row && x.row.origen === 'web' ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>'} ${x.row && x.row.validada ? '' : '<span class="chip warn">por validar</span>'} ${x.row && x.row.activa === false ? '<span class="chip bad">desactivada</span>' : ''}`;
+  const nombreHtml = (x, k, sk) => (edit === k + '|' + (sk || '')) ? `<span class="cta-ren"><input class="in" id="catRen" value="${esc(x.nombre)}" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''} aria-label="Nuevo nombre"><button class="btn sm pri" data-act="catRenOk">Guardar</button><button class="btn sm ghost" data-act="catRen" data-k="">Cancelar</button></span>`
+    : `<b>${esc(x.nombre)}</b> <button class="linkish" data-act="catRen" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''}>renombrar</button>${x.app && x.nombre !== x.app ? ` <span class="note">(en la app: ${esc(x.app)})</span>` : ''}`;
+  const filas = nodos.map((nd, i) => { const c = nd.app; const a = c ? catAj(c) || {} : {}; const van = c ? vaA(c) : []; const abierta = S.catAbierta === nd.key; const otros = ctrls.filter(x => !van.includes(x)); const act = !(nd.row && nd.row.activa === false);
+    const subs = abierta ? `<div class="cta-subs2">${nd.subs.map((x, j) => `<div class="cta-sr ${x.row && x.row.activa === false ? 'cta-oc' : ''}"><div class="cta-sn">${nombreHtml(x, nd.key, x.key)} <span class="note">${x.n} registros</span> ${estadoChips(x)}</div>
+        <div class="cta-sacc">${flechas(nd.key, j, nd.subs.length, x.key)}<button class="btn sm ghost" data-act="catActiva" data-k="${esc(nd.key)}" data-s="${esc(x.key)}">${x.row && x.row.activa === false ? 'Activar' : 'Desactivar'}</button>${x.row && x.row.origen === 'web' && !x.n ? `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(nd.key)}" data-s="${esc(x.key)}">Eliminar</button>` : ''}</div></div>`).join('')}
+        <div class="cta-sr cta-snew"><input class="in" id="catNuevaSub" data-k="${esc(nd.key)}" placeholder="Nueva subcategoría de ${esc(nd.nombre)}"><button class="btn sm" data-act="catNuevaSub" data-k="${esc(nd.key)}">Agregar</button></div></div>` : '';
+    return `<div class="cta-cr ${act ? '' : 'cta-oc'}" data-catr="${esc(c)}"><div class="cta-c1"><button class="btn sm ghost cta-cx" data-act="catAbrir" data-c="${esc(nd.key)}" aria-expanded="${abierta}" title="Subcategorías">${abierta ? '▾' : '▸'}</button><div style="min-width:0">${nombreHtml(nd, nd.key)}
+        <div class="cat">${nd.u ? `${nd.u.n} registros · ${L(nd.u.tot)}${nd.u.ult ? ' · último ' + fFecha(nd.u.ult) : ''}` : 'sin registros'} · ${nd.subs.length} subcategorías${a.grupo ? ` · se cuenta como <b>${esc(catNom(a.grupo))}</b>` : ''}</div><div class="cta-chips">${estadoChips(nd)}</div></div></div>
+      <div class="cta-fl cta-ctl"><span>Va al control</span>${tipo === 'gasto' && c ? van.map(x => { const exact = (x.categorias || []).includes(c); const p = (x.categorias || []).find(pp => pp && c.startsWith(pp)); return `<span class="chip" title="${exact ? 'Agregada desde aquí' : 'Regla del control: empieza con “' + esc(p) + '”'}"><span class="dot ${colorClass(x)}"></span>${esc(x.corto || x.nombre)}${exact ? ` <button class="cta-chx" data-act="catQuitarCtl" data-ctl="${esc(x.id)}" data-c="${esc(c)}" aria-label="Quitar de ${esc(x.corto || x.nombre)}">×</button>` : ''}</span>`; }).join('') + (otros.length ? `<select class="in cta-add" data-catctl="${esc(c)}" aria-label="Agregar a un control"><option value="">+ control</option>${otros.map(x => `<option value="${esc(x.id)}">${esc(x.corto || x.nombre)}</option>`).join('')}</select>` : '') : '<b class="muted">—</b>'}</div>
+      <label class="cta-fl"><span>Unir con</span>${c ? `<select class="in" data-catf="grupo"><option value="">—</option>${nombresApp.filter(x => x !== c).map(x => `<option value="${esc(x)}" ${a.grupo === x ? 'selected' : ''}>${esc(catNom(x))}</option>`).join('')}</select>` : '<b class="muted">—</b>'}</label>
+      <div class="cta-cacc">${flechas(nd.key, i, nodos.length)}<button class="btn sm ghost" data-act="catActiva" data-k="${esc(nd.key)}">${act ? 'Desactivar' : 'Activar'}</button>${nd.row && nd.row.origen === 'web' && !nd.u ? `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(nd.key)}">Eliminar</button>` : ''}</div>
+      ${subs}</div>`; }).join('');
+  return `<div class="row cta-adbar"><div class="tj-tabs cta-ctabs">${[['g', 'Gastos'], ['i', 'Ingresos']].map(([v, t]) => `<button class="tj-tab ${(S.catTipo === 'i' ? 'i' : 'g') === v ? 'on' : ''}" data-act="catTipo" data-v="${v}">${t}</button>`).join('')}</div>
+      <span class="cta-ren"><input class="in" id="catNueva" placeholder="Nueva categoría de ${tipo === 'gasto' ? 'gasto' : 'ingreso'}"><button class="btn sm pri" data-act="catNueva">Agregar</button></span></div>
+    ${S.cats === null ? '<div class="tj-aviso">Para crear, renombrar, ordenar y desactivar categorías corre en Supabase el SQL de la fase 2 (fase2.sql).</div>' : ''}
+    ${porVal ? `<div class="tj-aviso"><b>${porVal} ${porVal === 1 ? 'elemento está' : 'categorías y subcategorías están'} por validar.</b> Son las que llegaron en los registros de la app y están vigentes tal como llegaron. Cuando las revises, valídalas. <button class="btn sm pri" data-act="catValidarTodo">Validar la estructura de ${tipo === 'gasto' ? 'gastos' : 'ingresos'}</button></div>` : ''}
+    ${dups.length ? `<div class="tj-aviso cta-dups"><b>Posibles duplicados</b>${dups.map(l => `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">${l.map(x => `<span class="chip">${esc(catNom(x))} · ${nodos.find(n => n.app === x).u.n}</span>`).join('')}<button class="btn sm" data-act="catUnir" data-a="${esc(l[0])}" data-l="${esc(JSON.stringify(l.slice(1)))}">Unir en “${esc(catNom(l[0]))}”</button></div>`).join('')}</div>` : ''}
+    <div class="panel"><div class="cta-cr cta-ah" aria-hidden="true"><span>Categoría</span><span>Va al control</span><span>Unir con</span><span></span></div>${filas || '<div class="bd note">Sin categorías todavía.</div>'}
+    <div class="bd note"><b>Renombrar</b> cambia el nombre que se muestra; los registros de la app se siguen reconociendo por su nombre original. <b>Desactivar</b> la quita de los filtros y de los registros nuevos, sin tocar los registros que ya la usan. <b>Unir con</b> cuenta una categoría como otra en filtros y reportes. <b>Va al control</b> es la regla que usa la Bandeja (las reglas por prefijo, como “8.”, se cambian en Ajustes). Solo se pueden eliminar las creadas aquí que no tienen registros.</div></div>`;
 }
 async function catGuardar(c, campos) {
   if (!S.catAj) return toast('Primero corre en Supabase el SQL de cuentas (cuentas.sql).');
   const prev = S.catAj.get(c) || {cat: c}; const row = Object.assign({}, prev, campos, {cat: c, actualizado_el: new Date().toISOString()}); if (row.grupo === '') row.grupo = null;
   const d = await q(sb.from('categoria_ajustes').upsert(row).select()); S.catAj.set(c, d && d[0] ? d[0] : row);
+}
+async function catAccion(b) {
+  const tipo = S.catTipo === 'i' ? 'ingreso' : 'gasto'; const act = b.dataset.act;
+  if (act === 'catRen') { S.catEdit = b.dataset.k ? b.dataset.k + '|' + (b.dataset.s || '') : ''; render(); const r = $('#catRen'); if (r) { r.focus(); r.select(); } return; }
+  if (act === 'catRenOk') { const r = $('#catRen'); const v = r.value.trim(); if (!v) return toast('Escribe el nombre.'); const [nd, sub] = catNodo(tipo, r.dataset.k, r.dataset.s);
+    try { await catGuardarNodo(tipo, nd, sub, {nombre: v}); S.catEdit = ''; toast('Nombre actualizado'); } catch (e) {} return render(); }
+  if (act === 'catActiva') { const [nd, sub] = catNodo(tipo, b.dataset.k, b.dataset.s); const x = sub || nd; const ahora = !(x.row && x.row.activa === false);
+    try { await catGuardarNodo(tipo, nd, sub, {activa: !ahora}); toast(ahora ? 'Desactivada: ya no sale en filtros ni registros nuevos' : 'Activada'); } catch (e) {} return render(); }
+  if (act === 'catMover') { const nodos = catArbol(tipo); const nd = nodos.find(x => x.key === b.dataset.k); const lista = b.dataset.s ? nd.subs : nodos; const i = lista.findIndex(x => x.key === (b.dataset.s || b.dataset.k)); const j = i + (+b.dataset.d);
+    if (j < 0 || j >= lista.length) return; [lista[i], lista[j]] = [lista[j], lista[i]];
+    try { for (let k = 0; k < lista.length; k++) { const x = lista[k]; if (b.dataset.s) await catGuardarNodo(tipo, nd, x, {orden: (k + 1) * 10}); else await catGuardarNodo(tipo, x, null, {orden: (k + 1) * 10}); } } catch (e) {} return render(); }
+  if (act === 'catNueva') { const v = ($('#catNueva').value || '').trim(); if (!v) return toast('Escribe el nombre de la categoría.'); if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
+    if (catArbol(tipo).some(x => x.nombre.toUpperCase() === v.toUpperCase())) return toast('Ya existe esa categoría.');
+    const hay = catArbol(tipo).map(x => x.row ? +x.row.orden || 0 : 0); const row = {id: crUid(), tipo, padre: null, nombre: v, app_nombre: null, orden: Math.max(0, ...hay) ? Math.max(...hay) + 10 : 0, activa: true, origen: 'web', validada: true};
+    try { const d = await q(sb.from('categorias').insert(row).select(), 'Categoría creada'); S.cats.push(d && d[0] ? d[0] : row); catMapas(); } catch (e) {} return render(); }
+  if (act === 'catNuevaSub') { const inp = document.querySelector(`#catNuevaSub[data-k="${CSS.escape(b.dataset.k)}"]`); const v = (inp && inp.value || '').trim(); if (!v) return toast('Escribe el nombre de la subcategoría.'); if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
+    const [nd] = catNodo(tipo, b.dataset.k); if (nd.subs.some(x => x.nombre.toUpperCase() === v.toUpperCase())) return toast('Ya existe esa subcategoría.');
+    try { const padre = await catGuardarNodo(tipo, nd, null, null); const hs = nd.subs.map(x => x.row ? +x.row.orden || 0 : 0); const row = {id: crUid(), tipo, padre: padre.id, nombre: v, app_nombre: null, orden: Math.max(0, ...hs) ? Math.max(...hs) + 10 : 0, activa: true, origen: 'web', validada: true};
+      const d = await q(sb.from('categorias').insert(row).select(), 'Subcategoría creada'); S.cats.push(d && d[0] ? d[0] : row); catMapas(); S.catAbierta = 'r:' + padre.id; } catch (e) {} return render(); }
+  if (act === 'catBorrar') { const [nd, sub] = catNodo(tipo, b.dataset.k, b.dataset.s); const x = sub || nd; if (!x.row || x.row.origen !== 'web') return;
+    const key = x.row.id; if (S.catConfBorrar !== key) { S.catConfBorrar = key; toast('Toca Eliminar otra vez para confirmar'); return; } S.catConfBorrar = null;
+    try { await q(sb.from('categorias').delete().eq('id', key), 'Eliminada'); S.cats = S.cats.filter(r => r.id !== key && r.padre !== key); catMapas(); } catch (e) {} return render(); }
+  if (act === 'catValidarTodo') { if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).'); let k = 0;
+    try { for (const nd of catArbol(tipo)) { if (!(nd.row && nd.row.validada)) { await catGuardarNodo(tipo, nd, null, {validada: true}); k++; } for (const x of nd.subs) if (!(x.row && x.row.validada)) { await catGuardarNodo(tipo, nd, x, {validada: true}); k++; } }
+      toast(`${k} validadas`); } catch (e) {} return render(); }
 }
 /* --- eventos de Cuentas --- */
 document.addEventListener('click', async e => {
@@ -4920,8 +5045,22 @@ document.addEventListener('click', async e => {
   if (act === 'ajSigno') return guardarAjusteSigno(b.dataset.id, b.dataset.v);
   if (act === 'trasSug') return guardarTrasManual({[b.dataset.id]: b.dataset.n});
   if (act === 'trasSugTodas') { const c = {}; for (const [id, x] of ctaTrasSugerencias()) c[id] = x.otra; return guardarTrasManual(c); }
-  if (act === 'ctaGuardarF') { const n = S.ctaFicha; const inc = $('#ctaFI').value;
-    try { await ctaGuardar(n, {tipo: $('#ctaFT').value, moneda: $('#ctaFM').value, alias: $('#ctaFA').value.trim(), cuenta_pago: $('#ctaFP') && !$('#ctaFP').closest('label').hidden ? $('#ctaFP').value : null, incluir_total: inc === '' ? null : inc === '1', oculta: $('#ctaFO').checked, nota: $('#ctaFN').value.trim()}, 'Cuenta guardada'); S.ctaEdit = false; render(); pintarCtaFicha(); } catch (er) {} return; }
+  if (act === 'ctaGuardarF') { const n = S.ctaFicha; const inc = $('#ctaFI').value; const num = id => { const v = parseFloat(String($(id).value).replace(/[^0-9.\-]/g, '')); return isFinite(v) ? v : null; };
+    const vis = id => $(id) && !$(id).closest('label').hidden;
+    try { await ctaGuardar(n, {tipo: $('#ctaFT').value, moneda: $('#ctaFM').value, alias: $('#ctaFA').value.trim(), saldo_inicial: num('#ctaFS'), cuenta_pago: vis('#ctaFP') ? $('#ctaFP').value : null,
+        dia_corte: vis('#ctaFC') ? (parseInt($('#ctaFC').value) || null) : null, dia_pago: vis('#ctaFD') ? (parseInt($('#ctaFD').value) || null) : null,
+        incluir_total: inc === '' ? null : inc === '1', estado: $('#ctaFE').value, nota: $('#ctaFN').value.trim(), validada: true}, 'Cuenta guardada'); S.ctaEdit = false; render(); pintarCtaFicha(); } catch (er) {} return; }
+  if (act === 'ctaEliminar') { const n = b.dataset.n; if (S.ctaConfElim !== n) { S.ctaConfElim = n; return S.ctaFicha ? pintarCtaFicha() : render(); } S.ctaConfElim = null;
+    try { await ctaGuardar(n, {estado: 'eliminada', eliminada_el: new Date().toISOString()}, 'Cuenta eliminada; sus registros se conservan'); $('#modalRoot').innerHTML = ''; S.ctaFicha = null; S.ctaEdit = false; render(); } catch (er) {} return; }
+  if (act === 'ctaRestaurar') { try { await ctaGuardar(b.dataset.n, {estado: 'activa', eliminada_el: null}, 'Cuenta restaurada'); if (S.ctaFicha) pintarCtaFicha(); render(); } catch (er) {} return; }
+  if (act === 'ctaBorrarDef') { const n = b.dataset.n; if (S.ctaConfBorrar !== n) { S.ctaConfBorrar = n; return render(); } S.ctaConfBorrar = null;
+    try { await q(sb.from('cuentas').delete().eq('nombre', n), 'Cuenta borrada'); S.cta.delete(n); S._ctaVer++; } catch (er) {} return render(); }
+  if (act === 'ctaValidar') { try { await ctaGuardar(b.dataset.n, {validada: true}, 'Cuenta validada'); } catch (er) {} return render(); }
+  if (act === 'ctaValidarTodas') { const l = ctaNombres().filter(n => { const i = ctaInfo(n); return !i.validada && !i.elim; }); let k = 0;
+    for (const n of l) { try { await ctaGuardar(n, {validada: true}); k++; } catch (er) { break; } } toast(`${k} cuentas validadas`); return render(); }
+  if (act === 'ctaAdmVer') { S.ctaAdmVer = b.dataset.v; return render(); }
+  if (act === 'ctaNueva') { S.ctaNueva = true; return pintarCtaNueva(); }
+  if (act === 'ctaCrear') return ctaCrear();
   if (act === 'ctaAdm') { S.ctaAdm = b.dataset.v; return render(); }
   if (act === 'ctaTiposApp') { try { const rows = CTA_TIPOS_APP.filter(([id]) => !ctTipo(id)).map(([id, nombre, clase], k) => ({id, nombre, clase, orden: (k + 1) * 10, incluir_total: true}));
       const d = await q(sb.from('cuenta_tipos').upsert(rows).select(), 'Tipos de cuenta creados'); S.ctT.push(...(d && d.length ? d : rows)); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
@@ -4935,16 +5074,18 @@ document.addEventListener('click', async e => {
     try { await q(sb.from('cuenta_tipos').delete().eq('id', id), 'Tipo eliminado'); S.ctT = S.ctT.filter(t => t.id !== id); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
   if (act === 'catTipo') { S.catTipo = b.dataset.v; S.catAbierta = null; return render(); }
   if (act === 'catAbrir') { S.catAbierta = S.catAbierta === b.dataset.c ? null : b.dataset.c; return render(); }
+  if (['catRen', 'catRenOk', 'catActiva', 'catMover', 'catNueva', 'catNuevaSub', 'catBorrar', 'catValidarTodo'].includes(act)) return catAccion(b);
   if (act === 'catUnir') { const a = b.dataset.a; const l = JSON.parse(b.dataset.l || '[]'); try { for (const c of l) await catGuardar(c, {grupo: a}); toast(`Unidas en “${a}”`); } catch (er) {} return render(); }
   if (act === 'catQuitarCtl') { const c = ctrlById(b.dataset.ctl); if (!c) return; c.categorias = (c.categorias || []).filter(p => p !== b.dataset.c);
     try { await guardarControl(c); toast('Quitada de ' + (c.corto || c.nombre)); } catch (er) {} return render(); }
 });
 document.addEventListener('change', async e => {
   const el = e.target;
-  if (el.id === 'ctaFT') { const t = ctTipo(el.value); const lb = document.querySelector('.cta-fpago'); if (lb) lb.hidden = !(t && t.clase === 'debito'); return; }
+  if (el.id === 'ctaFT' || el.id === 'ncT') { const t = ctTipo(el.value); const cl = t ? t.clase : ''; const f = el.closest('.cta-form, .modal');
+    f.querySelectorAll('.cta-fpago').forEach(lb => lb.hidden = !['debito', 'credito'].includes(cl)); f.querySelectorAll('.cta-fcred').forEach(lb => lb.hidden = cl !== 'credito'); return; }
   const tr = el.closest && el.closest('[data-ctan]');
   if (tr && el.dataset.ctaf) { const n = tr.dataset.ctan; const k = el.dataset.ctaf; let v = el.type === 'checkbox' ? el.checked : el.value;
-    if (k === 'incluir_total') v = v === '' ? null : v === '1'; const campos = {[k]: v};
+    if (k === 'incluir_total') v = v === '' ? null : v === '1'; const campos = {[k]: v}; if (k === 'estado') campos.oculta = v !== 'activa';
     try { await ctaGuardar(n, campos); } catch (er) {} return render(); }
   const tt = el.closest && el.closest('tr[data-ctt]');
   if (tt && el.dataset.cttf) { const t = ctTipo(tt.dataset.ctt); if (!t) return; const k = el.dataset.cttf; const v = el.type === 'checkbox' ? el.checked : k === 'orden' ? (+el.value || 0) : el.value.trim(); if (k === 'nombre' && !v) return render();
