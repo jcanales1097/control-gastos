@@ -631,6 +631,27 @@ table.cta-adm td{vertical-align:middle}table.cta-adm .in{min-width:0;width:100%;
 .cta-subs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.cta-subs .chip{font-size:10px;font-weight:400}
 .cta-cx{width:22px;height:22px;padding:0;margin-right:4px}.cta-oc td{opacity:.6}
 .cta-ctabs{max-width:320px}.cta-ttabs{grid-template-columns:repeat(4,1fr);max-width:600px}.cta-it .btn{flex:none}@media (max-width:760px){.cta-lst .cta-it{flex-wrap:wrap;row-gap:4px}.cta-lst .cta-it>div:first-child{flex:1 1 100%!important}.cta-lst .cta-it>.num{margin-right:auto}}.aj-seg{flex:none}
+/* Catálogo de 3 niveles */
+.ct-form{overflow:hidden}.ct-fhd{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;padding:12px 14px;font:inherit;color:inherit;cursor:pointer;text-align:left}.ct-fhd b{font-size:14px}.ct-fx{margin-left:auto;color:var(--muted)}
+.ct-fbd{display:grid!important;grid-template-columns:minmax(220px,1.3fr) minmax(200px,1.3fr) minmax(150px,.8fr) auto;gap:10px;align-items:end;border-top:1px solid var(--line)}.ct-fbd label{display:grid;gap:3px;font-size:11.5px;color:var(--muted)}
+.ct-val{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ct-bar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}.ct-bar #catQ{flex:1;max-width:none}
+.ct-hd{display:grid;grid-template-columns:28px 1fr auto;gap:8px;padding:6px 12px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);background:var(--sunk)}
+.ct-row{display:grid;grid-template-columns:28px 1fr auto;gap:4px 8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line)}
+.ct-row.n2{padding-left:30px}.ct-row.n3{padding-left:52px}.ct-row.n1{background:color-mix(in srgb,var(--sunk) 55%,transparent)}.ct-row.ct-on{background:var(--sunk)}
+.ct-off .ct-main{opacity:.55}.ct-chev{border:0;background:none;color:var(--muted);font-size:14px;width:26px;height:26px;cursor:pointer;border-radius:6px}
+.ct-main{min-width:0;cursor:pointer}.ct-l1{display:flex;gap:6px;align-items:center;min-width:0}.ct-l1 b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ct-row.n3 .ct-l1 b{font-weight:500}
+.ct-nv{flex:none;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--line);color:var(--muted)}.n1 .ct-nv{background:var(--azul);color:#fff}.n2 .ct-nv{background:color-mix(in srgb,var(--azul) 30%,transparent);color:var(--fg)}
+.ct-l2{font-size:11px;color:var(--muted);margin-top:1px}.ct-l2 .chip{font-size:9.5px;padding:0 5px}
+.ct-acc{display:flex;gap:2px;align-items:center}.ct-acc .btn[disabled]{opacity:.25}.ct-pw-off{color:var(--bad)}
+.ct-ed{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 12px;padding:8px 0 4px 34px}.ct-ed label{display:grid;gap:3px;font-size:11.5px;color:var(--muted)}
+.ct-ctl{display:flex;gap:4px;flex-wrap:wrap;align-items:center;grid-column:1/-1}.ct-ctl .cta-add{width:auto}.ct-edb{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ct-fbd>*{min-width:0}.ct-fbd .in{width:100%;max-width:none}.ct-mov{display:none;gap:4px;align-items:center}
+@media (max-width:760px){
+  .ct-fbd{grid-template-columns:1fr}.ct-acc [data-act=catMover]{display:none}.ct-mov{display:flex}.ct-l1{align-items:flex-start}.ct-l1 b{white-space:normal;overflow:visible}.ct-bar{flex-wrap:wrap}.ct-bar #catQ{flex:1 1 100%}
+  .ct-hd{display:none}.ct-row{grid-template-columns:24px 1fr auto;padding:7px 10px;gap:2px 6px}.ct-row.n2{padding-left:20px}.ct-row.n3{padding-left:34px}
+  .ct-acc .btn{width:30px;height:30px;padding:0}.ct-l1 b{font-size:13px}.ct-ed{padding-left:0;grid-template-columns:1fr}
+}
 .cta-adbar{gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.cta-vtabs{grid-template-columns:repeat(4,1fr);max-width:620px;flex:1}
 .cta-chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:3px}.cta-chips .chip{font-size:10px;padding:0 6px}
 .cta-arel{grid-template-columns:1fr auto!important}.cta-elacc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
@@ -2928,6 +2949,9 @@ async function guardarPegar() {
 /* ===== iconos de acción ===== */
 // ICO: Dibujos (SVG) de los íconos de acción: editar, borrar, quitar, dividir, asociar, validar.
 const ICO = {
+  arriba: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>', abajo: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
+  activar: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/>', bajarxl: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>',
+  mas: '<path d="M12 5v14M5 12h14"/>',
   editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   borrar: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
   quitar: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
@@ -3838,7 +3862,7 @@ function abrirDetalleTx(id) {
       ${enCta}${trasHtml}
       <div class="eyebrow">En Registro Contable</div>
       <table class="dist"><tbody>
-        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${fila('Categoría', esc(t.cat))}${fila('Subcategoría', esc(t.sub))}${fila('Contenido', esc(t.nota))}${fila('Detalle', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
+        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${fila('Grupal', esc(catG(t.cat)) + (catG(t.cat) !== t.cat && t.cat ? ` <span class="note">(${esc(t.cat)})</span>` : ''))}${fila('Subgrupal', esc(subG(t.cat, t.sub)))}${fila('Detalle', esc(notaG(t.cat, t.sub, t.nota)))}${fila('Descripción', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
       </tbody></table>
       <div class="eyebrow">En la plataforma</div>
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
@@ -4552,12 +4576,17 @@ const ctaCfg = n => (S.cta && S.cta.get(n)) || {};
 // Categorías: grupo (unir duplicados) y ocultas, guardados en categoria_ajustes.
 const catAj = c => S.catAj && S.catAj.get(String(c || '').trim());
 // Catálogo (tabla categorias): nombre que se muestra por cada nombre de la app, y categorías desactivadas.
-let _catNom = new Map(), _subNom = new Map(), _catInact = new Set();
-function catMapas() { _catNom = new Map(); _subNom = new Map(); _catInact = new Set(); const rows = S.cats || []; const byId = new Map(rows.map(r => [r.id, r]));
-  rows.forEach(r => { if (!r.padre) { if (r.app_nombre) { if (r.nombre && r.nombre !== r.app_nombre) _catNom.set(r.app_nombre, r.nombre); if (r.activa === false) _catInact.add(r.app_nombre); } }
-    else { const pa = byId.get(r.padre); if (pa && pa.app_nombre && r.app_nombre && r.nombre && r.nombre !== r.app_nombre) _subNom.set(pa.app_nombre + '|' + r.app_nombre, r.nombre); } }); }
+// Catálogo (tabla categorias) en 3 niveles: Grupal (categoría de la app) → Subgrupal (subcategoría) → Detalle (nota).
+// Mapas del nombre que se muestra por cada nombre de la app, y de lo desactivado.
+let _catNom = new Map(), _subNom = new Map(), _notaNom = new Map(), _catInact = new Set();
+function catMapas() { _catNom = new Map(); _subNom = new Map(); _notaNom = new Map(); _catInact = new Set(); const rows = S.cats || []; const byId = new Map(rows.map(r => [r.id, r]));
+  const ruta = r => { const l = []; let x = r; while (x) { l.unshift(x); x = x.padre ? byId.get(x.padre) : null; } return l; };
+  rows.forEach(r => { const l = ruta(r); if (l.some(x => !x.app_nombre)) return; const k = l.map(x => x.app_nombre).join('|');
+    if (r.nombre && r.nombre !== r.app_nombre) (l.length === 1 ? _catNom : l.length === 2 ? _subNom : _notaNom).set(k, r.nombre);
+    if (l.length === 1 && r.activa === false) _catInact.add(r.app_nombre); }); }
 const catNom = c => _catNom.get(c) || c;
 const subG = (c, sb2) => _subNom.get(String(c || '').trim() + '|' + String(sb2 || '').trim()) || sb2 || '';
+const notaG = (c, sb2, n) => _notaNom.get([c, sb2, n].map(x => String(x || '').trim()).join('|')) || n || '';
 const catG = c => { const a = catAj(c); return catNom(a && a.grupo ? a.grupo : (c || '')); };
 const catOc = c => { const a = catAj(c); return !!(a && a.oculta) || _catInact.has(String(c || '').trim()); };
 // ctaClaseSug: clase que sugiere el nombre de la cuenta (solo para "Asignar tipos sugeridos"; se puede cambiar).
@@ -4705,7 +4734,7 @@ function pintarCtaFicha() {
     const rev = ctaTrasRev();
     const fila = f => { const t = f.t; const tras = tjEsTras(t);
       const izq = tras ? 'Transferencia' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(subG(t.cat, t.sub)) : ''}`;
-      const tit = t.nota || (tras ? 'Traslado' : t.sub || t.cat || 'Registro');
+      const tit = (t.nota ? notaG(t.cat, t.sub, t.nota) : '') || (tras ? 'Traslado' : subG(t.cat, t.sub) || catG(t.cat) || 'Registro');
       const hx = (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
       return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="Ver todo el detalle del movimiento"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
@@ -4934,97 +4963,139 @@ function vCtaTipos() {
       <tr class="cta-nuevo"><td><input class="in" id="cttN" placeholder="Nuevo tipo"></td><td><select class="in" id="cttC">${cls('banco')}</select></td><td></td><td></td><td></td><td><button class="btn sm pri" data-act="cttNuevo">Agregar</button></td></tr></tbody></table></div>
     <div class="bd note">La <b>clase</b> decide cómo se comporta: efectivo, banco y ahorro suman al <b>Capital</b>; tarjetas de crédito y préstamos van en <b>A deber</b>; una tarjeta de débito con cuenta de pago descuenta de su banco.</div></div>`;
 }
-/* Categorías: catálogo de ingresos y gastos con sus subcategorías.
-   Las que llegaron en los registros de la app son la estructura vigente ("de la app · por validar") hasta que el administrador las valide.
-   Se pueden crear, renombrar, ordenar y desactivar; renombrar no toca los registros (se reconocen por el nombre con que llegaron).
-   Unir con, Oculta y Va al control siguen igual (categoria_ajustes). */
+/* ===== Catálogo de categorías en 3 niveles: Grupal → Subgrupal → Detalle =====
+   En los registros de la app: Categoría = Grupal, Subcategoría = Subgrupal, Nota = Detalle. Cada nivel depende de su padre.
+   Lo que llegó en los registros es la estructura vigente ("de la app · por validar") hasta que el administrador la valide.
+   Renombrar cambia el nombre que se muestra; los registros se siguen reconociendo por su nombre de la app. */
+const CAT_NIV = ['', 'Grupal', 'Subgrupal', 'Detalle'];
 function catArbol(tipo) {
   const ing = tipo === 'ingreso'; const ord = (a, b) => a.localeCompare(b, 'es', {numeric: true});
-  const uso = new Map(); D.txs.forEach(t => { if (tjEsTras(t) || tjEsAjuste(t) || t.borradoApp) return; if ((t.code === 0) !== ing) return; const c = String(t.cat || '').trim(); if (!c) return;
-    if (!uso.has(c)) uso.set(c, {n: 0, tot: 0, ult: '', subs: new Map()}); const o = uso.get(c); o.n++; o.tot = crR2(o.tot + (+t.montoApp || 0)); if (t.fecha > o.ult) o.ult = t.fecha;
-    const sb2 = String(t.sub || '').trim(); if (sb2) o.subs.set(sb2, (o.subs.get(sb2) || 0) + 1); });
-  // Orden: primero las que ya tienen un orden fijado (al mover con ↑ ↓), luego el resto por nombre (como en la app).
   const oo = x => x.row && +x.row.orden > 0 ? +x.row.orden : 0; const porOrden = (a, b) => (oo(a) ? 0 : 1) - (oo(b) ? 0 : 1) || oo(a) - oo(b) || ord(a.nombre, b.nombre);
-  const rows = (S.cats || []).filter(r => r.tipo === tipo); const usados = new Set(); const nodos = [];
-  rows.filter(r => !r.padre).forEach(r => { if (r.app_nombre) usados.add(r.app_nombre); nodos.push({row: r, app: r.app_nombre || '', nombre: r.nombre, u: r.app_nombre ? uso.get(r.app_nombre) : null}); });
-  for (const [app, u] of uso) if (!usados.has(app)) nodos.push({row: null, app, nombre: app, u});
-  nodos.forEach(nd => { nd.key = nd.row ? 'r:' + nd.row.id : 'a:' + nd.app; nd.subs = []; const us = new Set();
-    rows.filter(r => nd.row && r.padre === nd.row.id).forEach(r => { if (r.app_nombre) us.add(r.app_nombre); nd.subs.push({row: r, app: r.app_nombre || '', nombre: r.nombre, n: nd.u && r.app_nombre ? nd.u.subs.get(r.app_nombre) || 0 : 0}); });
-    if (nd.u) for (const [sb2, n] of nd.u.subs) if (!us.has(sb2)) nd.subs.push({row: null, app: sb2, nombre: sb2, n});
-    nd.subs.forEach(x => x.key = x.row ? 'r:' + x.row.id : 'a:' + x.app);
-    nd.subs.sort(porOrden); });
-  nodos.sort(porOrden);
-  return nodos;
+  const uso = new Map(); const sumar = (m, k, t) => { if (!m.has(k)) m.set(k, {n: 0, tot: 0, ult: '', ch: new Map()}); const o = m.get(k); o.n++; o.tot = crR2(o.tot + (+t.montoApp || 0)); if (t.fecha > o.ult) o.ult = t.fecha; return o.ch; };
+  D.txs.forEach(t => { if (tjEsTras(t) || tjEsAjuste(t) || t.borradoApp) return; if ((t.code === 0) !== ing) return; const c = String(t.cat || '').trim(); if (!c) return;
+    const m2 = sumar(uso, c, t); const sb2 = String(t.sub || '').trim(); if (!sb2) return; const m3 = sumar(m2, sb2, t); const nt = String(t.nota || '').trim(); if (nt) sumar(m3, nt, t); });
+  const rows = (S.cats || []).filter(r => r.tipo === tipo);
+  const hijos = (padreRow, u, nivel) => { const l = []; const usados = new Set();
+    rows.filter(r => padreRow ? r.padre === padreRow.id : nivel === 1 && !r.padre).forEach(r => { if (r.app_nombre) usados.add(r.app_nombre); l.push({row: r, app: r.app_nombre || '', nombre: r.nombre, u: u && r.app_nombre ? u.get(r.app_nombre) || null : null, nivel}); });
+    if (u) for (const [app, x] of u) if (!usados.has(app)) l.push({row: null, app, nombre: app, u: x, nivel});
+    l.forEach(nd => { nd.key = nd.app ? 'a:' + nd.app : 'r:' + nd.row.id;   /* llave estable: no cambia al guardar la fila */ nd.hijos = nivel < 3 ? hijos(nd.row, nd.u ? nd.u.ch : null, nivel + 1) : []; });
+    return l.sort(porOrden); };
+  return hijos(null, uso, 1);
 }
-const catNodo = (tipo, key, subKey) => { const nd = catArbol(tipo).find(x => x.key === key); return subKey ? [nd, nd && nd.subs.find(x => x.key === subKey)] : [nd, null]; };
-// catGuardarNodo: guarda (o crea) la fila del catálogo de una categoría o subcategoría; las de la app se guardan la primera vez que se tocan.
-async function catGuardarNodo(tipo, nd, sub, campos) {
+// catRuta: los nodos desde el Grupal hasta el buscado, a partir de sus llaves.
+function catRuta(tipo, keys) { const out = []; let l = catArbol(tipo); for (const k of keys) { const nd = l.find(x => x.key === k); if (!nd) return null; out.push(nd); l = nd.hijos; } return out; }
+// catGuardarRuta: guarda (o crea, de arriba hacia abajo) las filas de la ruta y aplica los cambios al último nivel.
+async function catGuardarRuta(tipo, ruta, campos) {
   if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
-  const fila = async (x, padre) => { if (x.row) return x.row; const row = {id: crUid(), tipo, padre: padre ? padre.id : null, nombre: x.nombre, app_nombre: x.app || null, orden: 0, activa: true, origen: 'app', validada: false};
-    const d = await q(sb.from('categorias').insert(row).select()); x.row = d && d[0] ? d[0] : row; S.cats.push(x.row); return x.row; };
-  const padre = await fila(nd, null); const obj = sub ? await fila(sub, padre) : padre;
+  let padre = null;
+  for (const x of ruta) { if (!x.row) { const row = {id: crUid(), tipo, padre: padre ? padre.id : null, nombre: x.nombre, app_nombre: x.app || null, orden: 0, activa: true, origen: 'app', validada: false};
+      const d = await q(sb.from('categorias').insert(row).select()); x.row = d && d[0] ? d[0] : row; S.cats.push(x.row); } padre = x.row; }
+  const obj = ruta[ruta.length - 1].row;
   if (campos && Object.keys(campos).length) { const d = await q(sb.from('categorias').update(campos).eq('id', obj.id).select()); Object.assign(obj, d && d[0] ? d[0] : campos); }
   catMapas(); return obj;
 }
+// catPlano: el árbol en filas (para la lista, la búsqueda y el Excel).
+function catPlano(nodos, padres = []) { const out = []; nodos.forEach(nd => { const r = [...padres, nd]; out.push(r); out.push(...catPlano(nd.hijos, r)); }); return out; }
 function vCtaCats() {
-  const tipo = S.catTipo === 'i' ? 'ingreso' : 'gasto'; const nodos = catArbol(tipo); const ord = (a, b) => a.localeCompare(b, 'es', {numeric: true});
-  const norm = c => c.replace(/^[\d.\s]+/, '').replace(/\(.*?\)/g, '').trim().toLowerCase();
-  const conUso = nodos.filter(nd => nd.app && nd.u); const nombresApp = conUso.map(nd => nd.app).sort(ord);
-  const dup = new Map(); conUso.forEach(nd => { const c = nd.app; if (catAj(c) && catAj(c).grupo) return; const k = norm(c); if (!k) return; if (!dup.has(k)) dup.set(k, []); dup.get(k).push(c); });
-  const dups = [...dup.values()].filter(l => l.length > 1).map(l => l.sort((a, b) => nodos.find(x => x.app === b).u.n - nodos.find(x => x.app === a).u.n));
+  const tipo = S.catTipo === 'i' ? 'ingreso' : 'gasto'; const arbol = catArbol(tipo); const plano = catPlano(arbol); const qq = (S.catQ || '').trim().toUpperCase();
+  const llave = r => r.map(x => x.key).join('›'); const exp = S.catExp || (S.catExp = new Set()); const edit = S.catEdit || '';
+  // búsqueda: se ven las coincidencias y sus padres, abiertos
+  let vis; if (qq) { const ok = new Set(); plano.forEach(r => { const nd = r[r.length - 1]; if ((nd.nombre + ' ' + nd.app).toUpperCase().includes(qq)) r.forEach((x, i) => ok.add(llave(r.slice(0, i + 1)))); }); vis = plano.filter(r => ok.has(llave(r))); }
+  else vis = plano.filter(r => r.slice(0, -1).every((x, i) => S.catExpTodo || exp.has(llave(r.slice(0, i + 1)))));
   const ctrls = familiares(); const vaA = c => ctrls.filter(x => (x.categorias || []).some(p => p && c.startsWith(p)));
-  const porVal = nodos.reduce((k, nd) => k + (nd.row && nd.row.validada ? 0 : 1) + nd.subs.filter(x => !(x.row && x.row.validada)).length, 0);
-  const edit = S.catEdit || ''; const flechas = (k, i, len, sk) => `<button class="btn sm ghost cta-mv" data-act="catMover" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''} data-d="-1" ${i ? '' : 'disabled'} aria-label="Subir">↑</button><button class="btn sm ghost cta-mv" data-act="catMover" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''} data-d="1" ${i < len - 1 ? '' : 'disabled'} aria-label="Bajar">↓</button>`;
-  const estadoChips = x => `${x.row && x.row.origen === 'web' ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>'} ${x.row && x.row.validada ? '' : '<span class="chip warn">por validar</span>'} ${x.row && x.row.activa === false ? '<span class="chip bad">desactivada</span>' : ''}`;
-  const nombreHtml = (x, k, sk) => (edit === k + '|' + (sk || '')) ? `<span class="cta-ren"><input class="in" id="catRen" value="${esc(x.nombre)}" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''} aria-label="Nuevo nombre"><button class="btn sm pri" data-act="catRenOk">Guardar</button><button class="btn sm ghost" data-act="catRen" data-k="">Cancelar</button></span>`
-    : `<b>${esc(x.nombre)}</b> <button class="linkish" data-act="catRen" data-k="${esc(k)}" ${sk ? `data-s="${esc(sk)}"` : ''}>renombrar</button>${x.app && x.nombre !== x.app ? ` <span class="note">(en la app: ${esc(x.app)})</span>` : ''}`;
-  const filas = nodos.map((nd, i) => { const c = nd.app; const a = c ? catAj(c) || {} : {}; const van = c ? vaA(c) : []; const abierta = S.catAbierta === nd.key; const otros = ctrls.filter(x => !van.includes(x)); const act = !(nd.row && nd.row.activa === false);
-    const subs = abierta ? `<div class="cta-subs2">${nd.subs.map((x, j) => `<div class="cta-sr ${x.row && x.row.activa === false ? 'cta-oc' : ''}"><div class="cta-sn">${nombreHtml(x, nd.key, x.key)} <span class="note">${x.n} registros</span> ${estadoChips(x)}</div>
-        <div class="cta-sacc">${flechas(nd.key, j, nd.subs.length, x.key)}<button class="btn sm ghost" data-act="catActiva" data-k="${esc(nd.key)}" data-s="${esc(x.key)}">${x.row && x.row.activa === false ? 'Activar' : 'Desactivar'}</button>${x.row && x.row.origen === 'web' && !x.n ? `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(nd.key)}" data-s="${esc(x.key)}">Eliminar</button>` : ''}</div></div>`).join('')}
-        <div class="cta-sr cta-snew"><input class="in" id="catNuevaSub" data-k="${esc(nd.key)}" placeholder="Nueva subcategoría de ${esc(nd.nombre)}"><button class="btn sm" data-act="catNuevaSub" data-k="${esc(nd.key)}">Agregar</button></div></div>` : '';
-    return `<div class="cta-cr ${act ? '' : 'cta-oc'}" data-catr="${esc(c)}"><div class="cta-c1"><button class="btn sm ghost cta-cx" data-act="catAbrir" data-c="${esc(nd.key)}" aria-expanded="${abierta}" title="Subcategorías">${abierta ? '▾' : '▸'}</button><div style="min-width:0">${nombreHtml(nd, nd.key)}
-        <div class="cat">${nd.u ? `${nd.u.n} registros · ${L(nd.u.tot)}${nd.u.ult ? ' · último ' + fFecha(nd.u.ult) : ''}` : 'sin registros'} · ${nd.subs.length} subcategorías${a.grupo ? ` · se cuenta como <b>${esc(catNom(a.grupo))}</b>` : ''}</div><div class="cta-chips">${estadoChips(nd)}</div></div></div>
-      <div class="cta-fl cta-ctl"><span>Va al control</span>${tipo === 'gasto' && c ? van.map(x => { const exact = (x.categorias || []).includes(c); const p = (x.categorias || []).find(pp => pp && c.startsWith(pp)); return `<span class="chip" title="${exact ? 'Agregada desde aquí' : 'Regla del control: empieza con “' + esc(p) + '”'}"><span class="dot ${colorClass(x)}"></span>${esc(x.corto || x.nombre)}${exact ? ` <button class="cta-chx" data-act="catQuitarCtl" data-ctl="${esc(x.id)}" data-c="${esc(c)}" aria-label="Quitar de ${esc(x.corto || x.nombre)}">×</button>` : ''}</span>`; }).join('') + (otros.length ? `<select class="in cta-add" data-catctl="${esc(c)}" aria-label="Agregar a un control"><option value="">+ control</option>${otros.map(x => `<option value="${esc(x.id)}">${esc(x.corto || x.nombre)}</option>`).join('')}</select>` : '') : '<b class="muted">—</b>'}</div>
-      <label class="cta-fl"><span>Unir con</span>${c ? `<select class="in" data-catf="grupo"><option value="">—</option>${nombresApp.filter(x => x !== c).map(x => `<option value="${esc(x)}" ${a.grupo === x ? 'selected' : ''}>${esc(catNom(x))}</option>`).join('')}</select>` : '<b class="muted">—</b>'}</label>
-      <div class="cta-cacc">${flechas(nd.key, i, nodos.length)}<button class="btn sm ghost" data-act="catActiva" data-k="${esc(nd.key)}">${act ? 'Desactivar' : 'Activar'}</button>${nd.row && nd.row.origen === 'web' && !nd.u ? `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(nd.key)}">Eliminar</button>` : ''}</div>
-      ${subs}</div>`; }).join('');
-  return `<div class="row cta-adbar"><div class="tj-tabs cta-ctabs">${[['g', 'Gastos'], ['i', 'Ingresos']].map(([v, t]) => `<button class="tj-tab ${(S.catTipo === 'i' ? 'i' : 'g') === v ? 'on' : ''}" data-act="catTipo" data-v="${v}">${t}</button>`).join('')}</div>
-      <span class="cta-ren"><input class="in" id="catNueva" placeholder="Nueva categoría de ${tipo === 'gasto' ? 'gasto' : 'ingreso'}"><button class="btn sm pri" data-act="catNueva">Agregar</button></span></div>
-    ${S.cats === null ? '<div class="tj-aviso">Para crear, renombrar, ordenar y desactivar categorías corre en Supabase el SQL de la fase 2 (fase2.sql).</div>' : ''}
-    ${porVal ? `<div class="tj-aviso"><b>${porVal} ${porVal === 1 ? 'elemento está' : 'categorías y subcategorías están'} por validar.</b> Son las que llegaron en los registros de la app y están vigentes tal como llegaron. Cuando las revises, valídalas. <button class="btn sm pri" data-act="catValidarTodo">Validar la estructura de ${tipo === 'gasto' ? 'gastos' : 'ingresos'}</button></div>` : ''}
-    ${dups.length ? `<div class="tj-aviso cta-dups"><b>Posibles duplicados</b>${dups.map(l => `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">${l.map(x => `<span class="chip">${esc(catNom(x))} · ${nodos.find(n => n.app === x).u.n}</span>`).join('')}<button class="btn sm" data-act="catUnir" data-a="${esc(l[0])}" data-l="${esc(JSON.stringify(l.slice(1)))}">Unir en “${esc(catNom(l[0]))}”</button></div>`).join('')}</div>` : ''}
-    <div class="panel"><div class="cta-cr cta-ah" aria-hidden="true"><span>Categoría</span><span>Va al control</span><span>Unir con</span><span></span></div>${filas || '<div class="bd note">Sin categorías todavía.</div>'}
-    <div class="bd note"><b>Renombrar</b> cambia el nombre que se muestra; los registros de la app se siguen reconociendo por su nombre original. <b>Desactivar</b> la quita de los filtros y de los registros nuevos, sin tocar los registros que ya la usan. <b>Unir con</b> cuenta una categoría como otra en filtros y reportes. <b>Va al control</b> es la regla que usa la Bandeja (las reglas por prefijo, como “8.”, se cambian en Ajustes). Solo se pueden eliminar las creadas aquí que no tienen registros.</div></div>`;
+  const porVal = plano.filter(r => !(r[r.length - 1].row && r[r.length - 1].row.validada)).length;
+  const nombresG = arbol.filter(nd => nd.app && nd.u).map(nd => nd.app);
+  const ib = (ico, tit, act, k, extra, dis) => icoBtn(ico, tit, act, '', extra).replace(`data-act="${act}"`, `data-act="${act}" data-k="${esc(k)}"${dis ? ' disabled' : ''}`);
+  const filas = vis.map(r => { const nd = r[r.length - 1]; const k = llave(r); const hermanos = r.length === 1 ? arbol : r[r.length - 2].hijos; const i = hermanos.indexOf(nd);
+    const abierta = qq || S.catExpTodo || exp.has(k); const act = !(nd.row && nd.row.activa === false); const web = nd.row && nd.row.origen === 'web';
+    const chips = `${web ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>'}${nd.row && nd.row.validada ? '' : ' <span class="chip warn">por validar</span>'}${act ? '' : ' <span class="chip bad">desactivada</span>'}`;
+    const c = r[0].app; const a = nd.nivel === 1 && c ? catAj(c) || {} : {};
+    let panel = '';
+    if (edit === k) { const van = nd.nivel === 1 && c ? vaA(c) : [];
+      const padres = nd.nivel === 1 ? [] : catPlano(arbol).filter(pr => pr.length === nd.nivel - 1);
+      panel = `<div class="ct-ed"><label>Nombre<input class="in" id="ctNom" value="${esc(nd.nombre)}"></label>
+        ${nd.nivel > 1 && web && !nd.u ? `<label>${CAT_NIV[nd.nivel - 1]} (padre)<select class="in" id="ctPadre">${padres.map(pr => `<option value="${esc(llave(pr))}" ${llave(pr) === llave(r.slice(0, -1)) ? 'selected' : ''}>${esc(pr.map(x => x.nombre).join(' › '))}</option>`).join('')}</select></label>` : ''}
+        ${nd.nivel === 1 && c ? `<label>Unir con<select class="in" data-catr-f="${esc(c)}" id="ctUnir"><option value="">—</option>${nombresG.filter(x => x !== c).map(x => `<option value="${esc(x)}" ${a.grupo === x ? 'selected' : ''}>${esc(catNom(x))}</option>`).join('')}</select></label>` : ''}
+        ${nd.nivel === 1 && c && tipo === 'gasto' ? `<div class="ct-ctl"><span class="note">Va al control</span>${van.map(x => { const exact = (x.categorias || []).includes(c); return `<span class="chip"><span class="dot ${colorClass(x)}"></span>${esc(x.corto || x.nombre)}${exact ? ` <button class="cta-chx" data-act="catQuitarCtl" data-ctl="${esc(x.id)}" data-c="${esc(c)}" aria-label="Quitar">×</button>` : ''}</span>`; }).join('')}${ctrls.filter(x => !van.includes(x)).length ? `<select class="in cta-add" data-catctl="${esc(c)}" aria-label="Agregar a un control"><option value="">+ control</option>${ctrls.filter(x => !van.includes(x)).map(x => `<option value="${esc(x.id)}">${esc(x.corto || x.nombre)}</option>`).join('')}</select>` : ''}</div>` : ''}
+        ${nd.app && nd.nombre !== nd.app ? `<div class="note">En la app se llama “${esc(nd.app)}”.</div>` : ''}
+        <div class="ct-mov"><span class="note">Orden</span>${ib('arriba', 'Subir', 'catMover', k, '', !i)}${ib('abajo', 'Bajar', 'catMover', k, 'ct-dn', i === hermanos.length - 1)}</div>
+        <div class="ct-edb">${web && !nd.u && !nd.hijos.length ? (S.catConfBorrar === k ? `<button class="btn sm danger" data-act="catBorrar" data-k="${esc(k)}">¿Eliminar? Sí</button>` : `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(k)}">Eliminar</button>`) : ''}<span style="flex:1"></span><button class="btn sm ghost" data-act="catEditar" data-k="">Cancelar</button><button class="btn sm pri" data-act="catEdOk" data-k="${esc(k)}">Guardar</button></div></div>`; }
+    const sub = nd.u ? `${nd.u.n} reg. · ${L(nd.u.tot)}` : 'sin registros';
+    return `<div class="ct-row n${nd.nivel} ${act ? '' : 'ct-off'} ${edit === k ? 'ct-on' : ''}" data-k="${esc(k)}">
+      <span class="ct-tg">${nd.hijos.length ? `<button class="ct-chev" data-act="catAbrir" data-k="${esc(k)}" aria-expanded="${!!abierta}" aria-label="${abierta ? 'Contraer' : 'Expandir'}">${abierta ? '▾' : '▸'}</button>` : ''}</span>
+      <div class="ct-main" data-act="catEditar" data-k="${esc(k)}" role="button" tabindex="0"><div class="ct-l1"><span class="ct-nv">N${nd.nivel}</span><b>${esc(nd.nombre)}</b></div>
+        <div class="ct-l2">${CAT_NIV[nd.nivel]} · ${sub}${nd.hijos.length ? ` · ${nd.hijos.length} ${nd.nivel === 1 ? 'subgrupales' : 'detalles'}` : ''}${a.grupo ? ` · se cuenta como ${esc(catNom(a.grupo))}` : ''} ${chips}</div></div>
+      <div class="ct-acc">${qq ? '' : ib('arriba', 'Subir', 'catMover', k, '', !i) + ib('abajo', 'Bajar', 'catMover', k, 'ct-dn', i === hermanos.length - 1)}${ib('activar', act ? 'Desactivar' : 'Activar', 'catActiva', k, act ? '' : 'ct-pw-off')}${nd.nivel < 3 ? ib('mas', 'Agregar ' + CAT_NIV[nd.nivel + 1].toLowerCase(), 'catNuevoEn', k) : ''}</div>
+      ${panel}</div>`; }).join('');
+  const padresForm = [['', 'Ninguno: será Grupal']].concat(plano.filter(r => r.length < 3).map(r => [llave(r), (r.length === 2 ? '   ' : '') + r.map(x => x.nombre).join(' › ')]));
+  const pSel = S.catPadre || ''; const nivelNuevo = pSel ? pSel.split('›').length + 1 : 1;
+  const form = `<div class="panel ct-form ${S.catForm ? '' : 'ct-cerrado'}"><button class="ct-fhd" data-act="catForm" aria-expanded="${!!S.catForm}"><b>Nuevo elemento</b><span class="note">${CAT_NIV[nivelNuevo]} de ${tipo === 'gasto' ? 'gastos' : 'ingresos'}</span><span class="ct-fx">${S.catForm ? '▴' : '▾'}</span></button>
+    ${S.catForm ? `<div class="bd ct-fbd"><label>Padre<select class="in" id="catPadre">${padresForm.map(([v, t]) => `<option value="${esc(v)}" ${v === pSel ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+      <label>Nombre<input class="in" id="catNuevoNom" placeholder="${nivelNuevo === 1 ? 'ej. 9. Mascotas' : nivelNuevo === 2 ? 'ej. 9.1. Veterinario' : 'ej. Vacunas'}" autocomplete="off"></label>
+      <label>Nivel<input class="in" value="Nivel ${nivelNuevo} · ${CAT_NIV[nivelNuevo]}" disabled></label>
+      <button class="btn pri" data-act="catCrear">Guardar</button></div>` : ''}</div>`;
+  return `<div class="row cta-adbar"><div class="tj-tabs cta-ctabs">${[['g', 'Gastos'], ['i', 'Ingresos']].map(([v, t]) => `<button class="tj-tab ${(S.catTipo === 'i' ? 'i' : 'g') === v ? 'on' : ''}" data-act="catTipo" data-v="${v}">${t}</button>`).join('')}</div></div>
+    ${S.cats === null ? '<div class="tj-aviso">Para administrar el catálogo corre en Supabase el SQL de la fase 2 (fase2.sql).</div>' : ''}
+    ${form}
+    ${porVal ? `<div class="tj-aviso ct-val"><span><b>${porVal}</b> por validar: lo que llegó de la app está vigente tal como llegó hasta que lo valides.</span><button class="btn sm pri" data-act="catValidarTodo">Validar ${tipo === 'gasto' ? 'gastos' : 'ingresos'}</button></div>` : ''}
+    <div class="panel ct-lst"><div class="ct-bar"><input type="search" class="in" id="catQ" placeholder="Buscar en los 3 niveles" value="${esc(S.catQ || '')}">
+        <button class="btn sm ghost" data-act="catExpTodo">${S.catExpTodo ? 'Contraer todo' : 'Expandir todo'}</button>${icoBtn('bajarxl', 'Exportar a Excel', 'catExcel')}</div>
+      <div class="ct-hd" aria-hidden="true"><span></span><span>Nombre · nivel</span><span>Acciones</span></div>
+      ${filas || `<div class="bd note">${qq ? 'Nada coincide con la búsqueda.' : 'Sin categorías todavía.'}</div>`}
+      <div class="bd note">Toca un nombre para editarlo. <b>N1 Grupal</b> = categoría, <b>N2 Subgrupal</b> = subcategoría, <b>N3 Detalle</b> = nota del registro. Desactivar lo quita de los filtros y de los registros nuevos sin tocar los registros que ya lo usan. Solo se elimina lo creado aquí que no tiene registros ni elementos debajo.</div></div>`;
 }
 async function catGuardar(c, campos) {
   if (!S.catAj) return toast('Primero corre en Supabase el SQL de cuentas (cuentas.sql).');
   const prev = S.catAj.get(c) || {cat: c}; const row = Object.assign({}, prev, campos, {cat: c, actualizado_el: new Date().toISOString()}); if (row.grupo === '') row.grupo = null;
   const d = await q(sb.from('categoria_ajustes').upsert(row).select()); S.catAj.set(c, d && d[0] ? d[0] : row);
 }
+async function catExcel() {
+  toast('Preparando Excel…');
+  try { if (!window.ExcelJS) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; sc.onload = ok; sc.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(sc); });
+    const wb = new ExcelJS.Workbook();
+    for (const tipo of ['gasto', 'ingreso']) { const ws = wb.addWorksheet(tipo === 'gasto' ? 'Gastos' : 'Ingresos');
+      ws.columns = [{header: 'Nivel', width: 8}, {header: 'Tipo de nivel', width: 12}, {header: 'Grupal', width: 34}, {header: 'Subgrupal', width: 34}, {header: 'Detalle', width: 34}, {header: 'Nombre en la app', width: 34}, {header: 'Registros', width: 10}, {header: 'Total', width: 16}, {header: 'Activa', width: 8}, {header: 'Origen', width: 10}, {header: 'Validada', width: 10}];
+      ws.getRow(1).eachCell(estiloHdr);
+      catPlano(catArbol(tipo)).forEach(r => { const nd = r[r.length - 1]; const row = ws.addRow([nd.nivel, CAT_NIV[nd.nivel], r[0].nombre, r[1] ? r[1].nombre : '', r[2] ? r[2].nombre : '', nd.app, nd.u ? nd.u.n : 0, nd.u ? nd.u.tot : 0, nd.row && nd.row.activa === false ? 'No' : 'Sí', nd.row && nd.row.origen === 'web' ? 'Web' : 'App', nd.row && nd.row.validada ? 'Sí' : 'No']);
+        row.getCell(8).numFmt = MONEYF; if (nd.nivel === 1) row.font = {bold: true}; }); }
+    const buf = await wb.xlsx.writeBuffer(); descargar('CATALOGO_CATEGORIAS.xlsx', new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  } catch (e) { toast('No se pudo exportar: ' + (e && e.message || e)); }
+}
 async function catAccion(b) {
-  const tipo = S.catTipo === 'i' ? 'ingreso' : 'gasto'; const act = b.dataset.act;
-  if (act === 'catRen') { S.catEdit = b.dataset.k ? b.dataset.k + '|' + (b.dataset.s || '') : ''; render(); const r = $('#catRen'); if (r) { r.focus(); r.select(); } return; }
-  if (act === 'catRenOk') { const r = $('#catRen'); const v = r.value.trim(); if (!v) return toast('Escribe el nombre.'); const [nd, sub] = catNodo(tipo, r.dataset.k, r.dataset.s);
-    try { await catGuardarNodo(tipo, nd, sub, {nombre: v}); S.catEdit = ''; toast('Nombre actualizado'); } catch (e) {} return render(); }
-  if (act === 'catActiva') { const [nd, sub] = catNodo(tipo, b.dataset.k, b.dataset.s); const x = sub || nd; const ahora = !(x.row && x.row.activa === false);
-    try { await catGuardarNodo(tipo, nd, sub, {activa: !ahora}); toast(ahora ? 'Desactivada: ya no sale en filtros ni registros nuevos' : 'Activada'); } catch (e) {} return render(); }
-  if (act === 'catMover') { const nodos = catArbol(tipo); const nd = nodos.find(x => x.key === b.dataset.k); const lista = b.dataset.s ? nd.subs : nodos; const i = lista.findIndex(x => x.key === (b.dataset.s || b.dataset.k)); const j = i + (+b.dataset.d);
-    if (j < 0 || j >= lista.length) return; [lista[i], lista[j]] = [lista[j], lista[i]];
-    try { for (let k = 0; k < lista.length; k++) { const x = lista[k]; if (b.dataset.s) await catGuardarNodo(tipo, nd, x, {orden: (k + 1) * 10}); else await catGuardarNodo(tipo, x, null, {orden: (k + 1) * 10}); } } catch (e) {} return render(); }
-  if (act === 'catNueva') { const v = ($('#catNueva').value || '').trim(); if (!v) return toast('Escribe el nombre de la categoría.'); if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
-    if (catArbol(tipo).some(x => x.nombre.toUpperCase() === v.toUpperCase())) return toast('Ya existe esa categoría.');
-    const hay = catArbol(tipo).map(x => x.row ? +x.row.orden || 0 : 0); const row = {id: crUid(), tipo, padre: null, nombre: v, app_nombre: null, orden: Math.max(0, ...hay) ? Math.max(...hay) + 10 : 0, activa: true, origen: 'web', validada: true};
-    try { const d = await q(sb.from('categorias').insert(row).select(), 'Categoría creada'); S.cats.push(d && d[0] ? d[0] : row); catMapas(); } catch (e) {} return render(); }
-  if (act === 'catNuevaSub') { const inp = document.querySelector(`#catNuevaSub[data-k="${CSS.escape(b.dataset.k)}"]`); const v = (inp && inp.value || '').trim(); if (!v) return toast('Escribe el nombre de la subcategoría.'); if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
-    const [nd] = catNodo(tipo, b.dataset.k); if (nd.subs.some(x => x.nombre.toUpperCase() === v.toUpperCase())) return toast('Ya existe esa subcategoría.');
-    try { const padre = await catGuardarNodo(tipo, nd, null, null); const hs = nd.subs.map(x => x.row ? +x.row.orden || 0 : 0); const row = {id: crUid(), tipo, padre: padre.id, nombre: v, app_nombre: null, orden: Math.max(0, ...hs) ? Math.max(...hs) + 10 : 0, activa: true, origen: 'web', validada: true};
-      const d = await q(sb.from('categorias').insert(row).select(), 'Subcategoría creada'); S.cats.push(d && d[0] ? d[0] : row); catMapas(); S.catAbierta = 'r:' + padre.id; } catch (e) {} return render(); }
-  if (act === 'catBorrar') { const [nd, sub] = catNodo(tipo, b.dataset.k, b.dataset.s); const x = sub || nd; if (!x.row || x.row.origen !== 'web') return;
-    const key = x.row.id; if (S.catConfBorrar !== key) { S.catConfBorrar = key; toast('Toca Eliminar otra vez para confirmar'); return; } S.catConfBorrar = null;
-    try { await q(sb.from('categorias').delete().eq('id', key), 'Eliminada'); S.cats = S.cats.filter(r => r.id !== key && r.padre !== key); catMapas(); } catch (e) {} return render(); }
-  if (act === 'catValidarTodo') { if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).'); let k = 0;
-    try { for (const nd of catArbol(tipo)) { if (!(nd.row && nd.row.validada)) { await catGuardarNodo(tipo, nd, null, {validada: true}); k++; } for (const x of nd.subs) if (!(x.row && x.row.validada)) { await catGuardarNodo(tipo, nd, x, {validada: true}); k++; } }
-      toast(`${k} validadas`); } catch (e) {} return render(); }
+  const tipo = S.catTipo === 'i' ? 'ingreso' : 'gasto'; const act = b.dataset.act; const k = b.dataset.k || ''; const keys = k ? k.split('›') : [];
+  if (act === 'catForm') { S.catForm = !S.catForm; return render(); }
+  if (act === 'catExpTodo') { S.catExpTodo = !S.catExpTodo; if (!S.catExpTodo) S.catExp = new Set(); return render(); }
+  if (act === 'catExcel') return catExcel();
+  if (act === 'catAbrir') { const e = S.catExp || (S.catExp = new Set()); if (S.catExpTodo) { S.catExpTodo = false; catPlano(catArbol(tipo)).forEach(r => e.add(r.map(x => x.key).join('›'))); } e.has(k) ? e.delete(k) : e.add(k); return render(); }
+  if (act === 'catEditar') { S.catEdit = S.catEdit === k ? '' : k; S.catConfBorrar = null; render(); const n = $('#ctNom'); if (n) n.focus({preventScroll: true}); return; }
+  if (act === 'catNuevoEn') { S.catForm = true; S.catPadre = k; render(); const n = $('#catNuevoNom'); if (n) { n.scrollIntoView({block: 'center'}); n.focus(); } return; }
+  if (act === 'catEdOk') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; const nom = ($('#ctNom').value || '').trim(); if (!nom) return toast('Escribe el nombre.');
+    const campos = {nombre: nom}; const ps = $('#ctPadre');
+    try { if (ps && ps.value !== keys.slice(0, -1).join('›')) { const pr = catRuta(tipo, ps.value.split('›')); const prow = await catGuardarRuta(tipo, pr, null); campos.padre = prow.id; }
+      await catGuardarRuta(tipo, ruta, campos); const u = $('#ctUnir'); if (u && nd.nivel === 1 && nd.app) { const g = u.value; if (((catAj(nd.app) || {}).grupo || '') !== g) await catGuardar(nd.app, {grupo: g}); }
+      S.catEdit = ''; toast('Guardado'); } catch (e) {} return render(); }
+  if (act === 'catActiva') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; const ahora = !(nd.row && nd.row.activa === false);
+    try { await catGuardarRuta(tipo, ruta, {activa: !ahora}); toast(ahora ? 'Desactivado: ya no sale en filtros ni en registros nuevos' : 'Activado'); } catch (e) {} return render(); }
+  if (act === 'catMover') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; const padres = ruta.slice(0, -1); const lista = padres.length ? padres[padres.length - 1].hijos : catArbol(tipo);
+    const i = lista.findIndex(x => x.key === nd.key); const j = i + (b.classList.contains('ct-dn') ? 1 : -1); if (j < 0 || j >= lista.length) return; [lista[i], lista[j]] = [lista[j], lista[i]];
+    try { for (let n = 0; n < lista.length; n++) await catGuardarRuta(tipo, [...padres, lista[n]], {orden: (n + 1) * 10}); } catch (e) {} return render(); }
+  if (act === 'catCrear') { if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).'); const nom = ($('#catNuevoNom').value || '').trim(); if (!nom) { toast('Escribe el nombre.'); return $('#catNuevoNom').focus(); }
+    const pk = $('#catPadre').value; const pr = pk ? catRuta(tipo, pk.split('›')) : []; const hermanos = pr.length ? pr[pr.length - 1].hijos : catArbol(tipo);
+    if (hermanos.some(x => x.nombre.toUpperCase() === nom.toUpperCase())) return toast('Ya existe con ese nombre en el mismo lugar.');
+    try { const prow = pr.length ? await catGuardarRuta(tipo, pr, null) : null; const hs = hermanos.map(x => x.row ? +x.row.orden || 0 : 0);
+      const row = {id: crUid(), tipo, padre: prow ? prow.id : null, nombre: nom, app_nombre: null, orden: Math.max(0, ...hs) ? Math.max(...hs) + 10 : 0, activa: true, origen: 'web', validada: true};
+      const d = await q(sb.from('categorias').insert(row).select(), CAT_NIV[pr.length + 1] + ' creado'); S.cats.push(d && d[0] ? d[0] : row); catMapas();
+      if (pk) (S.catExp || (S.catExp = new Set())).add(pk); S.catPadre = pk; } catch (e) {} render(); const n = $('#catNuevoNom'); if (n) n.focus(); return; }
+  if (act === 'catBorrar') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; if (!nd.row || nd.row.origen !== 'web' || nd.u || nd.hijos.length) return;
+    if (S.catConfBorrar !== k) { S.catConfBorrar = k; return render(); } S.catConfBorrar = null;
+    try { await q(sb.from('categorias').delete().eq('id', nd.row.id), 'Eliminado'); S.cats = S.cats.filter(r => r.id !== nd.row.id); catMapas(); S.catEdit = ''; } catch (e) {} return render(); }
+  if (act === 'catValidarTodo') { if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
+    // Se guarda todo de una vez: primero los Grupales, luego Subgrupales y Detalles, cada uno con su padre.
+    const filas = []; const recorrer = (l, padre) => l.forEach(nd => { if (!nd.row) nd.row = {id: crUid(), tipo, padre: padre ? padre.id : null, nombre: nd.nombre, app_nombre: nd.app || null, orden: 0, activa: true, origen: 'app'};
+      filas.push(Object.assign({}, nd.row, {validada: true})); recorrer(nd.hijos, nd.row); });
+    recorrer(catArbol(tipo), null); const pend = filas.filter(r => !(S.cats.find(x => x.id === r.id) || {}).validada);
+    try { for (let i = 0; i < pend.length; i += 300) { const d = await q(sb.from('categorias').upsert(pend.slice(i, i + 300)).select()); (d || pend.slice(i, i + 300)).forEach(r => { const j = S.cats.findIndex(x => x.id === r.id); if (j >= 0) S.cats[j] = r; else S.cats.push(r); }); }
+      catMapas(); toast(`${pend.length} validados`); } catch (e) {} return render(); }
 }
 /* --- eventos de Cuentas --- */
 document.addEventListener('click', async e => {
@@ -5072,15 +5143,15 @@ document.addEventListener('click', async e => {
     try { const d = await q(sb.from('cuenta_tipos').insert(row).select(), 'Tipo agregado'); S.ctT.push(d && d[0] ? d[0] : row); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
   if (act === 'cttBorrar') { const id = b.dataset.id; if (S.confirmCtt !== id) { S.confirmCtt = id; return render(); } S.confirmCtt = null;
     try { await q(sb.from('cuenta_tipos').delete().eq('id', id), 'Tipo eliminado'); S.ctT = S.ctT.filter(t => t.id !== id); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
-  if (act === 'catTipo') { S.catTipo = b.dataset.v; S.catAbierta = null; return render(); }
-  if (act === 'catAbrir') { S.catAbierta = S.catAbierta === b.dataset.c ? null : b.dataset.c; return render(); }
-  if (['catRen', 'catRenOk', 'catActiva', 'catMover', 'catNueva', 'catNuevaSub', 'catBorrar', 'catValidarTodo'].includes(act)) return catAccion(b);
+  if (act === 'catTipo') { S.catTipo = b.dataset.v; S.catEdit = ''; S.catPadre = ''; S.catQ = ''; return render(); }
+  if (['catAbrir', 'catForm', 'catExpTodo', 'catExcel', 'catEditar', 'catNuevoEn', 'catEdOk', 'catActiva', 'catMover', 'catCrear', 'catBorrar', 'catValidarTodo'].includes(act)) return catAccion(b);
   if (act === 'catUnir') { const a = b.dataset.a; const l = JSON.parse(b.dataset.l || '[]'); try { for (const c of l) await catGuardar(c, {grupo: a}); toast(`Unidas en “${a}”`); } catch (er) {} return render(); }
   if (act === 'catQuitarCtl') { const c = ctrlById(b.dataset.ctl); if (!c) return; c.categorias = (c.categorias || []).filter(p => p !== b.dataset.c);
     try { await guardarControl(c); toast('Quitada de ' + (c.corto || c.nombre)); } catch (er) {} return render(); }
 });
 document.addEventListener('change', async e => {
   const el = e.target;
+  if (el.id === 'catPadre') { S.catPadre = el.value; render(); const n = $('#catNuevoNom'); if (n) n.focus(); return; }
   if (el.id === 'ctaFT' || el.id === 'ncT') { const t = ctTipo(el.value); const cl = t ? t.clase : ''; const f = el.closest('.cta-form, .modal');
     f.querySelectorAll('.cta-fpago').forEach(lb => lb.hidden = !['debito', 'credito'].includes(cl)); f.querySelectorAll('.cta-fcred').forEach(lb => lb.hidden = cl !== 'credito'); return; }
   const tr = el.closest && el.closest('[data-ctan]');
@@ -5099,6 +5170,7 @@ document.addEventListener('change', async e => {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'ctaQ') { S.ctaQ = el.value; const pos = el.selectionStart; pintarCtaFicha(); const n = $('#ctaQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
+  if (el.id === 'catQ') { S.catQ = el.value; const pos = el.selectionStart; render(); const n = $('#catQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'ctaAdmQ') { S.ctaAdmQ = el.value; const pos = el.selectionStart; render(); const n = $('#ctaAdmQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
 });
 document.addEventListener('click', async e => {
