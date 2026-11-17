@@ -702,8 +702,8 @@ body:has(.graf-full){overflow:hidden}
 .sheet-l{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}.sheet-l button{border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;font-size:17px;text-align:left;padding:16px;cursor:pointer}.sheet-l button:last-child{border-bottom:0}.sheet-l button:active{background:var(--sunk)}
 .sheet-t{font-size:17px;font-weight:600;padding:4px 2px}.sheet-in{width:100%!important;max-width:none!important;font-size:16px!important;padding:10px!important;border-radius:10px!important}.sheet-b{min-height:48px;font-size:16px}
 @media (min-width:900px){
-  .cta-mat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
-  .cta-mat>.cta-g{margin:0;min-width:0}
+  .cta-mat{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:0;grid-auto-rows:2px;align-items:start}
+  .cta-mat>.cta-g{margin:0 0 14px;min-width:0;align-self:start}
   .cta-mat .cta-g[data-tipo]:not([data-tipo=""])>.cta-gh{cursor:grab}
   body.ordenando .cta-mat .cta-gh{cursor:grabbing}
   .cta-mat .cta-g.arrastrando{opacity:.85;outline:2px dashed var(--accent);outline-offset:2px;box-shadow:0 10px 26px rgba(0,0,0,.25)}
@@ -1496,7 +1496,7 @@ function render() {
   window.scrollTo(0, keep);
   // Créditos: si el detalle de un crédito está abierto (o se acaba de cerrar un formulario suyo), se vuelve a pintar con los datos nuevos.
   if (enCred() && S.credFicha && (!$('#modalRoot').innerHTML || document.querySelector('.cr-fmodal'))) pintarCredFicha(); else if (!enCred()) S.credFicha = null;
-  dibujarGraficos(); dibujarVeh();
+  dibujarGraficos(); dibujarVeh(); ctaMasonry();
   if (S._focusF) { const el = document.querySelector(`[data-ftab=q][data-k="${S._focusF}"]`); if (el) { el.focus({preventScroll: true}); el.setSelectionRange(el.value.length, el.value.length); } S._focusF = null; }
   const qi = $('#fq'); if (qi && S._focusQ) { qi.focus({preventScroll: true}); qi.setSelectionRange(qi.value.length, qi.value.length); S._focusQ = false; }
 }
@@ -5172,6 +5172,13 @@ function ctaOrdCmp(a, b) { const o = (S.aj && S.aj.ctaOrden) || []; const ia = o
   return (ia < 0 ? 1e6 : ia) - (ib < 0 ? 1e6 : ib) || a.n.localeCompare(b.n, 'es', {numeric: true}); }
 /* Ordenar arrastrando (sirve con dedo en el iPhone y con mouse): se toma el ≡, se arrastra y al soltar se guarda.
    Se usan eventos de puntero, no el arrastre nativo del navegador, porque en Safari del iPhone el nativo no funciona. */
+/* ctaMasonry: matriz sin huecos. Cada cuadro ocupa tantas filas finas (2px) como su alto, y la cuadrícula pone el siguiente
+   en la columna que termina antes; así al contraer o expandir un tipo los de abajo suben y no quedan espacios. */
+function ctaMasonry() {
+  document.querySelectorAll('.cta-mat').forEach(m => { const dos = getComputedStyle(m).gridTemplateColumns.split(' ').length > 1;
+    [...m.children].forEach(el => { if (!dos) { el.style.gridRowEnd = ''; return; } el.style.gridRowEnd = 'span ' + Math.max(1, Math.ceil((el.getBoundingClientRect().height + 14) / 2)); }); });
+}
+window.addEventListener('resize', () => { clearTimeout(window._msT); window._msT = setTimeout(ctaMasonry, 120); });
 let _drag = null, _preDrag = null, _movioTipo = false;
 /* En la computadora el tipo también se mueve sin entrar a "Ordenar": se mantiene presionada su barra y se arrastra con el cursor.
    Un clic sin mover sigue siendo contraer / expandir. */
@@ -5197,7 +5204,7 @@ document.addEventListener('pointermove', e => {
   if (!_drag || e.pointerId !== _drag.id) return; e.preventDefault(); const {item, sel, cont} = _drag; const y = e.clientY;
   if (cont.classList.contains('cta-mat') && getComputedStyle(cont).display === 'grid') {   // matriz de 2 columnas: el lugar es el cuadro bajo el cursor
     const todos = [...cont.querySelectorAll(':scope > ' + sel)]; const obj = todos.find(x => { if (x === item) return false; const r = x.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && y >= r.top && y <= r.bottom; });
-    if (obj) { if (todos.indexOf(item) < todos.indexOf(obj)) obj.after(item); else cont.insertBefore(item, obj); }
+    if (obj) { if (todos.indexOf(item) < todos.indexOf(obj)) obj.after(item); else cont.insertBefore(item, obj); ctaMasonry(); }
     if (y < 90) window.scrollBy(0, -12); else if (y > window.innerHeight - 60) window.scrollBy(0, 12); return; }
   const hermanos = [...cont.querySelectorAll(':scope > ' + sel)].filter(x => x !== item);
   const antes = hermanos.find(x => { const r = x.getBoundingClientRect(); return y < r.top + r.height / 2; });
