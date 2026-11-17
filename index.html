@@ -772,8 +772,8 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .tj-fmodal .tj-fhd{position:sticky;top:0;z-index:3;background:var(--panel)}
 .tjm-per{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:6px 12px 8px;font-size:12px;color:var(--muted)}.tjm-per b{color:var(--ink);font-weight:600}.tjm-per .btn{margin-left:auto}
 .tjm-pv{color:var(--good);font-weight:600}.tjm-man{border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-block:8px}
-.tjm-th,.tjm-pr{grid-template-columns:64px repeat(3,1fr) 92px}.tjm-th span:first-child{text-align:left}.tjm-pr b{display:grid;line-height:1.15}.tjm-pr b .cat{font-weight:400;font-size:10.5px}.tjm-pr .chip{font-size:10.5px;padding:2px 7px}
-@media (max-width:760px){.tjm-th,.tjm-pr{grid-template-columns:52px repeat(3,1fr) 70px}.tjm-pr .chip{font-size:9.5px;padding:2px 5px}}
+.tjm-th,.tjm-pr{grid-template-columns:96px repeat(4,1fr);align-items:start}.tjm-th{align-items:end}.tjm-th span:first-child{text-align:left}.tjm-pr b{display:grid;justify-items:start;gap:2px;line-height:1.15}.tjm-pr b .cat{font-weight:400;font-size:10.5px}.tjm-pr .chip{font-size:10px;padding:1px 6px;font-weight:600}.tjm-pr .num{padding-top:2px}.tjm-pr .rc-sl2.neg{color:var(--bad);font-weight:600}
+@media (max-width:760px){.tjm-th,.tjm-pr{grid-template-columns:70px repeat(4,1fr)}.tjm-pr .chip{font-size:9px;padding:1px 5px}}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
 /* ===== Fase 4 ===== */
@@ -5493,13 +5493,15 @@ function vTjMov(t) {
   if (!ps.length) return `<div class="tjm-f">${filtros}</div><div class="note" style="padding:14px">Sin cortes todavía.</div>${pie}`;
   const vals = p => { if (!pl) return {cg: U ? p.gU : p.gL, pa: U ? p.pU : p.pL, fa: U ? p.sU : p.sL};
     const l = vis.filter(f => corteDe(f) === p.corte); const cg = crR2(-l.filter(f => f.lado === 'r').reduce((s, f) => s + f.v, 0)), pa = crR2(l.filter(f => f.lado === 'd').reduce((s, f) => s + f.v, 0)); return {cg, pa, fa: crR2(Math.max(0, cg - pa))}; };
+  // Saldo global de cada corte: lo que se debe de ese corte y de todos los anteriores (suma de los saldos de corte hasta ahí).
+  const glob = new Map(); { let acc = 0; ps.forEach(p => { acc = crR2(acc + vals(p).fa); glob.set(p.corte, acc); }); }
   let nav, sum, cuerpo, info = '';
   if (vista === 'c') {
     const i = ps.findIndex(p => p.corte === cor); const p = ps[i]; const prev = ps[i - 1], next = ps[i + 1]; const R = vals(p);
     nav = `<div class="rc-nav"><button class="btn sm ghost" data-act="tjMovCorte" data-v="${prev ? prev.corte : ''}" ${prev ? '' : 'disabled'} aria-label="Corte anterior">‹</button><b>Corte ${tjNom(p.corte)}</b><button class="btn sm ghost" data-act="tjMovCorte" data-v="${next ? next.corte : ''}" ${next ? '' : 'disabled'} aria-label="Corte siguiente">›</button></div>`;
-    info = `<div class="tjm-per"><span class="chip ${p.est[1]}">${p.est[0]}</span><span>Cargos del <b>${fFecha(p.desde).slice(0, 5)}</b> al <b>${fFecha(p.corte).slice(0, 5)}</b> · pagos del <b>${fFecha(p.vDesde).slice(0, 5)}</b> al <b>${fFecha(p.vHasta).slice(0, 5)}</b></span>
+    info = `<div class="tjm-per"><span class="chip ${p.est[1]}">${p.est[0]}</span><span>Cargos del <b>${fFecha(p.desde).slice(0, 5)}</b> al <b>${fFecha(p.corte).slice(0, 5)}</b> · pagos del <b>${fFecha(p.vDesde).slice(0, 5)}</b> al <b class="${p.venc ? 'neg' : ''}">${fFecha(p.vHasta).slice(0, 5)}</b> (fecha de pago)</span>
       ${p.abierto || p.vacio || p.auto ? '' : `<button class="btn sm ${p.pagado ? 'ghost' : ''}" data-act="tjCortePag" data-c="${p.corte}">${p.pagado ? 'Quitar pagado' : 'Marcar pagado'}</button>`}</div>`;
-    sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(R.cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(R.pa)}</b></div><div><span>${R.fa > 0.004 ? 'Por pagar' : 'Pendiente'}</span><b class="num ${R.fa > 0.004 && !p.abierto ? 'neg' : ''}">${num(R.fa)}</b></div><div><span>Pagar antes del</span><b class="num ${p.venc ? 'neg' : ''}">${fFecha(p.vHasta).slice(0, 5)}</b></div></div>`;
+    sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(R.cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(R.pa)}</b></div><div><span>Saldo del corte</span><b class="num ${R.fa > 0.004 && !p.abierto ? 'neg' : ''}">${num(R.fa)}</b></div><div><span>Saldo global</span><b class="num ${glob.get(p.corte) > 0.004 ? 'neg' : ''}">${num(glob.get(p.corte))}</b></div></div>`;
     const l = vis.filter(f => corteDe(f) === p.corte); const ids = new Set(d.filas.map(f => f.t.id));
     const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); }); const rev = ctaTrasRev();
     const fila = f => { const x = f.t; const tras = tjEsTras(x); const pp = plDe(f.cta);
@@ -5520,9 +5522,9 @@ function vTjMov(t) {
     const ia = anios.indexOf(anio); const prev = anios[ia - 1] || '', next = anios[ia + 1] || '';
     nav = `<div class="rc-nav"><button class="btn sm ghost" data-act="tjMovAnio" data-v="${prev}" ${prev ? '' : 'disabled'} aria-label="Año anterior">‹</button><b>Cortes ${anio}</b><button class="btn sm ghost" data-act="tjMovAnio" data-v="${next}" ${next ? '' : 'disabled'} aria-label="Año siguiente">›</button></div>`;
     const l = ps.filter(p => p.corte.slice(0, 4) === anio).reverse(); const T = l.reduce((a, p) => { const r = vals(p); a.cg += r.cg; a.pa += r.pa; a.fa += r.fa; return a; }, {cg: 0, pa: 0, fa: 0});
-    sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(T.cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(T.pa)}</b></div><div><span>Por pagar</span><b class="num ${T.fa > 0.004 ? 'neg' : ''}">${num(T.fa)}</b></div><div><span>Cortes</span><b class="num">${l.length}</b></div></div>`;
-    cuerpo = `<div class="rc-th tjm-th"><span>Corte</span><span>Cargos</span><span>Pagos</span><span>Por pagar</span><span>Estado</span></div>` + l.map(p => { const r = vals(p);
-      return `<div class="rc-pr tjm-pr" data-act="tjMovIr" data-vista="c" data-v="${p.corte}" role="button" tabindex="0"><b>${tjNom(p.corte)}<span class="cat">pago ${fFecha(p.vHasta).slice(0, 5)}</span></b><span class="num rc-r">${num(r.cg)}</span><span class="num rc-d">${num(r.pa)}</span><span class="num ${r.fa > 0.004 && !p.abierto ? 'neg' : ''}">${num(r.fa)}</span><span><span class="chip ${p.est[1]}">${p.est[0]}</span></span></div>`; }).join('');
+    sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(T.cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(T.pa)}</b></div><div><span>Saldo de los cortes</span><b class="num ${T.fa > 0.004 ? 'neg' : ''}">${num(T.fa)}</b></div><div><span>Saldo global</span><b class="num ${(l.length ? glob.get(l[0].corte) : 0) > 0.004 ? 'neg' : ''}">${num(l.length ? glob.get(l[0].corte) : 0)}</b></div></div>`;
+    cuerpo = `<div class="rc-th tjm-th"><span>Corte</span><span>Cargos</span><span>Pagos</span><span>Saldo del corte</span><span>Saldo global</span></div>` + l.map(p => { const r = vals(p);
+      return `<div class="rc-pr tjm-pr" data-act="tjMovIr" data-vista="c" data-v="${p.corte}" role="button" tabindex="0"><b>${tjNom(p.corte)}<span class="cat">pago ${fFecha(p.vHasta).slice(0, 5)}</span><span class="chip ${p.est[1]}">${p.est[0]}</span></b><span class="num rc-r">${num(r.cg)}</span><span class="num rc-d">${num(r.pa)}</span><span class="num ${r.fa > 0.004 && !p.abierto ? 'neg' : ''}">${num(r.fa)}</span><span class="num rc-sl2 ${glob.get(p.corte) > 0.004 ? 'neg' : ''}">${num(glob.get(p.corte))}</span></div>`; }).join('');
   }
   return `<div class="tjm-f">${filtros}${nav}${tabs}${info}${sum}</div>${avisoMan}<div class="rc-lst">${cuerpo}</div>${pie}`;
 }
