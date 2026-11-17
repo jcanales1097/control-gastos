@@ -693,6 +693,14 @@ body:has(.graf-full){overflow:hidden}
 .rg-lbtn{flex:none;border:1px solid var(--line);background:var(--sunk);color:var(--fg);font:inherit;font-size:13px;border-radius:8px;padding:6px 9px;cursor:pointer}
 .rg-grid2{grid-template-columns:repeat(2,minmax(0,1fr))}.rg-grid2>.rg-cel:nth-child(3n){border-right:1px solid var(--line)}.rg-grid2>.rg-cel:nth-child(2n){border-right:0}
 .rg-grid2 .rg-cel{min-height:52px;text-align:left;align-items:flex-start;padding-inline:12px}
+.rc-it{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.rc-it.rc-sel{background:color-mix(in srgb,var(--bad) 30%,var(--panel))!important}.rc-it.rc-sel .rc-c,.rc-it.rc-sel .rc-s{color:var(--fg);opacity:.8}
+.sel-hd{background:color-mix(in srgb,var(--azul) 22%,var(--panel))}.sel-hd .btn[disabled]{opacity:.35}
+.sel-sub{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:color-mix(in srgb,var(--azul) 12%,var(--panel));border-bottom:1px solid var(--line);font-size:15px;position:sticky;top:var(--mhd,0px);z-index:2}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60}
+.sheet{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);z-index:61;display:grid;gap:10px;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.3);max-height:85vh;overflow:auto}
+.sheet-l{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}.sheet-l button{border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;font-size:17px;text-align:left;padding:16px;cursor:pointer}.sheet-l button:last-child{border-bottom:0}.sheet-l button:active{background:var(--sunk)}
+.sheet-t{font-size:17px;font-weight:600;padding:4px 2px}.sheet-in{width:100%!important;max-width:none!important;font-size:16px!important;padding:10px!important;border-radius:10px!important}.sheet-b{min-height:48px;font-size:16px}
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
@@ -4983,6 +4991,11 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act; if (!act.startsWith('reg')) return;
   if (act === 'regNuevo') return abrirRegForm();
   if (act === 'regMios') { S.regF = null; S.regPick = null; return pintarRegMios(); }
+  if (act === 'regElimDetNo') { const t = S.detAbierto && D.byId.get(S.detAbierto.id); S.regConfElimDet = null; if (t) abrirDetalleTx(t.id); return; }
+  if (act === 'regElimDet') { const id = b.dataset.id; const t = S.detAbierto && D.byId.get(S.detAbierto.id);
+    if (S.regConfElimDet !== id) { S.regConfElimDet = id; if (t) abrirDetalleTx(t.id); return; }
+    S.regConfElimDet = null; await regCambiarEstado(id, 'eliminado', null, 'eliminado', 'Registro eliminado (queda en Registros web → Eliminados)'); S._ctaVer = (S._ctaVer || 0) + 1;
+    if (S.ctaVolver) { cerrarCapa(); } else $('#modalRoot').innerHTML = ''; return render(); }
   if (act === 'regEditar') { const r = regDe(b.dataset.id); if (!r) return; if (!esAdmin() && r.estado !== 'pendiente') return; S.regConfElim = null; return abrirRegForm(r.id); }
   if (act === 'regTipo') { regLeerForm(); S.regPick = null; S.regPickG = null; S.regF.tipo = b.dataset.v; if (b.dataset.v !== 'traslado') S.regF.conComision = false; return pintarRegForm(); }
   if (act === 'regSwap') { regLeerForm(); [S.regF.cuenta, S.regF.destino] = [S.regF.destino, S.regF.cuenta]; return pintarRegForm(); }
@@ -5028,7 +5041,7 @@ function regDetalleHtml(t) {
       <div><span>Registrado por ${esc(nombreDe(r.creado_por))}</span><span>${cuando(r.creado_el)}</span></div>
       ${r.aprobado_por && r.aprobado_por !== r.creado_por ? `<div><span>Aprobado por ${esc(nombreDe(r.aprobado_por))}</span><span>${cuando(r.aprobado_el)}</span></div>` : ''}
       ${h.filter(x => x.accion !== 'creado').map(x => `<div><span>${ACC[x.accion] || esc(x.accion)} por ${esc(nombreDe(x.por))}</span><span>${cuando(x.el)}</span></div>`).join('')}</div>
-    <div class="row" style="justify-content:flex-end"><button class="btn sm pri" data-act="regEditar" data-id="${esc(r.id)}">Editar registro</button></div>`;
+    <div class="row" style="justify-content:flex-end">${S.regConfElimDet === r.id ? `<span class="note">¿Eliminarlo? Queda en Registros web → Eliminados.</span><button class="btn sm ghost" data-act="regElimDetNo">No</button><button class="btn sm danger" data-act="regElimDet" data-id="${esc(r.id)}">Sí, eliminar</button>` : `<button class="btn sm ghost danger" data-act="regElimDet" data-id="${esc(r.id)}">Eliminar registro</button><button class="btn sm pri" data-act="regEditar" data-id="${esc(r.id)}">Editar registro</button>`}</div>`;
 }
 // regPublicarCatalogo: los demás usuarios no leen los registros de la app, así que el catálogo vigente (el que sale de los datos y aún no validas)
 // se guarda en la tabla categorias como "sin validar" para que lo vean en su formulario. No cambia nombres ni orden; solo agrega lo que falta.
@@ -5235,11 +5248,85 @@ document.addEventListener('click', e => {
   else { const ks = [...document.querySelectorAll('.cta-g [data-act=ctaGTog]')].map(x => x.dataset.k); ks.forEach(k => b.dataset.v === 'cerrar' ? c.add(k) : c.delete(k)); }
   ctaColGuardar(); render();
 });
+/* ===== Selección múltiple en el detalle de una cuenta (como Registro Contable) =====
+   Mantener presionado un registro lo selecciona y entra en modo selección: cada toque suma o quita registros, arriba se ve cuántos
+   y su total, y se pueden eliminar o cambiar en bloque la fecha, la categoría, la cuenta o el detalle.
+   Se cambian los registros hechos en la plataforma. Los que vienen de Registro Contable se cambian en la app (la próxima
+   sincronización los traería de vuelta como estaban), así que se avisan y se dejan igual. */
+const ctaSel = () => S.ctaSel || (S.ctaSel = new Set());
+function ctaSelInfo() {
+  const d = S.ctaFicha ? ctaDatos(S.ctaFicha) : null; const ids = ctaSel(); const filas = d ? d.filas.filter(f => ids.has(f.t.id)) : [];
+  const web = filas.filter(f => f.t.web && regDe(f.t.web)); const app = filas.length - web.length;
+  return {filas, web, app, total: crR2(filas.reduce((s, f) => s + f.v, 0)), mon: d ? d.i.mon : 'L'};
+}
+function ctaSelBarra() {
+  const I = ctaSelInfo(); const TR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+  return `<div class="hd sel-hd"><button class="btn sm ghost ico" data-act="selSalir" aria-label="Salir de la selección">✕</button><h2 id="ctaT" style="margin-right:auto">Editar</h2>
+      <button class="btn sm ghost ico" data-act="selMenu" data-v="borrar" aria-label="Eliminar seleccionados" ${I.web.length ? '' : 'disabled'}>${TR}</button><button class="btn sm ghost ico" data-act="selMenu" data-v="menu" aria-label="Más acciones" ${I.web.length ? '' : 'disabled'}>⋮</button></div>
+    <div class="sel-sub"><span>${I.filas.length} ${I.filas.length === 1 ? 'seleccionado' : 'seleccionados'}${I.app ? ` <span class="note">· ${I.app} de la app</span>` : ''}</span><b class="num">${ctaFmt(I.total, I.mon)}</b></div>`;
+}
+// Hoja inferior con las acciones (menú, confirmación de borrar y los formularios de cada cambio).
+function ctaSelHoja() {
+  const m = S.ctaSelMenu; if (!m) return ''; const I = ctaSelInfo(); const n = I.web.length;
+  const avisoApp = I.app ? `<div class="note">${I.app} ${I.app === 1 ? 'registro es' : 'registros son'} de Registro Contable: ${I.app === 1 ? 'cámbialo' : 'cámbialos'} en la app; aquí no se tocan.</div>` : '';
+  let c;
+  if (m === 'menu') c = `<div class="sheet-l">${[['fecha', 'Editar todas las fechas'], ['cat', 'Editar todas las categorías'], ['cta', 'Editar todas las cuentas'], ['det', 'Editar todos los detalles']].map(([k, t]) => `<button data-act="selMenu" data-v="${k}">${t}</button>`).join('')}</div>${avisoApp}`;
+  else if (m === 'borrar') c = `<div class="sheet-t">¿Eliminar ${n} ${n === 1 ? 'registro' : 'registros'}?</div><div class="note">Dejan de contar en los saldos. Quedan en Cuentas → Registros web → Eliminados y se pueden restaurar.</div>${avisoApp}<button class="btn danger sheet-b" data-act="selAplicar" data-v="borrar">Eliminar ${n}</button>`;
+  else if (m === 'fecha') c = `<div class="sheet-t">Nueva fecha para ${n}</div><input class="in sheet-in" type="date" id="selFecha" value="${esc((I.web[0] || {}).t ? I.web[0].t.fecha : hoy())}">${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="fecha">Cambiar fecha</button>`;
+  else if (m === 'cta') c = `<div class="sheet-t">Nueva cuenta para ${n}</div><select class="in sheet-in" id="selCta"><option value="">Elige la cuenta</option>${regCuentasOpts('')}</select><div class="note">En un traslado cambia el lado que está en esta cuenta.</div>${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="cta">Cambiar cuenta</button>`;
+  else if (m === 'det') { const dl = [...new Set(I.web.map(f => regDe(f.t.web)).filter(r => r.tipo === 'gasto' || r.tipo === 'ingreso').flatMap(r => regDetalles({tipo: r.tipo, grupal: r.grupal, subgrupal: r.subgrupal}).map(x => x.nom)))].slice(0, 80);
+    c = `<div class="sheet-t">Nuevo detalle para ${n}</div><input class="in sheet-in" id="selDet" list="selDetL" placeholder="Escribe o elige (vacío = sin detalle)" autocomplete="off"><datalist id="selDetL">${dl.map(x => `<option value="${esc(x)}">`).join('')}</datalist>${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="det">Cambiar detalle</button>`; }
+  else if (m === 'cat') { const tipos = new Set(I.web.map(f => regDe(f.t.web).tipo));
+    if (tipos.size !== 1 || ![...tipos][0].match(/gasto|ingreso/)) c = `<div class="sheet-t">Categorías</div><div class="note">Para cambiar la categoría en bloque, selecciona solo gastos o solo ingresos (los traslados y ajustes no tienen categoría).</div>`;
+    else { const tp = [...tipos][0]; const cat = regCatalogo(tp); const gs = S.selG || ''; const g = cat.find(x => x.nom === gs);
+      c = `<div class="sheet-t">Nueva categoría para ${n} ${tp === 'gasto' ? 'gastos' : 'ingresos'}</div>
+        <select class="in sheet-in" id="selG"><option value="">Grupal</option>${cat.map(x => `<option value="${esc(x.nom)}" ${x.nom === gs ? 'selected' : ''}>${esc(x.ver)}</option>`).join('')}</select>
+        <select class="in sheet-in" id="selS" ${g && g.hijos.length ? '' : 'disabled'}><option value="">${g && g.hijos.length ? 'Subgrupal' : 'Sin subgrupal'}</option>${(g ? g.hijos : []).map(x => `<option value="${esc(x.nom)}">${esc(x.ver)}</option>`).join('')}</select>
+        <label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="selLimpDet" checked> Quitar el detalle (puede no corresponder a la nueva categoría)</label>${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="cat">Cambiar categoría</button>`; } }
+  return `<div class="sheet-bg" data-act="selMenuX"></div><div class="sheet" role="dialog" aria-label="Acciones">${c}<button class="btn ghost sheet-b" data-act="selMenuX">No</button></div>`;
+}
+async function ctaSelAplicar(k) {
+  const I = ctaSelInfo(); if (!I.web.length) return; let campos;
+  if (k === 'fecha') { const v = ($('#selFecha') || {}).value; if (!v) return toast('Elige la fecha.'); campos = () => ({fecha: v}); }
+  else if (k === 'cta') { const v = ($('#selCta') || {}).value; if (!v) return toast('Elige la cuenta.'); campos = (r, t) => /-d$/.test(t.id) ? (v === r.cuenta ? null : {cuenta_destino: v}) : (v === r.cuenta_destino ? null : {cuenta: v}); }
+  else if (k === 'det') { const v = ((($('#selDet') || {}).value) || '').trim() || null; campos = () => ({detalle: v}); }
+  else if (k === 'cat') { const g = ($('#selG') || {}).value; if (!g) return toast('Elige el grupal.'); const sg = ($('#selS') || {}).value || null; const limp = ($('#selLimpDet') || {}).checked; campos = () => Object.assign({grupal: g, subgrupal: sg}, limp ? {detalle: null} : {}); }
+  else if (k === 'borrar') campos = () => ({estado: 'eliminado'});
+  const vistos = new Set(); let ok = 0, salt = 0; S.ctaSelMenu = null; pintarCtaFicha();
+  for (const f of I.web) { const r = regDe(f.t.web); if (vistos.has(r.id)) continue; vistos.add(r.id); const c = campos(r, f.t); if (!c) { salt++; continue; }
+    const antes = Object.assign({}, r); c.actualizado_el = new Date().toISOString();
+    if (r.tipo === 'ajuste' && k === 'cta') delete c.cuenta_destino;
+    try { const {data, error} = await sb.from('registros').update(c).eq('id', r.id).select(); if (error) throw error; Object.assign(r, data && data[0] ? data[0] : c); await regHist(r.id, k === 'borrar' ? 'eliminado' : 'editado', antes, r); ok++; } catch (e) { toast(errMsg(e)); break; } }
+  ctaSel().clear(); derive(); S._ctaVer = (S._ctaVer || 0) + 1;
+  toast(`${k === 'borrar' ? 'Eliminados' : 'Cambiados'}: ${ok}${salt ? ` · ${salt} sin cambio (la cuenta sería la misma de los dos lados)` : ''}${I.app ? ` · ${I.app} de la app sin tocar` : ''}`);
+  pintarCtaFicha(); render();
+}
+// Mantener presionado (dedo o mouse): medio segundo sin moverse.
+let _lp = null, _lpHecho = false;   // _lpHecho: el toque que sigue a mantener presionado no debe contar como otro toque
+document.addEventListener('pointerdown', e => { const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov]'); if (!it || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const x = e.clientX, y = e.clientY; clearTimeout(_lp && _lp.t); _lpHecho = false;
+  _lp = {x, y, t: setTimeout(() => { _lp = null; ctaSel().add(it.dataset.id); S.ctaSelCta = S.ctaFicha; _lpHecho = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; const lst = document.querySelector('.rc-bd'); const sc = lst ? lst.scrollTop : 0; pintarCtaFicha(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; }, 500)}; });
+['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { if (_lp) { clearTimeout(_lp.t); _lp = null; } }));
+document.addEventListener('pointermove', e => { if (_lp && Math.hypot(e.clientX - _lp.x, e.clientY - _lp.y) > 10) { clearTimeout(_lp.t); _lp = null; } });
+document.addEventListener('contextmenu', e => { if (e.target.closest('.cta-modal .rc-it')) e.preventDefault(); });
+// En modo selección un toque suma o quita el registro (no abre su detalle).
+document.addEventListener('click', e => {
+  const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov]');
+  if (it && (ctaSel().size || _lpHecho)) { e.stopImmediatePropagation(); e.preventDefault(); if (_lpHecho) { _lpHecho = false; return; }
+    const id = it.dataset.id; ctaSel().has(id) ? ctaSel().delete(id) : ctaSel().add(id); const sc = (document.querySelector('.rc-bd') || {}).scrollTop || 0; pintarCtaFicha(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; return; }
+  const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
+  if (act === 'selSalir') { ctaSel().clear(); S.ctaSelMenu = null; return pintarCtaFicha(); }
+  if (act === 'selMenu') { S.ctaSelMenu = b.dataset.v; S.selG = ''; return pintarCtaFicha(); }
+  if (act === 'selMenuX') { S.ctaSelMenu = null; return pintarCtaFicha(); }
+  if (act === 'selAplicar') return ctaSelAplicar(b.dataset.v);
+}, true);
+document.addEventListener('change', e => { if (e.target.id === 'selG') { S.selG = e.target.value; pintarCtaFicha(); } });
+
 // pintarCtaFicha: detalle de una cuenta en ventana emergente (pantalla completa en el teléfono): saldo y movimientos por día.
 function pintarCtaFicha() {
   /* Detalle de una cuenta como en Registro Contable: pestañas Diario / Mensual / Anual, flechas para cambiar de período,
      franja Depósito · Retiro · Balance · Saldo del período y, en Diario, los registros por día con el saldo que quedó después de cada uno. */
-  const n = S.ctaFicha; if (!n) return; const d = ctaDatos(n); const i = d.i; const fmt = v => ctaFmt(v, i.mon); const sinSaldo = !!i.pago;
+  const n = S.ctaFicha; if (!n) return; if (S.ctaSelCta !== n) { ctaSel().clear(); S.ctaSelMenu = null; S.ctaSelCta = n; } const d = ctaDatos(n); const i = d.i; const enSel = ctaSel().size > 0; const fmt = v => ctaFmt(v, i.mon); const sinSaldo = !!i.pago;
   const num = v => (i.mon === 'USD' ? '$ ' : '') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const sNum = v => (v < -0.004 ? '-' : '') + num(v);
   const vista = S.ctaVista || 'd'; const mHoy = hoy().slice(0, 7);
@@ -5265,7 +5352,7 @@ function pintarCtaFicha() {
       const tit = (t.nota ? notaG(t.cat, t.sub, t.nota) : '') || (tras ? 'Traslado' : subG(t.cat, t.sub) || catG(t.cat) || 'Registro');
       const hx = t.hora || (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
-      return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="Ver todo el detalle del movimiento"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
+      return `<div class="rc-it ${enSel && ctaSel().has(t.id) ? 'rc-sel' : ''}" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="${enSel ? 'Tocar para seleccionar' : 'Ver todo el detalle · mantener presionado para seleccionar'}"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
         <div class="rc-v"><span class="num ${f.lado === 'r' ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${sNum(f.lado === 'r' ? -f.v : f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
     cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const r = resumen(ls, fe); const wd = dt.getDay();
       return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}</span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
@@ -5286,8 +5373,8 @@ function pintarCtaFicha() {
     : nProb ? `<div class="tj-aviso">${nProb} ${nProb === 1 ? 'traslado de esta cuenta no tiene' : 'traslados de esta cuenta no tienen'} su otra cuenta clara. <button class="btn sm" data-act="ctaIrTras">Revisar traslados</button></div>` : '';
   const LUPA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal cta-modal rc-modal" role="dialog" aria-modal="true" aria-labelledby="ctaT">
-    <div class="hd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0">${ctaClsIco(i.clase)}<div style="min-width:0"><h2 id="ctaT">${esc(i.nom)}</h2><div class="note">${i.tipo ? esc(i.tipo.nombre) : 'Sin tipo'}${i.cfg.alias ? ' · ' + esc(i.n) : ''} · ${i.mon === 'USD' ? 'dólares' : 'lempiras'}${sinSaldo ? '' : ' · saldo hoy <b class="num ' + (d.saldo < -0.004 ? 'neg' : '') + '">' + fmt(d.saldo) + '</b>'}</div></div></div>
-      <button class="btn sm ghost ico" data-act="ctaBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.ctaBus}">${LUPA}</button>${icoBtn('editar', 'Editar cuenta', 'ctaEditar')}<button class="btn sm ghost ico" data-act="cerrarModal" title="Cerrar (Esc)" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    ${enSel ? ctaSelBarra() : `<div class="hd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0">${ctaClsIco(i.clase)}<div style="min-width:0"><h2 id="ctaT">${esc(i.nom)}</h2><div class="note">${i.tipo ? esc(i.tipo.nombre) : 'Sin tipo'}${i.cfg.alias ? ' · ' + esc(i.n) : ''} · ${i.mon === 'USD' ? 'dólares' : 'lempiras'}${sinSaldo ? '' : ' · saldo hoy <b class="num ' + (d.saldo < -0.004 ? 'neg' : '') + '">' + fmt(d.saldo) + '</b>'}</div></div></div>
+      <button class="btn sm ghost ico" data-act="ctaBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.ctaBus}">${LUPA}</button>${icoBtn('editar', 'Editar cuenta', 'ctaEditar')}<button class="btn sm ghost ico" data-act="cerrarModal" title="Cerrar (Esc)" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}
     <div class="bd rc-bd">
       ${S.ctaEdit ? ctaForm(i) : ''}${aviso}
       ${S.ctaBus ? `<input class="in" id="ctaQ" type="search" placeholder="Buscar en todos los registros (texto o monto)" value="${esc(S.ctaQ || '')}" style="max-width:none">` : ''}
@@ -5295,7 +5382,7 @@ function pintarCtaFicha() {
       <div class="rc-tabs" role="tablist">${[['d', 'Diario'], ['m', 'Mensual'], ['a', 'Anual']].map(([k, t]) => `<button class="${vista === k && !qq ? 'on' : ''}" role="tab" aria-selected="${vista === k}" data-act="ctaVista" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="rc-sum"><div><span>Depósito</span><b class="num rc-d">${num(R.dep)}</b></div><div><span>Retiro</span><b class="num rc-r">${num(R.ret)}</b></div><div><span>Balance</span><b class="num">${sNum(R.bal)}</b></div><div><span>Saldo</span><b class="num rc-sl2">${sinSaldo ? '—' : sNum(R.saldo)}</b></div></div>
       <div class="rc-lst">${cuerpo}</div>
-    </div></div></div>`;
+    </div>${ctaSelHoja()}</div></div>`;
 }
 // ctaForm: editar la configuración de una cuenta (tipo, moneda, nombre corto, cuenta de pago, total, oculta).
 function ctaForm(i) {
