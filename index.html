@@ -1548,13 +1548,14 @@ window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return;
 // renderTabs: Dibuja la barra superior: pestañas, contadores, botón Sincronizar, usuario, Guía y Salir.
 function renderTabs() {
   const a = esAdmin(); const nb = bandeja().length, nv = porValidar().length + regPendientes().length;
+  // Orden del encabezado: Inicio, Cuentas, Vehículos, Proyectos, los gestores de gastos (controles), Bandeja, Por validar, Cambios, Movimientos, Usuarios, Ajustes.
   const items = [['inicio', 'Inicio']];
+  if (a) { const nv = ctaAlertas(); items.push(['cuentas', `Cuentas${nv.tc + nv.pre ? ` <span class="count bad-bg">${nv.tc + nv.pre}</span>` : ''}`]); }
+  if (S.veh !== undefined && (a || vehs().length)) items.push(['vehiculos', `Vehículos${a && detectados().length ? ` <span class="count warn-bg">${detectados().length}</span>` : ''}`]);
+  if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
+  familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
   if (a) items.push(['bandeja', `Bandeja ${nb ? `<span class="count">${nb}</span>` : ''}`], ['validar', `Por validar ${nv ? `<span class="count warn-bg">${nv}</span>` : ''}`]);
   const nc = a ? cambios().length : 0; if (nc || S.view === 'cambios') items.push(['cambios', `Cambios ${nc ? `<span class="count bad-bg">${nc}</span>` : ''}`]);
-  familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
-  if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
-  if (S.veh !== undefined && (a || vehs().length)) items.push(['vehiculos', `Vehículos${a && detectados().length ? ` <span class="count warn-bg">${detectados().length}</span>` : ''}`]);
-  if (a) { const nv = ctaAlertas(); items.push(['cuentas', `Cuentas${nv.tc + nv.pre ? ` <span class="count bad-bg">${nv.tc + nv.pre}</span>` : ''}`]); }
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
   const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
   $('#tabs').innerHTML = items.map(([h, l]) => `<a href="#${h}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`).join('');
