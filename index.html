@@ -5186,7 +5186,7 @@ const ctaClsIco = cl => `<span class="cta-ico cta-${cl || 'x'}" aria-hidden="tru
 // ctaTotales: Capital (lo que se tiene), A deber (tarjetas y préstamos) y Balance, en L y en $; equivalente en lempiras a la tasa del día.
 function ctaTotales(infos) {
   const T = {capL: 0, capU: 0, debL: 0, debU: 0, n: 0};
-  infos.forEach(i => { if (!i.incl || i.elim || i.pago) return;   /* una inhabilitada sigue contando (su dinero existe); una eliminada no */ const d = ctaDatos(i.n); const k = (i.deuda ? 'deb' : 'cap') + (i.mon === 'USD' ? 'U' : 'L'); T[k] = crR2(T[k] + d.saldo); T.n++; });
+  infos.forEach(i => { if (!i.incl || i.elim || i.pago || i.estado !== 'activa') return;   /* solo cuentas activas: las inhabilitadas y eliminadas no suman en el resumen ni en los totales por tipo */ const d = ctaDatos(i.n); const k = (i.deuda ? 'deb' : 'cap') + (i.mon === 'USD' ? 'U' : 'L'); T[k] = crR2(T[k] + d.saldo); T.n++; });
   const tasa = tasaUSD(); T.cap = crR2(T.capL + T.capU * tasa); T.deb = crR2(T.debL + T.debU * tasa); T.bal = crR2(T.cap + T.deb); return T;
 }
 // ctaOrdCmp: orden elegido por el administrador (ajuste ctaOrden: lista de nombres); las que no están, después, por nombre.
