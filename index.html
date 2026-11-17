@@ -645,6 +645,9 @@ table.cta-adm td{vertical-align:middle}table.cta-adm .in{min-width:0;width:100%;
 .ct-l2{font-size:11px;color:var(--muted);margin-top:1px}.ct-l2 .chip{font-size:9.5px;padding:0 5px}
 .ct-acc{display:flex;gap:2px;align-items:center}.ct-acc .btn[disabled]{opacity:.25}.ct-pw-off{color:var(--bad)}
 .ct-ed{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 12px;padding:8px 0 4px 34px}.ct-ed label{display:grid;gap:3px;font-size:11.5px;color:var(--muted)}
+.ct-ed>*,.ct-sus>*{min-width:0}.ct-ed .in{width:100%;max-width:100%;min-width:0;box-sizing:border-box}.ct-ed select.in{text-overflow:ellipsis}
+.ct-sus{grid-column:1/-1;display:flex;gap:8px;align-items:end;flex-wrap:wrap}.ct-sus label{flex:1 1 260px}.ct-sus .note{flex:1 1 100%}
+.ct-reglas{padding:10px 12px;display:grid;gap:6px;border-top:1px solid var(--line)}.ct-regla{display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .ct-ctl{display:flex;gap:4px;flex-wrap:wrap;align-items:center;grid-column:1/-1}.ct-ctl .cta-add{width:auto}.ct-edb{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ct-fbd>*{min-width:0}.ct-fbd .in{width:100%;max-width:none}.ct-mov{display:none;gap:4px;align-items:center}
 @media (max-width:760px){
@@ -1015,6 +1018,19 @@ const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo:
 const normMov = m => Object.assign({}, m, {valor: +m.valor || 0, fecha: m.fecha ? String(m.fecha).slice(0, 10) : null, app_monto: m.app_monto == null ? null : +m.app_monto, app_fecha: m.app_fecha ? String(m.app_fecha).slice(0, 10) : null});
 
 // rowToTx: Convierte una fila de Registro Contable [id, fecha, código, cuenta, …, monto] en un objeto "tx". Aplica la moneda extranjera si se importó.
+/* Sustituciones de categorías (ajuste catReglas): "lo que esté en Grupal › Subgrupal › Detalle X pasa a Y", para todos los registros.
+   Los datos de la app no se tocan (la sincronización los vuelve a traer igual): la regla se aplica cada vez que se arman los registros,
+   así que también vale para lo que se sincronice después. Cada regla: {id, tipo, de: [grupal, subgrupal?, detalle?], a: [...], el}.
+   Si el destino es igual o más profundo que el origen se conservan los niveles de abajo del registro; si es menos profundo, se vacían. */
+function reclasificar(t) {
+  const reglas = S.aj && S.aj.catReglas; if (!reglas || !reglas.length) return t;
+  if (t.code === 3 || t.code === 4 || /dinero (ingresad|gastad)|transfer|traslad/i.test(String(t.tipoMov || '')) || /modificar saldo/i.test(t.cat)) return t;
+  const tipo = t.code === 0 ? 'ingreso' : 'gasto';
+  for (const r of reglas) { if (r.tipo !== tipo) continue; const v = [t.cat, t.sub, t.nota]; if (!r.de.every((x, i) => v[i] === x)) continue;
+    if (!t.orig) t.orig = {cat: t.cat, sub: t.sub, nota: t.nota}; const nv = [0, 1, 2].map(i => i < r.a.length ? r.a[i] : r.a.length >= r.de.length ? v[i] : '');
+    [t.cat, t.sub, t.nota] = nv; (t.reglas || (t.reglas = [])).push(r.id); }
+  return t;
+}
 function rowToTx(r) {
   const [id, fecha, code, cuenta, tipoMov, cat, sub, nota, det, monto] = r;
   const t = {id, fecha, code, cuenta, tipoMov, cat: (cat || '').trim(), sub: (sub || '').trim(), nota: (nota || '').trim(), det: (det || '').trim(), monto: Math.abs(+monto || 0), neg: (+monto || 0) < 0, mes: fecha.slice(0, 7)};
@@ -1042,7 +1058,7 @@ function decisionDe(id) {
 function derive() {
   const txs = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
-    const t = rowToTx(r); const dc = decisionDe(t.id);
+    const t = reclasificar(rowToTx(r)); const dc = decisionDe(t.id);
     if (dc.borrado) t.borradoApp = dc.borrado.at; if (dc.web) t.versionWeb = dc.web;
     txs.push(t);
   }
@@ -3862,7 +3878,7 @@ function abrirDetalleTx(id) {
       ${enCta}${trasHtml}
       <div class="eyebrow">En Registro Contable</div>
       <table class="dist"><tbody>
-        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${fila('Grupal', esc(catG(t.cat)) + (catG(t.cat) !== t.cat && t.cat ? ` <span class="note">(${esc(t.cat)})</span>` : ''))}${fila('Subgrupal', esc(subG(t.cat, t.sub)))}${fila('Detalle', esc(notaG(t.cat, t.sub, t.nota)))}${fila('Descripción', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
+        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${t.orig ? fila('Sustituida', `<span class="small">en la app: ${esc([t.orig.cat, t.orig.sub, t.orig.nota].filter(Boolean).join(' › '))}</span>`) : ''}${fila('Grupal', esc(catG(t.cat)) + (catG(t.cat) !== t.cat && t.cat ? ` <span class="note">(${esc(t.cat)})</span>` : ''))}${fila('Subgrupal', esc(subG(t.cat, t.sub)))}${fila('Detalle', esc(notaG(t.cat, t.sub, t.nota)))}${fila('Descripción', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
       </tbody></table>
       <div class="eyebrow">En la plataforma</div>
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
@@ -5018,8 +5034,10 @@ function vCtaCats() {
         ${nd.nivel === 1 && c ? `<label>Unir con<select class="in" data-catr-f="${esc(c)}" id="ctUnir"><option value="">—</option>${nombresG.filter(x => x !== c).map(x => `<option value="${esc(x)}" ${a.grupo === x ? 'selected' : ''}>${esc(catNom(x))}</option>`).join('')}</select></label>` : ''}
         ${nd.nivel === 1 && c && tipo === 'gasto' ? `<div class="ct-ctl"><span class="note">Va al control</span>${van.map(x => { const exact = (x.categorias || []).includes(c); return `<span class="chip"><span class="dot ${colorClass(x)}"></span>${esc(x.corto || x.nombre)}${exact ? ` <button class="cta-chx" data-act="catQuitarCtl" data-ctl="${esc(x.id)}" data-c="${esc(c)}" aria-label="Quitar">×</button>` : ''}</span>`; }).join('')}${ctrls.filter(x => !van.includes(x)).length ? `<select class="in cta-add" data-catctl="${esc(c)}" aria-label="Agregar a un control"><option value="">+ control</option>${ctrls.filter(x => !van.includes(x)).map(x => `<option value="${esc(x.id)}">${esc(x.corto || x.nombre)}</option>`).join('')}</select>` : ''}</div>` : ''}
         ${nd.app && nd.nombre !== nd.app ? `<div class="note">En la app se llama “${esc(nd.app)}”.</div>` : ''}
+        <div class="ct-sus"><label>Sustituir por<select class="in" id="ctSus"><option value="">— elige el destino —</option>${plano.filter(pr => { const kk = llave(pr); return kk !== k && !kk.startsWith(k + '›'); }).map(pr => `<option value="${esc(llave(pr))}">${'· '.repeat(pr.length - 1)}N${pr.length} ${esc(pr.map(x => x.nombre).join(' › '))}</option>`).join('')}</select></label>
+          <button class="btn sm" data-act="catSustituir" data-k="${esc(k)}">Sustituir</button><span class="note">Pasa sus ${nd.u ? nd.u.n : 0} registros al destino${nd.nivel < 3 ? ', con lo que tengan debajo' : ''}. Luego podrás eliminar esta si queda sin registros.</span></div>
         <div class="ct-mov"><span class="note">Orden</span>${ib('arriba', 'Subir', 'catMover', k, '', !i)}${ib('abajo', 'Bajar', 'catMover', k, 'ct-dn', i === hermanos.length - 1)}</div>
-        <div class="ct-edb">${web && !nd.u && !nd.hijos.length ? (S.catConfBorrar === k ? `<button class="btn sm danger" data-act="catBorrar" data-k="${esc(k)}">¿Eliminar? Sí</button>` : `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(k)}">Eliminar</button>`) : ''}<span style="flex:1"></span><button class="btn sm ghost" data-act="catEditar" data-k="">Cancelar</button><button class="btn sm pri" data-act="catEdOk" data-k="${esc(k)}">Guardar</button></div></div>`; }
+        <div class="ct-edb">${nd.row && !nd.u ? (S.catConfBorrar === k ? `<button class="btn sm danger" data-act="catBorrar" data-k="${esc(k)}">¿Eliminar? Sí</button>` : `<button class="btn sm ghost danger" data-act="catBorrar" data-k="${esc(k)}">Eliminar</button>`) : ''}<span style="flex:1"></span><button class="btn sm ghost" data-act="catEditar" data-k="">Cancelar</button><button class="btn sm pri" data-act="catEdOk" data-k="${esc(k)}">Guardar</button></div></div>`; }
     const sub = nd.u ? `${nd.u.n} reg. · ${L(nd.u.tot)}` : 'sin registros';
     return `<div class="ct-row n${nd.nivel} ${act ? '' : 'ct-off'} ${edit === k ? 'ct-on' : ''}" data-k="${esc(k)}">
       <span class="ct-tg">${nd.hijos.length ? `<button class="ct-chev" data-act="catAbrir" data-k="${esc(k)}" aria-expanded="${!!abierta}" aria-label="${abierta ? 'Contraer' : 'Expandir'}">${abierta ? '▾' : '▸'}</button>` : ''}</span>
@@ -5042,7 +5060,10 @@ function vCtaCats() {
         <button class="btn sm ghost" data-act="catExpTodo">${S.catExpTodo ? 'Contraer todo' : 'Expandir todo'}</button>${icoBtn('bajarxl', 'Exportar a Excel', 'catExcel')}</div>
       <div class="ct-hd" aria-hidden="true"><span></span><span>Nombre · nivel</span><span>Acciones</span></div>
       ${filas || `<div class="bd note">${qq ? 'Nada coincide con la búsqueda.' : 'Sin categorías todavía.'}</div>`}
-      <div class="bd note">Toca un nombre para editarlo. <b>N1 Grupal</b> = categoría, <b>N2 Subgrupal</b> = subcategoría, <b>N3 Detalle</b> = nota del registro. Desactivar lo quita de los filtros y de los registros nuevos sin tocar los registros que ya lo usan. Solo se elimina lo creado aquí que no tiene registros ni elementos debajo.</div></div>`;
+      ${(() => { const rs = (S.aj && S.aj.catReglas || []).filter(r => r.tipo === tipo); if (!rs.length) return ''; const cnt = {}; D.txs.forEach(t => (t.reglas || []).forEach(id => cnt[id] = (cnt[id] || 0) + 1));
+        const nom = p => p.map((x, i) => i === 0 ? catNom(x) : i === 1 ? subG(p[0], x) : notaG(p[0], p[1], x)).join(' › ');
+        return `<div class="ct-reglas"><div class="eyebrow">Sustituciones aplicadas (${rs.length})</div>${rs.map(r => `<div class="ct-regla"><div style="min-width:0;flex:1"><b>${esc(r.de.join(' › '))}</b> → ${esc(nom(r.a))}<div class="note">${cnt[r.id] || 0} registros · ${fFecha(String(r.el).slice(0, 10))}</div></div><button class="btn sm ghost" data-act="catDeshacer" data-id="${esc(r.id)}">Deshacer</button></div>`).join('')}</div>`; })()}
+      <div class="bd note">Toca un nombre para editarlo. <b>N1 Grupal</b> = categoría, <b>N2 Subgrupal</b> = subcategoría, <b>N3 Detalle</b> = nota del registro. Desactivar lo quita de los filtros y de los registros nuevos sin tocar los registros que ya lo usan. <b>Sustituir por</b> pasa todos los registros de un elemento a otro (también los que se sincronicen después); se puede deshacer. Se puede eliminar lo que ya no tiene registros.</div></div>`;
 }
 async function catGuardar(c, campos) {
   if (!S.catAj) return toast('Primero corre en Supabase el SQL de cuentas (cuentas.sql).');
@@ -5086,9 +5107,19 @@ async function catAccion(b) {
       const row = {id: crUid(), tipo, padre: prow ? prow.id : null, nombre: nom, app_nombre: null, orden: Math.max(0, ...hs) ? Math.max(...hs) + 10 : 0, activa: true, origen: 'web', validada: true};
       const d = await q(sb.from('categorias').insert(row).select(), CAT_NIV[pr.length + 1] + ' creado'); S.cats.push(d && d[0] ? d[0] : row); catMapas();
       if (pk) (S.catExp || (S.catExp = new Set())).add(pk); S.catPadre = pk; } catch (e) {} render(); const n = $('#catNuevoNom'); if (n) n.focus(); return; }
-  if (act === 'catBorrar') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; if (!nd.row || nd.row.origen !== 'web' || nd.u || nd.hijos.length) return;
+  if (act === 'catBorrar') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; if (!nd.row || nd.u) return;   /* sin registros (ni debajo): se puede eliminar, con lo que tenga debajo */
     if (S.catConfBorrar !== k) { S.catConfBorrar = k; return render(); } S.catConfBorrar = null;
-    try { await q(sb.from('categorias').delete().eq('id', nd.row.id), 'Eliminado'); S.cats = S.cats.filter(r => r.id !== nd.row.id); catMapas(); S.catEdit = ''; } catch (e) {} return render(); }
+    const quitar = new Set([nd.row.id]); let cambio = true; while (cambio) { cambio = false; S.cats.forEach(r => { if (r.padre && quitar.has(r.padre) && !quitar.has(r.id)) { quitar.add(r.id); cambio = true; } }); }
+    try { await q(sb.from('categorias').delete().eq('id', nd.row.id), 'Eliminado'); S.cats = S.cats.filter(r => !quitar.has(r.id)); catMapas(); S.catEdit = ''; } catch (e) {} return render(); }
+  if (act === 'catSustituir') { const ruta = catRuta(tipo, keys); const sel = $('#ctSus'); if (!ruta || !sel || !sel.value) return toast('Elige por cuál se sustituye.');
+    const dest = catRuta(tipo, sel.value.split('›')); if (!dest) return; const nd = ruta[ruta.length - 1]; const n = nd.u ? nd.u.n : 0;
+    if (S.catConfSus !== k + '→' + sel.value) { S.catConfSus = k + '→' + sel.value; const bt = document.querySelector('[data-act=catSustituir]'); if (bt) { bt.textContent = `¿Sustituir en ${n} registros? Sí`; bt.classList.add('danger'); } return; } S.catConfSus = null;
+    try { // el destino se reconoce por su nombre: si se creó aquí, se fija su nombre de enlace
+      for (let i = 0; i < dest.length; i++) { const x = dest[i]; if (!x.app) { const row = await catGuardarRuta(tipo, dest.slice(0, i + 1), {app_nombre: x.nombre}); x.app = row.app_nombre; } }
+      const regla = {id: crUid(), tipo, de: ruta.map(x => x.app), a: dest.map(x => x.app || x.nombre), el: new Date().toISOString()};
+      await guardarAjuste('catReglas', [...(S.aj.catReglas || []), regla]); derive(); S.catEdit = ''; toast(`Sustituida en ${n} registros`); } catch (e) {} return render(); }
+  if (act === 'catDeshacer') { const reglas = (S.aj.catReglas || []).filter(r => r.id !== b.dataset.id);
+    try { await guardarAjuste('catReglas', reglas); derive(); toast('Sustitución deshecha: los registros vuelven a su categoría'); } catch (e) {} return render(); }
   if (act === 'catValidarTodo') { if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
     // Se guarda todo de una vez: primero los Grupales, luego Subgrupales y Detalles, cada uno con su padre.
     const filas = []; const recorrer = (l, padre) => l.forEach(nd => { if (!nd.row) nd.row = {id: crUid(), tipo, padre: padre ? padre.id : null, nombre: nd.nombre, app_nombre: nd.app || null, orden: 0, activa: true, origen: 'app'};
@@ -5144,7 +5175,7 @@ document.addEventListener('click', async e => {
   if (act === 'cttBorrar') { const id = b.dataset.id; if (S.confirmCtt !== id) { S.confirmCtt = id; return render(); } S.confirmCtt = null;
     try { await q(sb.from('cuenta_tipos').delete().eq('id', id), 'Tipo eliminado'); S.ctT = S.ctT.filter(t => t.id !== id); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
   if (act === 'catTipo') { S.catTipo = b.dataset.v; S.catEdit = ''; S.catPadre = ''; S.catQ = ''; return render(); }
-  if (['catAbrir', 'catForm', 'catExpTodo', 'catExcel', 'catEditar', 'catNuevoEn', 'catEdOk', 'catActiva', 'catMover', 'catCrear', 'catBorrar', 'catValidarTodo'].includes(act)) return catAccion(b);
+  if (['catAbrir', 'catForm', 'catExpTodo', 'catExcel', 'catEditar', 'catNuevoEn', 'catEdOk', 'catActiva', 'catMover', 'catCrear', 'catBorrar', 'catValidarTodo', 'catSustituir', 'catDeshacer'].includes(act)) return catAccion(b);
   if (act === 'catUnir') { const a = b.dataset.a; const l = JSON.parse(b.dataset.l || '[]'); try { for (const c of l) await catGuardar(c, {grupo: a}); toast(`Unidas en “${a}”`); } catch (er) {} return render(); }
   if (act === 'catQuitarCtl') { const c = ctrlById(b.dataset.ctl); if (!c) return; c.categorias = (c.categorias || []).filter(p => p !== b.dataset.c);
     try { await guardarControl(c); toast('Quitada de ' + (c.corto || c.nombre)); } catch (er) {} return render(); }
