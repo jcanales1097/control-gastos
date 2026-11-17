@@ -774,6 +774,8 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .tjm-pv{color:var(--good);font-weight:600}.tjm-ap{color:var(--good);font-weight:600;white-space:nowrap}.tjm-man{border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-block:8px}
 .tjm-th,.tjm-pr{grid-template-columns:96px repeat(4,1fr);align-items:start}.tjm-th{align-items:end}.tjm-th span:first-child{text-align:left}.tjm-pr b{display:grid;justify-items:start;gap:2px;line-height:1.15}.tjm-pr b .cat{font-weight:400;font-size:10.5px}.tjm-pr .chip{font-size:10px;padding:1px 6px;font-weight:600}.tjm-pr .num{padding-top:2px}.tjm-pr .rc-sl2.neg{color:var(--bad);font-weight:600}
 @media (max-width:760px){.tjm-th,.tjm-pr{grid-template-columns:70px repeat(4,1fr)}.tjm-pr .chip{font-size:9px;padding:1px 5px}}
+.app-ed{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk)}.app-ed label{display:grid;gap:4px;font-size:12px;color:var(--muted)}.app-ed .in{width:100%!important;max-width:none;font-size:16px}
+.app-ed-n{font-size:12.5px;border-left:3px solid var(--good);padding:4px 10px;margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
 /* ===== Fase 4 ===== */
@@ -1271,7 +1273,7 @@ function decisionDe(id) {
 function derive() {
   const txs = []; const corte = corteApp(); const post = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
-    const t = reclasificar(rowToTx(r)); const dc = decisionDe(t.id);
+    const t = reclasificar(rowToTx(appAplicarEd(r))); const dc = decisionDe(t.id); if (appEds()[t.id]) t.edWeb = appEds()[t.id];
     if (dc.borrado) t.borradoApp = dc.borrado.at; if (dc.web) t.versionWeb = dc.web;
     if (corte && t.fecha > corte) { if (!t.borradoApp) post.push(t); continue; }   // después del corte con la app solo cuenta lo registrado en la web
     txs.push(t);
@@ -4085,7 +4087,7 @@ async function iniciarHistorial() {
 }
 // abrirDetalleTx: Ficha completa de un registro de la app con su historial.
 function abrirDetalleTx(id) {
-  const t = D.byId.get(id); if (!t) return; S.detAbierto = {tipo: 'tx', id};
+  const t = D.byId.get(id); if (!t) return; S.detAbierto = {tipo: 'tx', id}; if (S.appEd && S.appEd !== id) S.appEd = null;
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
   const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
   const e = estadoTx(t); const pp = partes(t.id); const h = S.hist && S.hist.get(t.id); const ign = S.ign.get(t.id);
@@ -4113,7 +4115,7 @@ function abrirDetalleTx(id) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal dtx-modal" role="dialog" aria-modal="true" aria-labelledby="dtxT">
     <div class="hd"><h2 id="dtxT" style="margin-right:auto">${esc(t.nota || t.det || 'Movimiento')}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="${ctaN ? 'Volver a la cuenta' : 'Cerrar'}">${ctaN ? '‹ Volver' : 'Cerrar'}</button></div>
     <div class="bd">
-      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${tjEsTras(t) ? 'Traslado' : tjEsAjuste(t) ? (tjSignoBase(t) > 0 ? 'Ajuste de saldo (suma)' : 'Ajuste de saldo (resta)') : t.code === 0 ? 'Ingreso' : 'Egreso'}</span>${t.versionWeb ? '<span class="chip">Versión web conservada</span>' : ''}</div>
+      <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${tjEsTras(t) ? 'Traslado' : tjEsAjuste(t) ? (tjSignoBase(t) > 0 ? 'Ajuste de saldo (suma)' : 'Ajuste de saldo (resta)') : t.code === 0 ? 'Ingreso' : 'Egreso'}</span>${t.versionWeb ? '<span class="chip">Versión web conservada</span>' : ''}${t.edWeb ? '<span class="chip ok">Editado en la web</span>' : ''}</div>
       ${t.borradoApp ? `<div class="panel"><div class="bd small row" style="justify-content:space-between"><span><b class="neg">Borrado en la app.</b> Lo mantuviste en la plataforma el ${fFecha(t.borradoApp.slice(0, 10))}. Elimínalo cuando quieras homologar con la app${partes(t.id).length ? '; también se quitará de los controles donde está asignado' : ''}.</span><button class="btn sm danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? '¿Seguro? Eliminar' : 'Eliminar de la plataforma'}</button></div></div>` : ''}
       ${enCta}${trasHtml}
       ${usdFixHtml(t)}
@@ -4121,6 +4123,7 @@ function abrirDetalleTx(id) {
       <table class="dist"><tbody>
         ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${t.orig ? fila('Sustituida', `<span class="small">en la app: ${esc([t.orig.cat, t.orig.sub, t.orig.nota].filter(Boolean).join(' › '))}</span>`) : ''}${fila('Grupal', esc(catG(t.cat)) + (catG(t.cat) !== t.cat && t.cat ? ` <span class="note">(${esc(t.cat)})</span>` : ''))}${fila('Subgrupal', esc(subG(t.cat, t.sub)))}${fila('Detalle', esc(notaG(t.cat, t.sub, t.nota)))}${fila('Descripción', esc(t.det))}${fila(t.web ? 'Tipo' : 'Tipo en la app', esc(t.tipoMov))}${fila(t.web ? 'Registro web' : 'ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
       </tbody></table>
+      ${appEdHtml(t)}
       <div class="eyebrow">En la plataforma</div>
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
         ${restante(t) > 0.005 ? `<tr><td class="muted">Sin repartir</td><td class="num warn-t">${L(restante(t))}</td></tr>` : ''}</tbody></table>` : `<div class="note">${ign ? 'Marcado como no aplica' + (ign.motivo ? ': ' + esc(ign.motivo) : '') : 'Todavía no está en ningún control ni proyecto.'}</div>`}
@@ -4131,6 +4134,64 @@ function abrirDetalleTx(id) {
       <div class="row" style="justify-content:flex-end">${e === 'noaplica' ? `<button class="btn sm" data-act="restaurar" data-id="${esc(t.id)}">Devolver a la bandeja</button>` : ''}${restante(t) > 0.005 && e !== 'noaplica' ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">${pp.length ? 'Repartir lo que falta' : 'Asignar o dividir'}</button>` : pp.length ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">Cambiar reparto</button>` : ''}</div>
     </div></div></div>`;
 }
+
+/* ===================== Editar registros de Registro Contable =====================
+   Desde el corte la plataforma es la fuente: los registros que llegaron de la app también se editan aquí. El cambio se guarda aparte
+   (ajuste "appEdits", por id del registro) y se aplica encima de lo sincronizado: el registro conserva su id, así que sus asignaciones,
+   pagos de tarjeta, comprobantes y dólares escritos a mano siguen ligados. "Volver a lo de la app" quita el cambio. */
+const appEds = () => (S.aj && S.aj.appEdits) || {};
+// appAplicarEd: fila del portal [id, fecha, code, cuenta, tipo, cat, sub, nota, det, monto, extra] con los cambios hechos en la web.
+function appAplicarEd(r) { const o = appEds()[r[0]]; if (!o) return r; const x = r.slice();
+  if (o.fecha) x[1] = o.fecha; if (o.cuenta) x[3] = o.cuenta; if ('cat' in o) x[5] = o.cat; if ('sub' in o) x[6] = o.sub; if ('nota' in o) x[7] = o.nota; if ('det' in o) x[8] = o.det;
+  if (o.monto != null) x[9] = (+r[9] < 0 ? -1 : 1) * Math.abs(+o.monto); return x; }
+const appTipo = t => tjEsTras(t) ? 'traslado' : tjEsAjuste(t) ? 'ajuste' : t.code === 0 ? 'ingreso' : 'gasto';
+const appEsUSD = t => tjMonDe(tjCta(t.cuenta)) === 'USD';
+// appParche: cambios para un registro (solo lo que es distinto de lo que trajo la app). Devuelve el mapa nuevo de appEdits.
+function appParche(m, t, cambios) { const prev = m[t.id] || {}; const app = prev.app || {fecha: t.fecha, cuenta: t.cuenta, cat: t.cat, sub: t.sub, nota: t.nota, det: t.det, monto: t.monto};
+  const o = Object.assign({}, prev, cambios); const n = {app, por: S.me.id, el: new Date().toISOString()}; let hay = false;
+  ['fecha', 'cuenta', 'cat', 'sub', 'nota', 'det'].forEach(k => { if (k in o && (o[k] || '') !== (app[k] || '')) { n[k] = o[k] || ''; hay = true; } });
+  if (o.monto != null && cents(o.monto) !== cents(app.monto)) { n.monto = +o.monto; hay = true; }
+  if (hay) m[t.id] = n; else delete m[t.id]; return m; }
+async function appGuardarEds(m) { await guardarAjuste('appEdits', m); S.aj.appEdits = m; derive(); S._ctaVer = (S._ctaVer || 0) + 1; }
+// appEdHtml: en el detalle de un registro de la app: quién lo editó en la web, el botón Editar y el formulario.
+function appEdHtml(t) {
+  if (t.web || !esAdmin()) return ''; const o = appEds()[t.id]; const tipo = appTipo(t); const usd = appEsUSD(t); const corte = corteApp();
+  const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
+  const antes = o ? [o.fecha && ['fecha', fFecha(o.app.fecha)], o.cuenta && ['cuenta', o.app.cuenta], ('cat' in o || 'sub' in o || 'nota' in o) && ['categoría', [o.app.cat, o.app.sub, o.app.nota].filter(Boolean).join(' › ') || '—'], 'det' in o && ['descripción', o.app.det || '—'], o.monto != null && ['monto', L(o.app.monto)]].filter(Boolean) : [];
+  const nota = o ? `<div class="app-ed-n"><b>Editado en la web</b> por ${esc(nombreDe(o.por))} · ${cuando(o.el)}${antes.length ? `<div class="cat">En la app era: ${antes.map(([k, v]) => k + ' ' + esc(v)).join(' · ')}</div>` : ''}</div>` : '';
+  if (S.appEd !== t.id) return `${nota}<div class="row" style="justify-content:flex-end;gap:8px">${o ? (S.appEdQ === t.id ? `<span class="note">¿Volver a como está en la app?</span><button class="btn sm ghost" data-act="appEdQ" data-id="">No</button><button class="btn sm" data-act="appEdRev" data-id="${esc(t.id)}">Sí, volver</button>` : `<button class="btn sm ghost" data-act="appEdQ" data-id="${esc(t.id)}">Volver a lo de la app</button>`) : ''}<button class="btn sm pri" data-act="appEdAbrir" data-id="${esc(t.id)}">Editar</button></div>`;
+  const vMon = usd ? tjMonto(t).usd : t.monto; const catV = [t.cat, t.sub, t.nota].join('|'); let ops = '';
+  if (tipo === 'gasto' || tipo === 'ingreso') { ops = catOpcs(tipo, catV); if (!ops.includes(`value="${esc(catV)}"`)) ops = `<option value="${esc(catV)}" selected>${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › ') || 'Sin categoría')} (actual)</option>` + ops; }
+  const ctaOps = regCuentasOpts(tjCta(t.cuenta)); const enLista = ctaOps.includes(`value="${esc(tjCta(t.cuenta))}"`);
+  return `${nota}<div class="app-ed"><div class="eyebrow">Editar registro</div>
+    <label>Fecha<input class="in" type="date" id="aeFecha" value="${esc(t.fecha)}" ${corte ? `max="${corte}"` : ''}></label>
+    <label>Monto${usd ? ' en dólares' : ''}<input class="in num" id="aeMonto" inputmode="decimal" value="${(+vMon || 0).toFixed(2)}"></label>
+    <label>Cuenta<select class="in" id="aeCta">${enLista ? '' : `<option value="${esc(t.cuenta)}" selected>${esc(t.cuenta)}</option>`}${ctaOps}</select></label>
+    ${ops ? `<label>Categoría<select class="in" id="aeCat">${ops}</select></label>` : `<div class="note">${tipo === 'traslado' ? 'Traslado: aquí cambias esta fila (su cuenta, fecha y monto); la otra fila del traslado se edita aparte.' : 'Ajuste de saldo: no lleva categoría.'}</div>`}
+    <label>Descripción<input class="in" id="aeDet" value="${esc(t.det || '')}" autocomplete="off"></label>
+    ${corte ? `<div class="note">La fecha llega hasta el corte (${fFecha(corte)}); lo posterior se registra como registro web.</div>` : ''}
+    <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn sm ghost" data-act="appEdCerrar">Cancelar</button><button class="btn sm pri" data-act="appEdGuardar" data-id="${esc(t.id)}">Guardar cambios</button></div></div>`;
+}
+async function appEdGuardar(id) {
+  const t = D.byId.get(id); if (!t) return; const v = k => (($(k) || {}).value || '').trim(); const corte = corteApp();
+  const fecha = v('#aeFecha'); if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return toast('Escribe la fecha.'); if (corte && fecha > corte) return toast('Después del corte se registra en la web, no aquí.');
+  const monto = parseFloat(v('#aeMonto').replace(/[^0-9.]/g, '')); if (!(monto > 0)) return toast('Escribe el monto.');
+  const c = {fecha, cuenta: v('#aeCta') || t.cuenta, det: v('#aeDet')}; if ($('#aeCat')) { const [g, s2, d] = v('#aeCat').split('|'); Object.assign(c, {cat: g || '', sub: s2 || '', nota: d || ''}); }
+  try {
+    if (appEsUSD(t)) { if (cents(monto) !== cents(tjMonto(t).usd)) { const mu = Object.assign({}, (S.aj && S.aj.usdManual) || {}, {[id]: monto}); await guardarAjuste('usdManual', mu); S.aj.usdManual = mu; } }
+    else c.monto = monto;
+    await appGuardarEds(appParche(Object.assign({}, appEds()), t, c)); S.appEd = null; toast('Registro editado'); } catch (e) { return; }
+  render(); if (D.byId.get(id)) abrirDetalleTx(id); else cerrarCapa();
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b || !b.dataset.act.startsWith('appEd')) return; const act = b.dataset.act;
+  if (act === 'appEdAbrir') { S.appEd = b.dataset.id; S.appEdQ = null; abrirDetalleTx(b.dataset.id); const f = document.querySelector('.app-ed'); if (f) f.scrollIntoView({block: 'start', behavior: 'smooth'}); return; }
+  if (act === 'appEdCerrar') { const id = S.appEd; S.appEd = null; return abrirDetalleTx(id); }
+  if (act === 'appEdGuardar') return appEdGuardar(b.dataset.id);
+  if (act === 'appEdQ') { const id = b.dataset.id || S.appEdQ; S.appEdQ = b.dataset.id || null; return abrirDetalleTx(id); }
+  if (act === 'appEdRev') { const id = b.dataset.id; const m = Object.assign({}, appEds()); delete m[id]; S.appEdQ = null;
+    try { await appGuardarEds(m); toast('Volvió a como está en la app'); } catch (er) {} render(); if (D.byId.get(id)) abrirDetalleTx(id); return; }
+});
 
 /* ================= acciones ================= */
 // asignar: Asigna registros de la app a un control (crea movimientos válidos).
@@ -6081,27 +6142,27 @@ document.addEventListener('click', e => {
 const ctaSel = () => S.ctaSel || (S.ctaSel = new Set());
 function ctaSelInfo() {
   const d = S.ctaFicha ? ctaDatos(S.ctaFicha) : null; const ids = ctaSel(); const filas = d ? d.filas.filter(f => ids.has(f.t.id)) : [];
-  const web = filas.filter(f => f.t.web && regDe(f.t.web)); const app = filas.length - web.length;
-  return {filas, web, app, total: crR2(filas.reduce((s, f) => s + f.v, 0)), mon: d ? d.i.mon : 'L'};
+  const web = filas.filter(f => f.t.web && regDe(f.t.web)); const appF = filas.filter(f => !(f.t.web && regDe(f.t.web))); const app = appF.length;
+  return {filas, web, app, appF, total: crR2(filas.reduce((s, f) => s + f.v, 0)), mon: d ? d.i.mon : 'L'};
 }
 function ctaSelBarra() {
   const I = ctaSelInfo(); const TR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
   return `<div class="hd sel-hd"><button class="btn sm ghost ico" data-act="selSalir" aria-label="Salir de la selección">✕</button><h2 id="ctaT" style="margin-right:auto">Editar</h2>
-      <button class="btn sm ghost ico" data-act="selMenu" data-v="borrar" aria-label="Eliminar seleccionados" ${I.web.length ? '' : 'disabled'}>${TR}</button><button class="btn sm ghost ico" data-act="selMenu" data-v="menu" aria-label="Más acciones" ${I.web.length ? '' : 'disabled'}>⋮</button></div>
+      <button class="btn sm ghost ico" data-act="selMenu" data-v="borrar" aria-label="Eliminar seleccionados" ${I.web.length ? '' : 'disabled'}>${TR}</button><button class="btn sm ghost ico" data-act="selMenu" data-v="menu" aria-label="Más acciones" ${I.filas.length && esAdmin() ? '' : 'disabled'}>⋮</button></div>
     <div class="sel-sub"><span>${I.filas.length} ${I.filas.length === 1 ? 'seleccionado' : 'seleccionados'}${I.app ? ` <span class="note">· ${I.app} de la app</span>` : ''}</span><b class="num">${ctaFmt(I.total, I.mon)}</b></div>`;
 }
 // Hoja inferior con las acciones (menú, confirmación de borrar y los formularios de cada cambio).
 function ctaSelHoja() {
-  const m = S.ctaSelMenu; if (!m) return ''; const I = ctaSelInfo(); const n = I.web.length;
-  const avisoApp = I.app ? `<div class="note">${I.app} ${I.app === 1 ? 'registro es' : 'registros son'} de Registro Contable: ${I.app === 1 ? 'cámbialo' : 'cámbialos'} en la app; aquí no se tocan.</div>` : '';
+  const m = S.ctaSelMenu; if (!m) return ''; const I = ctaSelInfo(); const n = m === 'borrar' ? I.web.length : I.filas.length;
+  const avisoApp = I.app && m === 'borrar' ? `<div class="note">${I.app} ${I.app === 1 ? 'registro es' : 'registros son'} de Registro Contable: no se eliminan aquí (se pueden editar).</div>` : '';
   let c;
   if (m === 'menu') c = `<div class="sheet-l">${[['fecha', 'Editar todas las fechas'], ['cat', 'Editar todas las categorías'], ['cta', 'Editar todas las cuentas'], ['det', 'Editar todos los detalles']].map(([k, t]) => `<button data-act="selMenu" data-v="${k}">${t}</button>`).join('')}</div>${avisoApp}`;
   else if (m === 'borrar') c = `<div class="sheet-t">¿Eliminar ${n} ${n === 1 ? 'registro' : 'registros'}?</div><div class="note">Dejan de contar en los saldos. Quedan en Cuentas → Registros web → Eliminados y se pueden restaurar.</div>${avisoApp}<button class="btn danger sheet-b" data-act="selAplicar" data-v="borrar">Eliminar ${n}</button>`;
-  else if (m === 'fecha') c = `<div class="sheet-t">Nueva fecha para ${n}</div><input class="in sheet-in" type="date" id="selFecha" value="${esc((I.web[0] || {}).t ? I.web[0].t.fecha : hoy())}">${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="fecha">Cambiar fecha</button>`;
+  else if (m === 'fecha') c = `<div class="sheet-t">Nueva fecha para ${n}</div><input class="in sheet-in" type="date" id="selFecha" value="${esc((I.filas[0] || {}).t ? I.filas[0].t.fecha : hoy())}" ${corteApp() && I.app ? `max="${corteApp()}"` : ''}>${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="fecha">Cambiar fecha</button>`;
   else if (m === 'cta') c = `<div class="sheet-t">Nueva cuenta para ${n}</div><select class="in sheet-in" id="selCta"><option value="">Elige la cuenta</option>${regCuentasOpts('')}</select><div class="note">En un traslado cambia el lado que está en esta cuenta.</div>${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="cta">Cambiar cuenta</button>`;
   else if (m === 'det') { const dl = [...new Set(I.web.map(f => regDe(f.t.web)).filter(r => r.tipo === 'gasto' || r.tipo === 'ingreso').flatMap(r => regDetalles({tipo: r.tipo, grupal: r.grupal, subgrupal: r.subgrupal}).map(x => x.nom)))].slice(0, 80);
     c = `<div class="sheet-t">Nuevo detalle para ${n}</div><input class="in sheet-in" id="selDet" list="selDetL" placeholder="Escribe o elige (vacío = sin detalle)" autocomplete="off"><datalist id="selDetL">${dl.map(x => `<option value="${esc(x)}">`).join('')}</datalist>${avisoApp}<button class="btn pri sheet-b" data-act="selAplicar" data-v="det">Cambiar detalle</button>`; }
-  else if (m === 'cat') { const tipos = new Set(I.web.map(f => regDe(f.t.web).tipo));
+  else if (m === 'cat') { const tipos = new Set(I.web.map(f => regDe(f.t.web).tipo).concat(I.appF.map(f => appTipo(f.t))));
     if (tipos.size !== 1 || ![...tipos][0].match(/gasto|ingreso/)) c = `<div class="sheet-t">Categorías</div><div class="note">Para cambiar la categoría en bloque, selecciona solo gastos o solo ingresos (los traslados y ajustes no tienen categoría).</div>`;
     else { const tp = [...tipos][0]; const cat = regCatalogo(tp); const gs = S.selG || ''; const g = cat.find(x => x.nom === gs);
       c = `<div class="sheet-t">Nueva categoría para ${n} ${tp === 'gasto' ? 'gastos' : 'ingresos'}</div>
@@ -6111,19 +6172,22 @@ function ctaSelHoja() {
   return `<div class="sheet-bg" data-act="selMenuX"></div><div class="sheet" role="dialog" aria-label="Acciones">${c}<button class="btn ghost sheet-b" data-act="selMenuX">No</button></div>`;
 }
 async function ctaSelAplicar(k) {
-  const I = ctaSelInfo(); if (!I.web.length) return; let campos;
-  if (k === 'fecha') { const v = ($('#selFecha') || {}).value; if (!v) return toast('Elige la fecha.'); campos = () => ({fecha: v}); }
-  else if (k === 'cta') { const v = ($('#selCta') || {}).value; if (!v) return toast('Elige la cuenta.'); campos = (r, t) => /-d$/.test(t.id) ? (v === r.cuenta ? null : {cuenta_destino: v}) : (v === r.cuenta_destino ? null : {cuenta: v}); }
-  else if (k === 'det') { const v = ((($('#selDet') || {}).value) || '').trim() || null; campos = () => ({detalle: v}); }
-  else if (k === 'cat') { const g = ($('#selG') || {}).value; if (!g) return toast('Elige el grupal.'); const sg = ($('#selS') || {}).value || null; const limp = ($('#selLimpDet') || {}).checked; campos = () => Object.assign({grupal: g, subgrupal: sg}, limp ? {detalle: null} : {}); }
+  const I = ctaSelInfo(); if (!I.web.length && !(k !== 'borrar' && I.app)) return; let campos, appC = () => null;
+  if (k === 'fecha') { const v = ($('#selFecha') || {}).value; if (!v) return toast('Elige la fecha.'); if (I.app && corteApp() && v > corteApp()) return toast('Los registros de la app llegan hasta el corte (' + fFecha(corteApp()) + ').'); campos = () => ({fecha: v}); appC = () => ({fecha: v}); }
+  else if (k === 'cta') { const v = ($('#selCta') || {}).value; if (!v) return toast('Elige la cuenta.'); campos = (r, t) => /-d$/.test(t.id) ? (v === r.cuenta ? null : {cuenta_destino: v}) : (v === r.cuenta_destino ? null : {cuenta: v}); appC = () => ({cuenta: v}); }
+  else if (k === 'det') { const v = ((($('#selDet') || {}).value) || '').trim() || null; campos = () => ({detalle: v}); appC = () => ({nota: v || ''}); }
+  else if (k === 'cat') { const g = ($('#selG') || {}).value; if (!g) return toast('Elige el grupal.'); const sg = ($('#selS') || {}).value || null; const limp = ($('#selLimpDet') || {}).checked; campos = () => Object.assign({grupal: g, subgrupal: sg}, limp ? {detalle: null} : {}); appC = t => /gasto|ingreso/.test(appTipo(t)) ? Object.assign({cat: g, sub: sg || ''}, limp ? {nota: ''} : {}) : null; }
   else if (k === 'borrar') campos = () => ({estado: 'eliminado'});
   const vistos = new Set(); let ok = 0, salt = 0; S.ctaSelMenu = null; pintarCtaFicha();
   for (const f of I.web) { const r = regDe(f.t.web); if (vistos.has(r.id)) continue; vistos.add(r.id); const c = campos(r, f.t); if (!c) { salt++; continue; }
     const antes = Object.assign({}, r); c.actualizado_el = new Date().toISOString();
     if (r.tipo === 'ajuste' && k === 'cta') delete c.cuenta_destino;
     try { const {data, error} = await sb.from('registros').update(c).eq('id', r.id).select(); if (error) throw error; Object.assign(r, data && data[0] ? data[0] : c); await regHist(r.id, k === 'borrar' ? 'eliminado' : 'editado', antes, r); ok++; } catch (e) { toast(errMsg(e)); break; } }
+  // Registros de la app: el cambio se guarda como edición web encima de lo sincronizado.
+  let okA = 0; if (k !== 'borrar' && I.app) { const m = Object.assign({}, appEds()); I.appF.forEach(f => { const c = appC(f.t); if (c) { appParche(m, f.t, c); okA++; } });
+    if (okA) try { await appGuardarEds(m); } catch (e) { okA = 0; } }
   ctaSel().clear(); derive(); S._ctaVer = (S._ctaVer || 0) + 1;
-  toast(`${k === 'borrar' ? 'Eliminados' : 'Cambiados'}: ${ok}${salt ? ` · ${salt} sin cambio (la cuenta sería la misma de los dos lados)` : ''}${I.app ? ` · ${I.app} de la app sin tocar` : ''}`);
+  toast(`${k === 'borrar' ? 'Eliminados' : 'Cambiados'}: ${ok + okA}${salt ? ` · ${salt} sin cambio (la cuenta sería la misma de los dos lados)` : ''}${I.app && (k === 'borrar' || okA < I.app) ? ` · ${I.app - (k === 'borrar' ? 0 : okA)} de la app sin tocar` : ''}`);
   pintarCtaFicha(); render();
 }
 // Mantener presionado (dedo o mouse): medio segundo sin moverse.
