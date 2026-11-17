@@ -709,6 +709,28 @@ body:has(.graf-full){overflow:hidden}
   .cta-mat .cta-g.arrastrando{opacity:.85;outline:2px dashed var(--accent);outline-offset:2px;box-shadow:0 10px 26px rgba(0,0,0,.25)}
 }
 @media (max-width:899px){.cta-mat{display:grid;gap:12px}}
+.ctt-lst{display:grid}
+.ctt-it{border-bottom:1px solid var(--line);background:var(--panel)}.ctt-it:last-child{border-bottom:0}
+.ctt-row{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;min-height:60px}
+.ctt-row .ct-asa{margin:-6px 0 -6px -6px}
+.ctt-i{flex:1;min-width:0}.ctt-i b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ctt-i .cat{font-size:13px;color:var(--muted)}
+.ctt-chev{color:var(--muted);font-size:20px;transition:transform .15s}.ctt-it.abierto .ctt-chev{transform:rotate(90deg)}
+.ctt-it.abierto{background:var(--sunk)}
+.ctt-ed{display:grid;gap:14px;padding:4px 14px 16px}
+.ctt-ed label{display:grid;gap:4px;font-size:12px;color:var(--muted)}.ctt-ed .in{width:100%!important;max-width:none!important;font-size:16px;padding:10px}
+.ctt-lab{font-size:12px;color:var(--muted);margin-bottom:6px}
+.ctt-cls{display:flex;flex-wrap:wrap;gap:6px}
+.ctt-c{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;font-size:14px;border-radius:999px;padding:8px 12px;cursor:pointer}
+.ctt-c.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:600}
+.ctt-sw{display:flex!important;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.ctt-sw>span{display:grid;gap:2px}.ctt-sw b{font-size:15px;color:var(--fg);font-weight:600}
+input.sw{appearance:none;-webkit-appearance:none;flex:none;width:50px;height:30px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:background .15s}
+input.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX(20px)}
+.ctt-ctas{display:flex;flex-wrap:wrap;gap:6px}.ctt-ctas .chip{cursor:pointer;font-size:13px;padding:6px 10px}
+.ctt-pie{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}.ctt-pie .note{margin-right:auto}
+.ctt-pie .btn{min-height:40px}
+.ctt-it.arrastrando{background:var(--panel)}
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
@@ -5195,8 +5217,8 @@ document.addEventListener('pointermove', e => {
 document.addEventListener('pointerup', () => { _preDrag = null; });
 document.addEventListener('pointerdown', e => {
   const h = e.target.closest('[data-drag]'); if (!h) return; e.preventDefault();
-  const tipo = h.dataset.drag; const item = h.closest(tipo === 'tipo' ? '.cta-g' : '.cta-r'); if (!item) return;
-  const sel = tipo === 'tipo' ? '.cta-g[data-tipo]:not([data-tipo=""])' : '.cta-r'; const cont = item.parentElement;
+  const tipo = h.dataset.drag; const item = h.closest(tipo === 'tipo' ? '.cta-g, .ctt-it' : '.cta-r'); if (!item) return;
+  const sel = item.classList.contains('ctt-it') ? '.ctt-it[data-tipo]' : tipo === 'tipo' ? '.cta-g[data-tipo]:not([data-tipo=""])' : '.cta-r'; const cont = item.parentElement;
   _drag = {tipo, item, sel, cont, y0: e.clientY, id: e.pointerId}; item.classList.add('arrastrando'); document.body.classList.add('ordenando');
   try { h.setPointerCapture(e.pointerId); } catch (_) {}
 });
@@ -5600,16 +5622,43 @@ async function ctaCrear() {
     $('#modalRoot').innerHTML = ''; S.ctaNueva = false; S.ctaAdmVer = 'activas'; render(); } catch (er) {}
 }
 function vCtaTipos() {
-  const tipos = ctTipos(); const usos = {}; ctaNombres().forEach(n => { const t = ctaCfg(n).tipo; if (t) usos[t] = (usos[t] || 0) + 1; });
-  const cls = v => Object.entries(CTA_CLASES).map(([k, l]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${l}</option>`).join('');
-  const filas = tipos.map(t => `<tr data-ctt="${esc(t.id)}"><td><input class="in" data-cttf="nombre" value="${esc(t.nombre)}" aria-label="Nombre del tipo"></td><td><select class="in" data-cttf="clase" aria-label="Clase">${cls(t.clase)}</select></td>
-      <td><input class="in num" data-cttf="orden" type="number" value="${+t.orden || 0}" style="width:70px" aria-label="Orden"></td><td><label class="cr-ck"><input type="checkbox" data-cttf="incluir_total" ${t.incluir_total !== false ? 'checked' : ''}> En el total</label></td>
-      <td class="num">${usos[t.id] || 0}</td><td class="acc">${usos[t.id] ? '' : S.confirmCtt === t.id ? `<button class="btn sm danger" data-act="cttBorrar" data-id="${esc(t.id)}">¿Eliminar? Sí</button>` : icoBtn('borrar', 'Eliminar tipo', 'cttBorrar', '', 'danger').replace('data-act="cttBorrar"', `data-act="cttBorrar" data-id="${esc(t.id)}"`)}</td></tr>`).join('');
-  return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">Tipos de cuenta</h2>${tipos.length ? '' : '<button class="btn sm pri" data-act="ctaTiposApp">Crear los tipos de Registro Contable</button>'}</div>
-    <div class="tbl-wrap"><table class="cta-adm"><thead><tr><th>Tipo</th><th>Clase</th><th>Orden</th><th>Total</th><th class="num">Cuentas</th><th></th></tr></thead><tbody>${filas}
-      <tr class="cta-nuevo"><td><input class="in" id="cttN" placeholder="Nuevo tipo"></td><td><select class="in" id="cttC">${cls('banco')}</select></td><td></td><td></td><td></td><td><button class="btn sm pri" data-act="cttNuevo">Agregar</button></td></tr></tbody></table></div>
-    <div class="bd note">La <b>clase</b> decide cómo se comporta: efectivo, banco y ahorro suman al <b>Capital</b>; tarjetas de crédito y préstamos van en <b>A deber</b>; una tarjeta de débito con cuenta de pago descuenta de su banco.</div></div>`;
+  /* Tipos de cuenta en tarjetas (pensado para el iPhone): cada tipo muestra su clase, cuántas cuentas tiene y si va en el total.
+     Se toca para editarlo; se ordena arrastrando ≡; los cambios se guardan solos al cambiar cada dato. */
+  const tipos = ctTipos(); const cuentas = {}; ctaNombres().forEach(n => { const t = ctaCfg(n).tipo; if (t) (cuentas[t] = cuentas[t] || []).push(n); });
+  const CLS_EF = {efectivo: 'Suma al Capital', banco: 'Suma al Capital', ahorro: 'Suma al Capital', credito: 'Va en A deber', prestamo: 'Va en A deber', debito: 'Se descuenta de su banco', otros: 'Suma al Capital'};
+  const chips = (v, attr) => `<div class="ctt-cls">${Object.entries(CTA_CLASES).map(([k, l]) => `<button type="button" class="ctt-c ${v === k ? 'on' : ''}" ${attr} data-v="${k}">${ctaClsIco(k)}${l}</button>`).join('')}</div>`;
+  const ab = S.cttAbierto;
+  const tarjeta = t => { const cs = cuentas[t.id] || []; const open = ab === t.id; const fuera = t.incluir_total === false;
+    return `<div class="ctt-it ${open ? 'abierto' : ''}" data-tipo="${esc(t.id)}" data-ctt="${esc(t.id)}">
+      <div class="ctt-row" data-act="cttAbrir" data-id="${esc(t.id)}" role="button" tabindex="0" aria-expanded="${open}">
+        <span class="ct-asa" data-drag="tipo" data-v="${esc(t.id)}" role="button" aria-label="Arrastrar para mover" title="Arrastrar para mover">≡</span>${ctaClsIco(t.clase)}
+        <div class="ctt-i"><b>${esc(t.nombre)}</b><div class="cat">${CTA_CLASES[t.clase] || t.clase} · ${cs.length} ${cs.length === 1 ? 'cuenta' : 'cuentas'}${fuera ? ' · <span class="chip warn">fuera del total</span>' : ''}</div></div>
+        <span class="ctt-chev" aria-hidden="true">›</span></div>
+      ${open ? `<div class="ctt-ed">
+        <label>Nombre<input class="in" data-cttf="nombre" value="${esc(t.nombre)}" autocomplete="off"></label>
+        <div><div class="ctt-lab">Clase <span class="note">· ${CLS_EF[t.clase] || ''}</span></div>${chips(t.clase, 'data-act="cttClase" data-id="' + esc(t.id) + '"')}</div>
+        <label class="ctt-sw"><span><b>Incluir en el total</b><span class="note">${fuera ? 'Sus saldos no suman en Capital ni en A deber.' : 'Sus saldos suman en el resumen de arriba.'}</span></span><input type="checkbox" class="sw" data-cttf="incluir_total" ${fuera ? '' : 'checked'}></label>
+        <div><div class="ctt-lab">Cuentas de este tipo</div>${cs.length ? `<div class="ctt-ctas">${cs.map(ctaInfo).sort(ctaOrdCmp).map(i => `<button type="button" class="chip" data-act="ctaSel" data-n="${esc(i.n)}">${esc(i.nom)}</button>`).join('')}</div>` : '<div class="note">Ninguna. Se asigna desde Administración → Cuentas o en el detalle de cada cuenta.</div>'}</div>
+        <div class="ctt-pie">${cs.length ? '<span class="note">Para eliminarlo, primero pasa sus cuentas a otro tipo.</span>' : S.confirmCtt === t.id ? `<button class="btn sm ghost" data-act="cttNoBorrar">No</button><button class="btn sm danger" data-act="cttBorrar" data-id="${esc(t.id)}">Sí, eliminar</button>` : `<button class="btn sm ghost danger" data-act="cttBorrar" data-id="${esc(t.id)}">Eliminar tipo</button>`}<button class="btn sm pri" data-act="cttAbrir" data-id="${esc(t.id)}">Listo</button></div>
+      </div>` : ''}</div>`; };
+  const nuevo = S.cttNuevoAb ? `<div class="ctt-it abierto ctt-nuevo"><div class="ctt-ed">
+      <div class="ctt-lab"><b>Nuevo tipo</b></div><label>Nombre<input class="in" id="cttN" placeholder="ej. Billeteras digitales" autocomplete="off" value="${esc(S.cttNN || '')}"></label>
+      <div><div class="ctt-lab">Clase</div>${chips(S.cttNC || 'banco', 'data-act="cttNClase"')}</div>
+      <div class="ctt-pie"><button class="btn sm ghost" data-act="cttNuevoX">Cancelar</button><button class="btn sm pri" data-act="cttNuevo">Agregar tipo</button></div></div></div>` : '';
+  return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">Tipos de cuenta <span class="note">${tipos.length}</span></h2>${tipos.length ? (S.cttNuevoAb ? '' : '<button class="btn sm pri" data-act="cttNuevoAb">+ Nuevo tipo</button>') : '<button class="btn sm pri" data-act="ctaTiposApp">Crear los tipos de Registro Contable</button>'}</div>
+    <div class="ctt-lst">${nuevo}${tipos.map(tarjeta).join('')}</div>
+    <div class="bd note">Toca un tipo para editarlo; arrastra <b>≡</b> para cambiar su orden (es el orden en Cuentas y en el formulario). La <b>clase</b> decide cómo se comporta: efectivo, banco y ahorro suman al <b>Capital</b>; tarjetas de crédito y préstamos van en <b>A deber</b>; una tarjeta de débito con cuenta de pago se descuenta de su banco.</div></div>`;
 }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act; if (!act.startsWith('ctt') || act === 'cttBorrar' || act === 'cttNuevo') return;
+  if (act === 'cttAbrir') { if (e.target.closest('[data-drag]')) return; S.cttAbierto = S.cttAbierto === b.dataset.id ? null : b.dataset.id; S.confirmCtt = null; return render(); }
+  if (act === 'cttNoBorrar') { S.confirmCtt = null; return render(); }
+  if (act === 'cttNuevoAb') { S.cttNuevoAb = true; S.cttAbierto = null; render(); const n = $('#cttN'); if (n) n.focus(); return; }
+  if (act === 'cttNuevoX') { S.cttNuevoAb = false; S.cttNN = ''; return render(); }
+  if (act === 'cttNClase') { S.cttNN = ($('#cttN') || {}).value || ''; S.cttNC = b.dataset.v; return render(); }
+  if (act === 'cttClase') { const t = ctTipo(b.dataset.id); const v = b.dataset.v; if (!t || t.clase === v) return;
+    try { const d = await q(sb.from('cuenta_tipos').update({clase: v}).eq('id', t.id).select(), 'Clase cambiada: ' + CTA_CLASES[v]); Object.assign(t, d && d[0] ? d[0] : {clase: v}); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
+});
 /* ===== Catálogo de categorías en 3 niveles: Grupal → Subgrupal → Detalle =====
    En los registros de la app: Categoría = Grupal, Subcategoría = Subgrupal, Nota = Detalle. Cada nivel depende de su padre.
    Lo que llegó en los registros es la estructura vigente ("de la app · por validar") hasta que el administrador la valide.
@@ -5801,8 +5850,9 @@ document.addEventListener('click', async e => {
   if (act === 'ctaSugerir') { const sinT = ctaNombres().filter(n => ctaTipoMal(n) && ctaTipoSug(n)); let k = 0;
     for (const n of sinT) { try { const t = ctaTipoSug(n); await ctaGuardar(n, {tipo: t.id}); k++; } catch (er) { break; } }
     toast(`${k} cuentas con tipo sugerido. Revisa las que no sean correctas.`); return render(); }
-  if (act === 'cttNuevo') { const nombre = $('#cttN').value.trim(); if (!nombre) return toast('Escribe el nombre del tipo.');
-    const row = {id: 't' + crUid().slice(0, 8), nombre, clase: $('#cttC').value, orden: (Math.max(0, ...(S.ctT || []).map(t => +t.orden || 0)) + 10), incluir_total: true};
+  if (act === 'cttNuevo') { const nombre = $('#cttN').value.trim(); if (!nombre) { toast('Escribe el nombre del tipo.'); return $('#cttN').focus(); }
+    if (ctTipos().some(t => t.nombre.trim().toLowerCase() === nombre.toLowerCase())) return toast('Ya existe un tipo con ese nombre.');
+    S.cttNuevoAb = false; S.cttNN = ''; const row = {id: 't' + crUid().slice(0, 8), nombre, clase: S.cttNC || 'banco', orden: (Math.max(0, ...(S.ctT || []).map(t => +t.orden || 0)) + 10), incluir_total: true};
     try { const d = await q(sb.from('cuenta_tipos').insert(row).select(), 'Tipo agregado'); S.ctT.push(d && d[0] ? d[0] : row); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
   if (act === 'cttBorrar') { const id = b.dataset.id; if (S.confirmCtt !== id) { S.confirmCtt = id; return render(); } S.confirmCtt = null;
     try { await q(sb.from('cuenta_tipos').delete().eq('id', id), 'Tipo eliminado'); S.ctT = S.ctT.filter(t => t.id !== id); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
@@ -5821,9 +5871,9 @@ document.addEventListener('change', async e => {
   if (tr && el.dataset.ctaf) { const n = tr.dataset.ctan; const k = el.dataset.ctaf; let v = el.type === 'checkbox' ? el.checked : el.value;
     if (k === 'incluir_total') v = v === '' ? null : v === '1'; const campos = {[k]: v}; if (k === 'estado') campos.oculta = v !== 'activa';
     try { await ctaGuardar(n, campos); } catch (er) {} return render(); }
-  const tt = el.closest && el.closest('tr[data-ctt]');
+  const tt = el.closest && el.closest('[data-ctt]');
   if (tt && el.dataset.cttf) { const t = ctTipo(tt.dataset.ctt); if (!t) return; const k = el.dataset.cttf; const v = el.type === 'checkbox' ? el.checked : k === 'orden' ? (+el.value || 0) : el.value.trim(); if (k === 'nombre' && !v) return render();
-    try { const d = await q(sb.from('cuenta_tipos').update({[k]: v}).eq('id', t.id).select()); Object.assign(t, d && d[0] ? d[0] : {[k]: v}); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
+    try { const d = await q(sb.from('cuenta_tipos').update({[k]: v}).eq('id', t.id).select(), k === 'nombre' ? 'Nombre guardado' : k === 'incluir_total' ? (v ? 'Ahora suma en el total' : 'Ahora queda fuera del total') : 'Guardado'); Object.assign(t, d && d[0] ? d[0] : {[k]: v}); S._ctaVer = (S._ctaVer || 0) + 1; } catch (er) {} return render(); }
   if (el.dataset && el.dataset.trasman !== undefined) return guardarTrasManual({[el.dataset.trasman]: el.value});
   const tc = el.closest && el.closest('[data-catr]');
   if (tc && el.dataset.catf) { const c = tc.dataset.catr; const k = el.dataset.catf; try { await catGuardar(c, {[k]: el.type === 'checkbox' ? el.checked : el.value}); } catch (er) {} return render(); }
