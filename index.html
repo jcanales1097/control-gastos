@@ -652,6 +652,11 @@ body:has(.graf-full){overflow:hidden}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
 .cta-g{overflow:hidden}.cta-g .pr-f:last-child{border-bottom:0}
 .cta-gh{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--sunk);border-bottom:1px solid var(--line);font-size:13px}
+.cta-gh[data-act]{cursor:pointer;user-select:none;-webkit-user-select:none;min-height:40px}
+.cta-chev{display:inline-block;transition:transform .15s;transform:rotate(90deg);color:var(--muted);font-size:16px;line-height:1;width:12px;text-align:center}
+.cta-cerr .cta-chev{transform:rotate(0)}.cta-cerr .cta-gh{border-bottom:0}
+@media (hover:hover){.cta-gh[data-act]:hover{filter:brightness(.97)}}
+.cta-colbar{justify-content:flex-end;margin-bottom:-6px}
 .cta-gh .cta-gt{margin-left:auto;font-weight:600;font-size:12.5px;white-space:nowrap}
 .cta-ico{width:10px;height:10px;border-radius:3px;flex:none;background:var(--line)}
 .cta-efectivo{background:var(--good)}.cta-banco{background:var(--azul)}.cta-debito{background:var(--ca)}.cta-credito{background:var(--bad)}.cta-ahorro{background:var(--cc)}.cta-prestamo{background:var(--cb)}.cta-otros{background:var(--muted)}
@@ -5062,11 +5067,24 @@ function vCtaLista(tab) {
     return `<div class="pr-f cta-r ${ord ? 'cta-ord' : ''}" ${ord ? '' : 'data-act="ctaSel" role="button" tabindex="0"'} data-n="${esc(i.n)}">${asa('cta', i.n)}${ctaClsIco(i.clase)}<div class="pr-i"><b>${esc(i.nom)}</b><div class="cat">${sub}</div></div><div class="pr-v">${val}</div><span class="pr-ir" aria-hidden="true">›</span></div>`; };
   const bloques = claves.map(k => { const l = grupos.get(k); const tp = ctTipo(k); const tot = ctaTotales(l);
     const tt = tp && CTA_DEUDA.has(tp.clase) ? [tot.debL, tot.debU] : [tot.capL, tot.capU];
-    return `<div class="panel cta-g ${ord ? 'cta-ord' : ''}" data-tipo="${esc(tp ? tp.id : '')}"><div class="cta-gh">${tp ? asa('tipo', tp.id) : ''}${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${l.map(fila).join('')}</div>`; }).join('');
+    const ck = tp ? tp.id : '_'; const cerr = ctaCol().has(ck);
+    return `<div class="panel cta-g ${ord ? 'cta-ord' : ''} ${cerr ? 'cta-cerr' : ''}" data-tipo="${esc(tp ? tp.id : '')}"><div class="cta-gh" data-act="ctaGTog" data-k="${esc(ck)}" role="button" tabindex="0" aria-expanded="${!cerr}" title="${cerr ? 'Expandir' : 'Contraer'}">${tp ? asa('tipo', tp.id) : ''}<span class="cta-chev" aria-hidden="true">›</span>${ctaClsIco(tp ? tp.clase : '')}<b>${tp ? esc(tp.nombre) : 'Sin tipo'}</b><span class="note">${l.length}</span><span class="num cta-gt ${tt[0] < -0.004 ? 'neg' : ''}">${tp && tp.incluir_total === false ? '<span class="note">fuera del total</span>' : mixto(...tt)}</span></div>${cerr ? '' : l.map(fila).join('')}</div>`; }).join('');
+  const nCerr = claves.filter(k => ctaCol().has(k || '_')).length;
+  const barraCol = claves.length > 1 ? `<div class="row cta-colbar"><button class="btn sm ghost" data-act="ctaGTodos" data-v="${nCerr === claves.length ? 'abrir' : 'cerrar'}">${nCerr === claves.length ? '⊞ Expandir todos' : '⊟ Contraer todos'}</button></div>` : '';
   const ayuda = ord ? `<div class="tj-aviso cta-ordav"><span>Arrastra <b>≡</b> para mover: el de la barra de cada tipo mueve el tipo con sus cuentas; el de cada cuenta la mueve dentro de su tipo. Se guarda al soltar.</span><button class="btn sm pri" data-act="ctaOrdenar">Listo</button></div>` : '';
-  return `${ord ? '' : kpis}${ord ? ayuda : avisos}${bloques || `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
+  return `${ord ? '' : kpis}${ord ? ayuda : avisos}${bloques ? barraCol : ''}${bloques || `<div class="panel"><div class="bd note">${clases ? 'No hay cuentas de esta clase. Asigna el tipo de cada cuenta en Administración.' : 'Todavía no hay cuentas: sincroniza los registros de la app.'}</div></div>`}
     ${nOc ? `<button class="btn sm ghost" data-act="ctaVerOc" style="align-self:flex-start">${S.ctaVerOc ? 'Esconder' : 'Mostrar'} ${nOc} ${nOc === 1 ? 'cuenta inhabilitada' : 'cuentas inhabilitadas'}</button>` : ''}`;
 }
+// ctaCol: tipos contraídos en Cuentas (se recuerda en este navegador; si no se puede guardar, dura mientras la página esté abierta).
+function ctaCol() { if (!S.ctaCol) { let l = []; try { l = JSON.parse(localStorage.getItem('cg_ctaCol') || '[]'); } catch (e) {} S.ctaCol = new Set(Array.isArray(l) ? l : []); } return S.ctaCol; }
+function ctaColGuardar() { try { localStorage.setItem('cg_ctaCol', JSON.stringify([...ctaCol()])); } catch (e) {} }
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act=ctaGTog],[data-act=ctaGTodos]'); if (!b || e.target.closest('[data-drag]')) return;
+  const c = ctaCol();
+  if (b.dataset.act === 'ctaGTog') { const k = b.dataset.k; c.has(k) ? c.delete(k) : c.add(k); }
+  else { const ks = [...document.querySelectorAll('.cta-g [data-act=ctaGTog]')].map(x => x.dataset.k); ks.forEach(k => b.dataset.v === 'cerrar' ? c.add(k) : c.delete(k)); }
+  ctaColGuardar(); render();
+});
 // pintarCtaFicha: detalle de una cuenta en ventana emergente (pantalla completa en el teléfono): saldo y movimientos por día.
 function pintarCtaFicha() {
   /* Detalle de una cuenta como en Registro Contable: pestañas Diario / Mensual / Anual, flechas para cambiar de período,
@@ -5910,7 +5928,7 @@ document.addEventListener('paste', e => {
 document.addEventListener('keydown', e => {
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.tjPer && document.querySelector('.tj-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.tj-modal .cr-nav [data-act=tjNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.concQ && document.querySelector('.cr-modal') && !(e.target.matches && e.target.matches('input, select, textarea'))) { e.preventDefault(); const bt = document.querySelector(`.cr-modal .cr-nav [data-act=concNav][data-d="${e.key === 'ArrowLeft' ? -1 : 1}"]`); if (bt && !bt.disabled) bt.click(); return; }
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button], .rc-it[data-act], .rc-pr[data-act], .cta-r[data-act]')) { e.preventDefault(); e.target.click(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.cr-row[data-act], g[data-act][role=button], .rc-it[data-act], .rc-pr[data-act], .cta-r[data-act], .cta-gh[data-act]')) { e.preventDefault(); e.target.click(); return; }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.crGrafFull) { S.crGrafFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.vchartFull) { S.vchartFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.grafFull) { S.grafFull = null; return render(); }
