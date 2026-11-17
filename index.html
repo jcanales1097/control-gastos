@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><!-- maximum-scale=1: el iPhone no hace zoom al tocar un campo (se puede seguir ampliando con dos dedos) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#052659" id="metaTheme">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gastos">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Control de Gastos Familiares</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -752,6 +756,8 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .corte-ck>div span:nth-child(2){flex:1}.corte-ck .ok span:first-child{color:#2e9d5b;font-weight:700}.corte-ck .warn span:first-child{color:var(--bad);font-weight:700}.corte-ck .warn b{color:var(--bad)}
 .corte-f{display:grid;gap:4px;font-size:12px;color:var(--muted);max-width:320px}.corte-f .in{font-size:16px}
 .corte-post{border:1px solid var(--line);border-radius:12px;max-height:420px;overflow:auto}
+#offBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 6px);z-index:70;max-width:calc(100% - 24px);padding:7px 14px;border-radius:999px;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:auto}
+#offBar.off{background:#5A3F0B;color:#fff}#offBar.cola{background:var(--accent);color:var(--accent-ink)}#offBar .btn{min-height:28px;padding:3px 10px}
 /* ===== Fase 4 ===== */
 .rg-star{font-size:20px;line-height:1;padding:4px 10px}.rg-star.on{color:#e0a400}
 .rg-mk{position:relative;padding:0!important;align-items:stretch!important}
@@ -1404,6 +1410,7 @@ async function cargarTodo() {
   if (esAdmin()) { try { const {error} = await sb.from('tarjetas').select('titular').limit(1); S.f4b = !error; } catch (e) { S.f4b = false; } }
   if (esAdmin()) { try { S.notasDia = new Map((await todo('notas_dia', 'fecha')).map(r => [r.fecha, r])); } catch (e) { S.notasDia = null; } try { S.series = await todo('registro_series', 'creado_el'); } catch (e) { S.series = null; } }
   if (esAdmin()) setTimeout(regPublicarCatalogo, 1500);
+  offAplicar();   // lo hecho sin conexión que todavía no se envió
 }
 // guardarAjuste: Guarda un ajuste general (tabla ajustes).
 const guardarAjuste = (clave, valor) => { S.aj[clave] = valor; return q(sb.from('ajustes').upsert({clave, valor})); };
@@ -1440,9 +1447,11 @@ function aplicarTema() {
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarTema); } catch (e) {}
 // init: Punto de entrada: revisa la configuración, la sesión y arranca la app.
 async function init() {
+  offRegistrarSW();
   if (!CFG.supabaseUrl || !CFG.supabaseAnonKey) return renderSetup();
   if (!window.supabase || !window.supabase.createClient) return fatal('No se pudo cargar la conexión con la base de datos. Revisa tu internet y recarga la página.');
   sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {auth: {persistSession: true, autoRefreshToken: true, detectSessionInUrl: true}});
+  { const _from = sb.from.bind(sb); sb.from = t => { if (!OFF_T.has(t)) return _from(t); const o = offFrom(t, _from); o._real = () => _from(t); return o; }; }   // escrituras sin conexión → cola (fase 6)
   sb.auth.onAuthStateChange((ev, session) => {
     if (ev === 'PASSWORD_RECOVERY') { S.recuperando = true; renderAuth(); return; }
     if (ev === 'SIGNED_OUT' || !session) { S.me = null; renderAuth(); return; }
@@ -1455,7 +1464,8 @@ let arrancando = false;
 async function arrancar() {
   if (arrancando) return; arrancando = true;
   $('#topbar').hidden = false; app().innerHTML = '<div class="loading">Cargando tus datos…</div>';
-  try { await cargarTodo(); derive(); route(); render(); if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); iniciarHistorial().catch(() => {}); } }
+  S._sinRed = navigator.onLine === false;
+  try { await cargarTodo(); derive(); route(); render(); offBarra(); if (!S._sinRed) { try { localStorage.setItem('cg_ultimaRed', new Date().toISOString()); } catch (e) {} setTimeout(offEnviar, 1500); } if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); iniciarHistorial().catch(() => {}); } }
   catch (e) { fatal(errMsg(e)); }
   finally { arrancando = false; }
 }
@@ -5651,6 +5661,78 @@ document.addEventListener('click', async e => {
   if (act === 'cortePasar') return cortePasar(b.dataset.id);
 });
 
+/* ===================== Fase 6: sin conexión =====================
+   sw.js guarda la app y la última copia de cada lectura, así que abre y muestra los datos aunque no haya internet.
+   Lo que se guarda sin conexión (registros, su historial, marcadores, notas, pagos de tarjeta, ajustes…) va a una cola en
+   el teléfono, se ve al instante y se envía en orden al volver internet. Cada registro lleva su propio id, así que enviarlo
+   dos veces no lo duplica (el segundo intento falla por id repetido y se descarta). */
+const OFF_T = new Set(['registros', 'registro_hist', 'registro_series', 'marcadores', 'notas_dia', 'tarjeta_pagos', 'tarjeta_periodos', 'veh_registros', 'credito_enlaces', 'ajustes']);
+const OFF_S = {registros: 'reg', registro_hist: 'regHist', registro_series: 'series', marcadores: 'marc', tarjeta_pagos: 'tjpg', tarjeta_periodos: 'tjp', veh_registros: 'vreg', credito_enlaces: 'cenl'};
+const offCola = () => { try { return JSON.parse(localStorage.getItem('cg_cola') || '[]'); } catch (e) { return []; } };
+const offGuardarCola = l => { try { localStorage.setItem('cg_cola', JSON.stringify(l)); } catch (e) {} offBarra(); };
+const esErrRed = err => !!err && (err.code === 'offline' || /failed to fetch|networkerror|load failed|network request failed|internet|sin conexi/i.test(String(err.message || err)));
+// offFrom: igual que sb.from(tabla), pero si no hay internet las escrituras se guardan en la cola y responden como si se hubieran hecho.
+function offFrom(t, real) {
+  const b = {op: null, row: null, f: [], sel: false, opts: undefined}; let qb = null;
+  const api = {
+    select(...a) { if (!b.op) { qb = real(t).select(...a); return qb; } b.sel = true; return api; },
+    insert(r, o) { b.op = 'insert'; b.row = r; b.opts = o; return api; }, upsert(r, o) { b.op = 'upsert'; b.row = r; b.opts = o; return api; },
+    update(r) { b.op = 'update'; b.row = r; return api; }, delete() { b.op = 'delete'; return api; },
+    eq(k, v) { b.f.push([k, v]); return api; }, is(k, v) { b.f.push([k, v, 'is']); return api; }, in(k, v) { b.f.push([k, v, 'in']); return api; },
+    then(ok, mal) { return correr().then(ok, mal); }
+  };
+  async function enviar() { let x = b.op === 'delete' ? real(t).delete() : real(t)[b.op](b.row, b.opts); b.f.forEach(([k, v, m]) => { x = m === 'in' ? x.in(k, v) : m === 'is' ? x.is(k, v) : x.eq(k, v); }); if (b.sel) x = x.select(); return x; }
+  async function correr() {
+    if (navigator.onLine !== false && !offCola().length) { const r = await enviar(); if (!r.error || !esErrRed(r.error)) return r; }
+    if (t === 'adjuntos') return {data: null, error: {message: 'Sin conexión: los comprobantes se adjuntan cuando vuelva internet.'}};
+    const l = offCola(); l.push({t, op: b.op, row: b.row, f: b.f, opts: b.opts || null, el: new Date().toISOString()}); offGuardarCola(l);
+    const filas = b.row == null ? [] : Array.isArray(b.row) ? b.row : [b.row]; return {data: b.sel ? filas.map(x => Object.assign({}, x)) : null, error: null, enCola: true};
+  }
+  return api;
+}
+// offAplicar: pone en los datos cargados (copia guardada) lo que todavía está en la cola, para que se vea al abrir sin internet.
+function offAplicar() {
+  offCola().forEach(it => { const k = OFF_S[it.t];
+    if (it.t === 'ajustes') { if (it.row && it.row.clave) S.aj[it.row.clave] = it.row.valor; return; }
+    if (it.t === 'notas_dia') { if (!S.notasDia) return; if (it.op === 'delete') { const f = (it.f.find(x => x[0] === 'fecha') || [])[1]; S.notasDia.delete(f); } else S.notasDia.set(it.row.fecha, it.row); return; }
+    if (!k || !Array.isArray(S[k])) return; const arr = S[k]; const filas = it.row == null ? [] : Array.isArray(it.row) ? it.row : [it.row];
+    const coincide = x => it.f.every(([c, v, m]) => m === 'in' ? v.includes(x[c]) : x[c] === v);
+    if (it.op === 'insert' || it.op === 'upsert') filas.forEach(r => { const i = r.id ? arr.findIndex(x => x.id === r.id) : -1; if (i >= 0) Object.assign(arr[i], r); else arr.push(Object.assign({}, r)); });
+    else if (it.op === 'update') arr.filter(coincide).forEach(x => Object.assign(x, it.row));
+    else if (it.op === 'delete') S[k] = arr.filter(x => !coincide(x));
+  });
+}
+let _offEnviando = false;
+async function offEnviar() {
+  if (_offEnviando || navigator.onLine === false || !sb || !S.me) return; let l = offCola(); if (!l.length) return; _offEnviando = true; offBarra('enviando');
+  let ok = 0, malas = 0;
+  try { while (l.length) { const it = l[0]; let x = it.op === 'delete' ? sb.from(it.t)._real().delete() : sb.from(it.t)._real()[it.op](it.row, it.opts || undefined); (it.f || []).forEach(([k, v, m]) => { x = m === 'in' ? x.in(k, v) : x.eq(k, v); });
+      const r = await x; if (r.error && esErrRed(r.error)) break;   // se cortó otra vez: lo que falta queda en la cola
+      if (r.error && !/duplicate key|already exists|23505/i.test(r.error.message || '')) { malas++; const e = JSON.parse(localStorage.getItem('cg_cola_err') || '[]'); e.push(Object.assign({}, it, {error: r.error.message})); try { localStorage.setItem('cg_cola_err', JSON.stringify(e.slice(-50))); } catch (_) {} }
+      else ok++;
+      l = offCola(); l.shift(); offGuardarCola(l); } }
+  finally { _offEnviando = false; offBarra(); }
+  if (ok || malas) { toast(malas ? `Enviados ${ok}; ${malas} no se pudieron guardar (revisa Ajustes)` : `✓ ${ok} ${ok === 1 ? 'cambio hecho sin conexión enviado' : 'cambios hechos sin conexión enviados'}`); S._ultimaCarga = 0; try { await cargarTodo(); derive(); render(); } catch (e) {} }
+}
+// offBarra: aviso fijo arriba cuando no hay internet o hay cambios por enviar.
+function offBarra(estado) {
+  let el = document.getElementById('offBar'); if (!el) { el = document.createElement('div'); el.id = 'offBar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  const cl = offCola(); const n = cl.filter(x => x.t !== 'registro_hist').length || cl.length; const sinRed = navigator.onLine === false || S._sinRed; let ult = ''; try { ult = localStorage.getItem('cg_ultimaRed') || ''; } catch (e) {}
+  if (!sinRed && !n) { el.hidden = true; return; }
+  el.hidden = false; el.className = sinRed ? 'off' : 'cola';
+  el.innerHTML = estado === 'enviando' ? `Enviando ${n} ${n === 1 ? 'cambio' : 'cambios'}…`
+    : sinRed ? `<b>Sin conexión</b> · datos guardados${ult ? ' del ' + new Date(ult).toLocaleString('es-HN', {day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit'}) : ''}${n ? ` · ${n} por enviar` : ''}`
+    : `${n} ${n === 1 ? 'cambio' : 'cambios'} por enviar <button class="btn sm" data-act="offEnviar">Enviar ahora</button>`;
+}
+window.addEventListener('online', () => { S._sinRed = false; offBarra(); setTimeout(offEnviar, 800); });
+window.addEventListener('offline', () => { S._sinRed = true; offBarra(); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-act=offEnviar]'); if (b) offEnviar(); });
+function offRegistrarSW() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tipo === 'sinRed') { S._sinRed = true; offBarra(); } });
+}
+
 const enTj = () => S.view === 'cuentas' && S.ctaTab === 'tc';
 const enCred = () => S.view === 'cuentas' && S.ctaTab === 'pre';   // la pestaña Préstamos muestra el módulo de Créditos
 // ctaAlertas: cortes de tarjeta vencidos y cuotas de créditos atrasadas sin pago (para los contadores del menú y de las pestañas).
@@ -6469,7 +6551,8 @@ document.addEventListener('click', async e => {
   if (act === 'filtrosTel') { _filtrosAbiertos = !_filtrosAbiertos; filtrosTelefono(document.getElementById('app')); filtrosTelefono(document.getElementById('modalRoot')); return; }
   if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') cerrarCapa(); return; }
   if (act === 'recargar') return location.reload();
-  if (act === 'salir') { await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
+  if (act === 'salir') { const nc = offCola().length; if (nc) return toast(`Tienes ${nc} ${nc === 1 ? 'cambio' : 'cambios'} sin enviar: conéctate a internet antes de salir.`);
+    try { navigator.serviceWorker && navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage('limpiarDatos'); } catch (e) {} await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
   if (act === 'guardarSetup') { const u = $('#sbUrl').value.trim().replace(/\/$/, ''), k = $('#sbKey').value.trim(); if (!/^https:\/\/.+/.test(u) || k.length < 20) return toast('Revisa la URL y la clave.'); lsSet('cg-sb-url', u); lsSet('cg-sb-key', k); return location.reload(); }
   if (act === 'sync') return abrirSync(true);
   if (act === 'syncDirecto') return syncDirecto();
@@ -6831,7 +6914,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('dragover', e => { const d = e.target.closest && e.target.closest('#drop'); if (d) { e.preventDefault(); d.classList.add('on'); } });
 document.addEventListener('drop', async e => { const d = e.target.closest && e.target.closest('#drop'); if (!d) return; e.preventDefault(); d.classList.remove('on'); const f = e.dataTransfer.files[0]; if (f) procesarPayload(await f.text()); });
-$('#btnSync').addEventListener('click', () => abrirSync(true));
+$('#btnSync').addEventListener('click', () => navigator.onLine === false ? toast('Sin conexión: la sincronización con la app necesita internet.') : abrirSync(true));
 new MutationObserver(() => { if (document.querySelector('#modalRoot [data-thumb]:empty')) cargarMiniaturas(); }).observe($('#modalRoot'), {childList: true});
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(dibujarGraficos, 150); });
 /* ================= TELÉFONO: comodidad al escribir y tablas sin barra horizontal =================
