@@ -609,6 +609,44 @@ body:has(.graf-full){overflow:hidden}
 .dtx-cta>div{min-width:0}@media (max-width:760px){.dtx-cta>div{padding:6px 7px}.dtx-cta b{font-size:12px}.dtx-cta span{font-size:10px}}
 .dtx-tras{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:10px}.dtx-tras .dtx-fl{color:var(--muted)}
 @media (max-width:760px){.rc-it{grid-template-columns:72px 1fr auto;gap:6px;padding:7px 10px}.rc-dia .num{min-width:0}.rc-th,.rc-pr{grid-template-columns:38px repeat(4,1fr);gap:4px;padding-inline:10px}.rc-pr .num,.rc-th{font-size:11px}.rc-sum b{font-size:12.5px}}
+/* ===== Registro directo (fase 3) ===== */
+.rg-fab{--rc-r:var(--bad);position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:35;width:56px;height:56px;border-radius:50%;border:0;background:var(--rc-r);color:#fff;font-size:30px;line-height:1;font-weight:400;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;display:grid;place-items:center;padding:0 0 3px}
+.rg-fab:active{transform:scale(.94)}
+.rg-modal{max-width:560px!important;--rc-d:var(--azul);--rc-r:var(--bad)}
+.rg-it,.rg-apr,.rg-dup{--rc-d:var(--azul);--rc-r:var(--bad)}
+.rg-bd{display:grid;gap:12px}
+.rg-bd label{display:grid;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.rg-bd .in,.rg-aprb .in{width:100%!important;max-width:none!important;min-width:0;font-size:16px;border-radius:8px;padding:9px 10px;color:var(--fg)}
+.rg-bd input[type=date].in,.rg-bd input[type=time].in{min-height:42px;-webkit-appearance:none;appearance:none}
+.rg-tipos{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:var(--sunk);border-radius:10px;padding:3px}
+.rg-tt{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;font-size:14px;padding:9px 4px;border-radius:8px;cursor:pointer}
+.rg-tt.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.rg-tt-ingreso.on{color:var(--rc-d)}.rg-tt-gasto.on{color:var(--rc-r)}
+.rg-fh{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rg-monto{position:relative}
+.rg-monto .rg-mon{position:absolute;left:12px;bottom:13px;font-size:15px;color:var(--muted);pointer-events:none}
+.rg-monto .in{font-size:26px!important;font-weight:600;padding-left:50px!important;font-family:var(--f-num);text-align:right}
+.rg-ingreso .rg-monto .in{color:var(--rc-d)!important}.rg-gasto .rg-monto .in{color:var(--rc-r)!important}
+.rg-tras{display:grid;grid-template-columns:1fr;gap:6px;position:relative}
+.rg-swap{justify-self:center;font-size:18px;padding:2px 14px}
+.rg-com{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.rg-seg{width:100%}.rg-seg button{flex:1}
+.rg-pie{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--panel)}
+.rg-pie .btn{min-height:44px}
+.rg-it .rc-s{white-space:normal}
+.rg-dup,.rg-apr{border-bottom:6px solid var(--sunk)}
+.rg-dupb,.rg-aprb{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:8px 12px 12px}
+.rg-aprb label{display:grid;gap:3px;font-size:12px;color:var(--muted);flex:1 1 180px;min-width:0}.rg-aprb .in{width:100%;min-width:0}
+.rg-aprb .btn,.rg-dupb .btn{min-height:40px}
+.rg-vtabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.rg-hist{display:grid;gap:4px;font-size:12.5px}.rg-hist div{display:flex;gap:8px;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0}
+@media (max-width:760px){
+  #app{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .rg-modal.m-full{display:flex;flex-direction:column}.rg-modal.m-full .rg-bd{flex:1}
+  .rg-pie .btn{flex:1}
+  .rg-aprb .btn,.rg-dupb .btn{flex:1 1 auto}
+}
+
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
@@ -1068,6 +1106,8 @@ function derive() {
     if (dc.borrado) t.borradoApp = dc.borrado.at; if (dc.web) t.versionWeb = dc.web;
     txs.push(t);
   }
+  // Registros oficiales hechos en la plataforma: entran como filas iguales a las de la app (los vinculados, pendientes o rechazados no cuentan).
+  if (esAdmin() && S.reg) S.reg.forEach(r => { if (r.estado === 'oficial') regATx(r).forEach(t => txs.push(reclasificar(t))); });
   txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
   const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') { if (!asig.has(m.tx_id)) asig.set(m.tx_id, []); asig.get(m.tx_id).push(m); }
   D = {txs, byId: new Map(txs.map(t => [t.id, t])), asig};
@@ -1208,7 +1248,11 @@ async function cargarTodo() {
   } else {
     S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
     S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
+    try { S.cats = await todo('categorias', 'orden'); } catch (e) { S.cats = null; }   // catálogo para el formulario de registro (fase3.sql da permiso de lectura)
   }
+  // Registros hechos en la plataforma (fase3.sql). Sin la tabla, S.reg queda en null y el botón + lo avisa.
+  try { S.reg = await todo('registros', 'creado_el'); S.regHist = esAdmin() ? await todo('registro_hist', 'el') : []; } catch (e) { S.reg = null; S.regHist = []; }
+  if (esAdmin()) setTimeout(regPublicarCatalogo, 1500);
 }
 // guardarAjuste: Guarda un ajuste general (tabla ajustes).
 const guardarAjuste = (clave, valor) => { S.aj[clave] = valor; return q(sb.from('ajustes').upsert({clave, valor})); };
@@ -1342,7 +1386,7 @@ window.addEventListener('hashchange', () => { if (!S.me || !S.me.activo) return;
 
 // renderTabs: Dibuja la barra superior: pestañas, contadores, botón Sincronizar, usuario, Guía y Salir.
 function renderTabs() {
-  const a = esAdmin(); const nb = bandeja().length, nv = porValidar().length;
+  const a = esAdmin(); const nb = bandeja().length, nv = porValidar().length + regPendientes().length;
   const items = [['inicio', 'Inicio']];
   if (a) items.push(['bandeja', `Bandeja ${nb ? `<span class="count">${nb}</span>` : ''}`], ['validar', `Por validar ${nv ? `<span class="count warn-bg">${nv}</span>` : ''}`]);
   const nc = a ? cambios().length : 0; if (nc || S.view === 'cambios') items.push(['cambios', `Cambios ${nc ? `<span class="count bad-bg">${nc}</span>` : ''}`]);
@@ -1378,7 +1422,7 @@ function render() {
   else if (S.view === 'cuentas') html = vCuentas();
   else html = vControl(ctrlById(S.view.slice(2)));
   const pw0 = document.querySelector('.cr-plan-wrap'); const planPos = pw0 ? {c: pw0.dataset.c, top: pw0.scrollTop} : null;
-  app().innerHTML = html;
+  app().innerHTML = html + regFab();
   { const ct = document.querySelector('.cta-tabs .on'); if (ct) { const bar = ct.parentElement; if (bar.scrollWidth > bar.clientWidth) bar.scrollLeft = ct.offsetLeft - (bar.clientWidth - ct.offsetWidth) / 2; } }   // Cuentas: la pestaña activa siempre a la vista
   const pw = document.querySelector('.cr-plan-wrap');
   if (pw) { if (planPos && planPos.c === pw.dataset.c) pw.scrollTop = planPos.top; else { const tr = pw.querySelector('tr.cr-sel'); if (tr) pw.scrollTop = Math.max(0, tr.offsetTop - pw.clientHeight / 2); } }
@@ -1604,10 +1648,10 @@ function vValidarFila(m, conControl) {
 }
 // vValidar: VISTA POR VALIDAR (admin): lo que registraron los usuarios.
 function vValidar() {
-  const ps = porValidar().sort((a, b) => a.creado_el < b.creado_el ? -1 : 1);
-  return `<div class="stack"><div><div class="eyebrow">Por validar</div><h1>${ps.length ? `${ps.length} registros esperan tu revisión` : 'No hay nada por validar'}</h1>
+  const ps = porValidar().sort((a, b) => a.creado_el < b.creado_el ? -1 : 1); const nT = ps.length + regPendientes().length;
+  return `<div class="stack"><div><div class="eyebrow">Por validar</div><h1>${nT ? `${nT} registros esperan tu revisión` : 'No hay nada por validar'}</h1>
     <div class="note">Lo que registran los demás no cuenta en los saldos hasta que lo apruebes. Ligarlo a un registro de la app evita contarlo dos veces.</div></div>
-    <div class="panel">${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Fecha</th><th>Registró</th><th>Tipo</th><th>Descripción</th><th class="num">Valor</th><th></th></tr></thead><tbody>${ps.map(m => vValidarFila(m, true)).join('')}</tbody></table></div>` : '<div class="empty">Cuando alguien registre un gasto o ingreso, aparecerá aquí.</div>'}</div></div>`;
+    ${vValidarRegistros()}<div class="panel" ${!ps.length && regPendientes().length ? 'hidden' : ''}>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Fecha</th><th>Registró</th><th>Tipo</th><th>Descripción</th><th class="num">Valor</th><th></th></tr></thead><tbody>${ps.map(m => vValidarFila(m, true)).join('')}</tbody></table></div>` : '<div class="empty">Cuando alguien registre un gasto o ingreso, aparecerá aquí.</div>'}</div></div>`;
 }
 
 /* ================= vista: control / proyecto ================= */
@@ -3744,6 +3788,7 @@ async function aplicarSync(X) {
   derive(); render();
   const nWeb = X.mods.filter(x => X.dec[x.id] === 'web').length, nApp = X.mods.length - nWeb, nMan = X.dels.filter(x => X.dec[x.id] === 'mantener').length, nBor = X.dels.length - nMan;
   const nc = cambios().length;
+  S._catPub = false; setTimeout(regPublicarCatalogo, 800);   // categorías nuevas de la app: también para el formulario de los usuarios
   msg.innerHTML = `<b class="pos">Listo.</b> ${p.rows.length} movimientos leídos (${fFecha(p.desde)} a ${fFecha(p.hasta)}). ${prevRaw.size ? `${X.nuevos} nuevos${X.mods.length ? `; modificados: ${nApp} con la versión de la app${nWeb ? `, ${nWeb} con la versión web` : ''}` : ''}${X.dels.length ? `; borrados en la app: ${nBor} aplicados${nMan ? `, ${nMan} mantenidos` : ''}` : ''}.` : ''} ${mesesCamb.length} ${mesesCamb.length === 1 ? 'mes actualizado' : 'meses actualizados'}.${filasAct ? ` ${filasAct} ${filasAct === 1 ? 'fila asignada se actualizó' : 'filas asignadas se actualizaron'}.` : ''}${nc > cambiosAntes ? ` <b class="neg">${nc - cambiosAntes} filas asignadas por revisar.</b> <a href="#cambios" data-act="cerrarModal">Revisar cambios</a> ·` : ''} <a href="#bandeja" data-act="cerrarModal">Ver bandeja (${bandeja().length})</a>`;
 }
 // eliminarTx: Elimina un registro que se borró en la app y se había conservado.
@@ -3866,7 +3911,7 @@ function abrirDetalleTx(id) {
   const snap = pp.filter(m => m.app_monto != null).map(m => { const d = []; if (cents(m.app_monto) !== cents(t.monto)) d.push(`monto ${L(m.app_monto)}`); if (m.app_fecha && m.app_fecha !== t.fecha) d.push(`fecha ${fFecha(m.app_fecha)}`); if (m.app_detalle != null && m.app_detalle !== t.det) d.push(`detalle "${esc(m.app_detalle)}"`); return d; }).find(d => d.length);
   // Abierto desde el detalle de una cuenta: lo que hizo en esa cuenta (monto y saldo antes / después) y, si es traslado, sus dos lados.
   const ctaN = S.ctaVolver && S.view === 'cuentas' ? S.ctaVolver : ''; const cd = ctaN ? ctaDatos(ctaN) : null; const cf = cd ? cd.filas.find(x => x.t.id === t.id) : null;
-  const fmtC = v => ctaFmt(v, cd ? cd.i.mon : 'L'); const hx = (trasX(t) || [])[2];
+  const fmtC = v => ctaFmt(v, cd ? cd.i.mon : 'L'); const hx = t.hora || (trasX(t) || [])[2];
   const horaTxt = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m.' : ' p. m.') : '';
   const enCta = cf ? `<div class="eyebrow">En ${esc(cd.i.nom)}${cf.via ? ' · con ' + esc(cf.via) : ''}</div>
       <div class="dtx-cta"><div><span>${cf.lado === 'r' ? 'Retiro' : 'Depósito'}</span><b class="num ${cf.lado === 'r' ? 'rc-r' : 'rc-d'}">${cf.est ? '≈ ' : ''}${fmtC(cf.lado === 'r' ? -cf.v : cf.v)}</b></div>
@@ -3882,17 +3927,17 @@ function abrirDetalleTx(id) {
       <div class="row"><span class="chip ${(EST[e] || [])[1] || ''}">${esc(estadoTxt)}</span><span class="chip">${tjEsTras(t) ? 'Traslado' : tjEsAjuste(t) ? (tjSignoBase(t) > 0 ? 'Ajuste de saldo (suma)' : 'Ajuste de saldo (resta)') : t.code === 0 ? 'Ingreso' : 'Egreso'}</span>${t.versionWeb ? '<span class="chip">Versión web conservada</span>' : ''}</div>
       ${t.borradoApp ? `<div class="panel"><div class="bd small row" style="justify-content:space-between"><span><b class="neg">Borrado en la app.</b> Lo mantuviste en la plataforma el ${fFecha(t.borradoApp.slice(0, 10))}. Elimínalo cuando quieras homologar con la app${partes(t.id).length ? '; también se quitará de los controles donde está asignado' : ''}.</span><button class="btn sm danger" data-act="elimTx" data-id="${esc(t.id)}">${S.confirmElim === t.id ? '¿Seguro? Eliminar' : 'Eliminar de la plataforma'}</button></div></div>` : ''}
       ${enCta}${trasHtml}
-      <div class="eyebrow">En Registro Contable</div>
+      <div class="eyebrow">${t.web ? 'Registrado en la plataforma' : 'En Registro Contable'}</div>
       <table class="dist"><tbody>
-        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${t.orig ? fila('Sustituida', `<span class="small">en la app: ${esc([t.orig.cat, t.orig.sub, t.orig.nota].filter(Boolean).join(' › '))}</span>`) : ''}${fila('Grupal', esc(catG(t.cat)) + (catG(t.cat) !== t.cat && t.cat ? ` <span class="note">(${esc(t.cat)})</span>` : ''))}${fila('Subgrupal', esc(subG(t.cat, t.sub)))}${fila('Detalle', esc(notaG(t.cat, t.sub, t.nota)))}${fila('Descripción', esc(t.det))}${fila('Tipo en la app', esc(t.tipoMov))}${fila('ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
+        ${fila('Fecha', fFecha(t.fecha) + (horaTxt ? ' · ' + horaTxt : ''))}${t.moneda ? '' : fila('Monto', `<b class="num">${L(t.monto)}</b>`)}${fxFilas(t, fila)}${fila('Cuenta', esc(t.cuenta) + (tjDe ? ` <span class="chip">tarjeta ${esc((tjDe.banco || '') + ' · ' + (tjDe.nombre || ''))}</span>` : ''))}${tjEsTras(t) ? fila(ctaSigno(t) < 0 ? 'Cuenta destino' : 'Cuenta de origen', esc(tjDestino(t)) || '<span class="muted">la app no la indica</span>') : ''}${t.x ? fila('Otros datos del portal', `<span class="small muted">${esc(Object.entries(t.x).map(([k, v]) => k + ': ' + v).join(' · '))}</span>`) : ''}${t.orig ? fila('Sustituida', `<span class="small">en la app: ${esc([t.orig.cat, t.orig.sub, t.orig.nota].filter(Boolean).join(' › '))}</span>`) : ''}${fila('Grupal', esc(catG(t.cat)) + (catG(t.cat) !== t.cat && t.cat ? ` <span class="note">(${esc(t.cat)})</span>` : ''))}${fila('Subgrupal', esc(subG(t.cat, t.sub)))}${fila('Detalle', esc(notaG(t.cat, t.sub, t.nota)))}${fila('Descripción', esc(t.det))}${fila(t.web ? 'Tipo' : 'Tipo en la app', esc(t.tipoMov))}${fila(t.web ? 'Registro web' : 'ID en la app', `<span class="mono small">${esc(t.id)}</span>`)}
       </tbody></table>
       <div class="eyebrow">En la plataforma</div>
       ${pp.length ? `<table class="dist"><tbody>${pp.map(m => { const c = ctrlById(m.control); return `<tr><td><button class="linkish" data-act="detalleMovId" data-id="${esc(m.id)}">${esc(c ? c.nombre : m.control)} · ${esc(mesLargo(m.mes))} · ${esc(m.tipo)}</button><div class="cat">Asignado ${cuando(m.validado_el || m.creado_el)}</div></td><td class="num">${L(m.valor)}</td></tr>`; }).join('')}
         ${restante(t) > 0.005 ? `<tr><td class="muted">Sin repartir</td><td class="num warn-t">${L(restante(t))}</td></tr>` : ''}</tbody></table>` : `<div class="note">${ign ? 'Marcado como no aplica' + (ign.motivo ? ': ' + esc(ign.motivo) : '') : 'Todavía no está en ningún control ni proyecto.'}</div>`}
       ${snap ? `<div class="note">Al asignarse, en la app tenía ${snap.join(', ')}.</div>` : ''}
       ${(() => { const p0 = partes(t.id)[0]; return vAdjuntos(adjDeTx(t.id), {tx: t.id, mov: p0 ? p0.id : ''}, esAdmin()); })()}
-      <div class="eyebrow">Sincronización</div>
-      ${hist}
+      ${t.web ? regDetalleHtml(t) : `<div class="eyebrow">Sincronización</div>
+      ${hist}`}
       <div class="row" style="justify-content:flex-end">${e === 'noaplica' ? `<button class="btn sm" data-act="restaurar" data-id="${esc(t.id)}">Devolver a la bandeja</button>` : ''}${restante(t) > 0.005 && e !== 'noaplica' ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">${pp.length ? 'Repartir lo que falta' : 'Asignar o dividir'}</button>` : pp.length ? `<button class="btn sm" data-act="dividir" data-id="${esc(t.id)}">Cambiar reparto</button>` : ''}</div>
     </div></div></div>`;
 }
@@ -4046,6 +4091,7 @@ const tjEspejo = t => tjIdx().get(tjKey(t.fecha, t.montoApp != null ? t.montoApp
 const tjEsAjuste = t => /modificar saldo|ajuste de saldo/i.test((t.cat || '') + ' ' + (t.tipoMov || ''));
 // ajusteOrigen: de dónde sale el sentido de un ajuste: 'mano' (elegido en Cuentas → Ajustes), 'excel', 'contenido' o 'codigo' (dudoso).
 function ajusteOrigen(t) { const m = S.aj && S.aj.ajusteSigno; if (m && m[t.id]) return ['mano', m[t.id] > 0 ? 1 : -1];
+  if (t.web && t.signo) return ['web', t.signo > 0 ? 1 : -1];   // ajuste hecho en la plataforma: dice si suma o resta
   const xx = trasX(t); if (xx && xx[1]) return ['excel', xx[1] === 'entra' ? 1 : -1];
   const x = [t.nota, t.sub, t.det].join(' '); if (/ingres|dep[oó]sit|aument|entrad/i.test(x)) return ['contenido', 1]; if (/gast|retir|egres|dismin|salid/i.test(x)) return ['contenido', -1];
   return ['codigo', t.code === 0 ? 1 : -1]; }
@@ -4118,6 +4164,7 @@ const tjPagoEnUSD = (x, m) => !!m.aUSD || (tjEsUSD(x.cuenta) !== !!m.cruce);
 function tjMonto(t) { const m = tjMonto0(t); if (t.neg && !tjEsTras(t)) { m.l = -m.l; m.usd = -m.usd; if (m.hnl) m.hnl = -m.hnl; } return m; }
 function tjMonto0(t) {
   if (!tjEsUSD(t.cuenta)) return {l: +t.monto || 0, usd: 0};
+  if (t.web && t.moneda === 'USD') return {usd: +t.original || 0, l: 0, hnl: +t.monto || 0, tasa: t.tasa};   // registrado en la plataforma: el importe en dólares es exacto
   const hnl = +t.monto || 0;
   if (t.moneda && t.moneda !== 'USD') return {usd: +t.original || 0, l: 0, hnl};
   const ex = tjUSDExacto(t, hnl); if (ex) return {usd: ex.usd, l: 0, hnl, tasa: ex.tasa, fuente: ex.fuente};
@@ -4582,8 +4629,260 @@ const CTA_DEUDA = new Set(['credito', 'prestamo']);
 const CTA_TIPOS_APP = [['efectivo', 'Dinero en efectivo', 'efectivo'], ['banco', 'Banco', 'banco'], ['banco_alt', 'Banco - Alternativa', 'banco'], ['debito', 'Tarjetas de débito', 'debito'],
   ['tc_amex', 'TC BAC AMEX', 'credito'], ['tc_visa', 'TC BAC VISA', 'credito'], ['tc', 'Tarjetas de crédito', 'credito'], ['activos', '5. Activos', 'ahorro'], ['pago_e', 'Pago electrónico', 'otros'],
   ['inversion', 'Inversion', 'ahorro'], ['linea', 'Linea de crédito', 'prestamo'], ['prestamo', 'Préstamo', 'prestamo'], ['seguro', 'Seguro', 'otros'], ['otros', 'Otros', 'otros']];
-const CTA_TABS = [['res', 'Resumen'], ['ban', 'Efectivo y bancos'], ['tc', 'Tarjetas de crédito'], ['aho', 'Ahorro e inversión'], ['pre', 'Préstamos'], ['adm', 'Administración']];
+const CTA_TABS = [['res', 'Resumen'], ['ban', 'Efectivo y bancos'], ['tc', 'Tarjetas de crédito'], ['aho', 'Ahorro e inversión'], ['pre', 'Préstamos'], ['reg', 'Registros web'], ['adm', 'Administración']];
 const CTA_TAB_CLASES = {ban: ['efectivo', 'banco', 'debito', 'otros'], aho: ['ahorro']};
+/* ===================== Fase 3: registro directo en la plataforma =====================
+   Tabla registros (fase3.sql). El administrador registra en firme (estado "oficial"); los demás usuarios registran
+   "pendiente" y el administrador lo aprueba (completa la cuenta), lo vincula con un registro que ya existe o lo rechaza.
+   Un registro oficial se convierte en filas iguales a las de la app (regATx), así que cuenta en saldos, tarjetas, créditos,
+   Bandeja, controles y reportes sin cambiar nada de eso. Un traslado son dos filas (sale / entra), como en la app.
+   Durante la transición (fase 1 en paralelo) un registro web que coincide con uno de la app se marca como posible duplicado
+   y se puede vincular: el vinculado deja de contar. */
+const REG_TIPOS = {gasto: ['Gasto', 'rc-r'], ingreso: ['Ingreso', 'rc-d'], traslado: ['Traslado', ''], ajuste: ['Ajuste de saldo', '']};
+const REG_EST = {oficial: ['Oficial', 'ok'], pendiente: ['Por aprobar', 'warn'], vinculado: ['Vinculado', ''], rechazado: ['Rechazado', 'bad'], eliminado: ['Eliminado', 'bad']};
+const regDe = id => (S.reg || []).find(r => r.id === id);
+// regATx: filas (formato de la app) de un registro oficial.
+function regATx(r) {
+  const base = {fecha: r.fecha, hora: r.hora || '', mes: String(r.fecha).slice(0, 7), web: r.id, det: r.descripcion || '', neg: false};
+  const enUSD = c => { try { return ctaInfo(c).mon === 'USD'; } catch (e) { return tjEsUSD(c); } };
+  const amt = (c, m) => { m = Math.abs(+m || 0); if (!enUSD(c)) return {monto: m, montoApp: m}; const ts = +r.tasa || tasaUSD() || 0; const h = crR2(m * ts); return {monto: h, montoApp: h, moneda: 'USD', original: m, tasa: ts}; };
+  const fila = (suf, o) => Object.assign({id: 'W' + r.id + suf}, base, o);
+  if (r.tipo === 'gasto' || r.tipo === 'ingreso') return [fila('', {code: r.tipo === 'ingreso' ? 0 : 1, cuenta: r.cuenta || '', tipoMov: r.tipo === 'ingreso' ? 'Ingreso' : 'Gastos', cat: r.grupal || '', sub: r.subgrupal || '', nota: r.detalle || '', ...amt(r.cuenta, r.monto)})];
+  if (r.tipo === 'ajuste') return [fila('', {code: r.signo > 0 ? 0 : 1, cuenta: r.cuenta || '', tipoMov: 'Modificar saldo', cat: 'Modificar saldo', sub: '', nota: r.signo > 0 ? 'Ingresos' : 'Gastos', signo: r.signo > 0 ? 1 : -1, ...amt(r.cuenta, r.monto)})];
+  const out = [fila('-o', {code: 3, cuenta: r.cuenta, tipoMov: 'Dinero gastado', cat: r.cuenta_destino, sub: '', nota: r.detalle || 'Traslado', ...amt(r.cuenta, r.monto)}),
+    fila('-d', {code: 3, cuenta: r.cuenta_destino, tipoMov: 'Dinero ingresado', cat: r.cuenta, sub: '', nota: r.detalle || 'Traslado', ...amt(r.cuenta_destino, r.monto_destino != null ? r.monto_destino : r.monto)})];
+  if (+r.comision) out.push(fila('-c', {code: 1, cuenta: r.cuenta, tipoMov: 'Gastos', cat: 'Comisiones', sub: 'Traslados', nota: 'Comisión de traslado', ...amt(r.cuenta, r.comision)}));
+  return out;
+}
+const regWebDeTx = t => t && t.web ? regDe(t.web) : null;
+// regDuplicados: registros web oficiales que coinciden con uno de la app (misma cuenta, fecha ±1 día, mismo monto y tipo).
+function regDuplicados() {
+  if (!S.reg || !D.txs) return [];
+  const app = D.txs.filter(t => !t.web); const idx = new Map(); app.forEach(t => { const k = tjCta(t.cuenta) + '|' + cents(t.montoApp); if (!idx.has(k)) idx.set(k, []); idx.get(k).push(t); });
+  const dias = (a, b) => Math.abs((Date.parse(a) - Date.parse(b)) / 864e5);
+  const out = []; S.reg.filter(r => r.estado === 'oficial' && r.tipo !== 'traslado').forEach(r => { const t = D.byId.get('W' + r.id); if (!t) return;
+    const c = (idx.get(tjCta(t.cuenta) + '|' + cents(t.montoApp)) || []).filter(a => dias(a.fecha, t.fecha) <= 1 && (a.code === 0) === (t.code === 0)); if (c.length) out.push({r, t, app: c}); });
+  return out;
+}
+async function regHist(id, accion, antes, despues) { try { const row = {id: crUid(), registro: id, accion, antes: antes || null, despues: despues || null, por: S.me.id, el: new Date().toISOString()}; await sb.from('registro_hist').insert(row); (S.regHist || (S.regHist = [])).push(row); } catch (e) {} }
+const ahoraHora = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+const hora12 = h => h ? (((+h.slice(0, 2) + 11) % 12) + 1) + ':' + h.slice(3, 5) + (+h.slice(0, 2) < 12 ? ' a. m.' : ' p. m.') : '';
+
+/* --- Formulario (pantalla completa en el iPhone) --- */
+// Catálogo para elegir: Grupal y Subgrupal activos; los Detalle se sugieren pero se pueden escribir.
+function regCatalogo(tipo) {
+  const t = tipo === 'ingreso' ? 'ingreso' : 'gasto';
+  if (esAdmin() && D.txs) return catArbol(t).filter(n => !(n.row && n.row.activa === false)).map(n => ({nom: n.app || n.nombre, ver: n.nombre, hijos: n.hijos.filter(x => !(x.row && x.row.activa === false)).map(x => ({nom: x.app || x.nombre, ver: x.nombre, hijos: x.hijos.filter(z => !(z.row && z.row.activa === false)).map(z => ({nom: z.app || z.nombre, ver: z.nombre}))}))}));
+  const rows = (S.cats || []).filter(r => r.tipo === t && r.activa !== false); const ord = (a, b) => (+a.orden || 0) - (+b.orden || 0) || a.nombre.localeCompare(b.nombre, 'es', {numeric: true});
+  const de = p => rows.filter(r => (r.padre || null) === p).sort(ord);
+  return de(null).map(g => ({nom: g.app_nombre || g.nombre, ver: g.nombre, hijos: de(g.id).map(s2 => ({nom: s2.app_nombre || s2.nombre, ver: s2.nombre, hijos: de(s2.id).map(d => ({nom: d.app_nombre || d.nombre, ver: d.nombre}))}))}));
+}
+function regCuentasOpts(sel, excluir) {
+  const l = ctaNombres().map(ctaInfo).filter(i => i.estado === 'activa' && i.n !== excluir).sort((a, b) => { const ta = a.tipo ? +a.tipo.orden || 0 : 1e6, tb = b.tipo ? +b.tipo.orden || 0 : 1e6; return ta - tb || ctaOrdCmp(a, b); });
+  const g = new Map(); l.forEach(i => { const k = i.tipo ? i.tipo.nombre : 'Sin tipo'; if (!g.has(k)) g.set(k, []); g.get(k).push(i); });
+  return [...g].map(([k, xs]) => `<optgroup label="${esc(k)}">${xs.map(i => `<option value="${esc(i.n)}" ${i.n === sel ? 'selected' : ''}>${esc(i.nom)}${i.mon === 'USD' ? ' ($)' : ''}</option>`).join('')}</optgroup>`).join('');
+}
+function abrirRegForm(id) {
+  const r = id ? regDe(id) : null; const a = esAdmin();
+  const prev = S.regUlt || {};
+  S.regF = r ? {id: r.id, tipo: r.tipo, fecha: r.fecha, hora: r.hora || '', cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, comision: r.comision, signo: r.signo || 1, modoAj: 'monto',
+      grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || ''}
+    : {tipo: prev.tipo || 'gasto', fecha: hoy(), hora: ahoraHora(), cuenta: prev.cuenta || '', destino: prev.destino || '', monto: '', montoD: '', comision: '', signo: 1, modoAj: 'saldo', grupal: '', subgrupal: '', detalle: '', desc: ''};
+  if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
+  S.regVista = 'form'; pintarRegForm();
+}
+function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
+  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); }
+const numDe = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : NaN; };
+function pintarRegForm() {
+  const F = S.regF; const a = esAdmin(); const tipos = a ? ['ingreso', 'gasto', 'traslado', 'ajuste'] : ['ingreso', 'gasto'];
+  const cat = regCatalogo(F.tipo); const g = cat.find(x => x.nom === F.grupal); const sg = g && g.hijos.find(x => x.nom === F.subgrupal);
+  const monO = F.cuenta ? ctaInfo(F.cuenta).mon : 'L', monD = F.destino ? ctaInfo(F.destino).mon : 'L'; const tasa = tasaUSD();
+  let cuerpo = '';
+  const campoMonto = (lab, id, val, mon) => `<label class="rg-monto">${lab}<span class="rg-mon">${mon === 'USD' ? 'US$' : 'L'}</span><input class="in num" id="${id}" inputmode="decimal" value="${esc(val == null ? '' : String(val))}" placeholder="0.00" autocomplete="off"></label>`;
+  const ctaSel = (id, val, lab, excl) => `<label>${lab}<select class="in" id="${id}"><option value="">Elige la cuenta</option>${regCuentasOpts(val, excl)}</select></label>`;
+  if (F.tipo === 'traslado') {
+    const cruce = F.cuenta && F.destino && monO !== monD;
+    cuerpo = `<div class="rg-tras">${ctaSel('rgCuenta', F.cuenta, 'De', F.destino)}<button class="btn sm ghost rg-swap" data-act="regSwap" aria-label="Invertir cuentas" title="Invertir">⇅</button>${ctaSel('rgDestino', F.destino, 'A', F.cuenta)}</div>
+      ${campoMonto('Importe que sale', 'rgMonto', F.monto, monO)}
+      ${cruce ? campoMonto('Importe que llega', 'rgMontoD', F.montoD, monD) + `<div class="note">Monedas distintas. ${tasa ? 'Tasa del día: L ' + tasa.toFixed(4) + ' por dólar (el importe que llega se calcula solo si lo dejas vacío).' : ''}</div>` : ''}
+      ${F.conComision || +F.comision ? `<div class="rg-com">${campoMonto('Comisión', 'rgComision', F.comision, monO)}<button class="btn sm ghost" data-act="regSinCom" aria-label="Quitar comisión">✕</button></div>` : '<button class="btn sm ghost" data-act="regConCom" style="justify-self:start">+ Comisión</button>'}
+      <label>Detalle<input class="in" id="rgDet" value="${esc(F.detalle)}" placeholder="ej. Traslado de fondos"></label>`;
+  } else if (F.tipo === 'ajuste') {
+    const d = F.cuenta ? ctaDatos(F.cuenta) : null;
+    cuerpo = `${ctaSel('rgCuenta', F.cuenta, 'Cuenta')}
+      ${d ? `<div class="note">Saldo actual en la plataforma: <b class="num">${ctaFmt(d.saldo, monO)}</b></div>` : ''}
+      <div class="dm-seg rg-seg"><button class="${F.modoAj === 'saldo' ? 'on' : ''}" data-act="regModoAj" data-v="saldo">Escribir el saldo real</button><button class="${F.modoAj === 'monto' ? 'on' : ''}" data-act="regModoAj" data-v="monto">Sumar o restar</button></div>
+      ${F.modoAj === 'saldo' ? campoMonto('Saldo real de la cuenta', 'rgMonto', F.monto, monO) + `<div class="note" id="rgAjDif">${regAjDifTxt()}</div>`
+        : `<div class="dm-seg rg-seg"><button class="${F.signo > 0 ? 'on' : ''}" data-act="regSigno" data-v="1">Suma</button><button class="${F.signo < 0 ? 'on' : ''}" data-act="regSigno" data-v="-1">Resta</button></div>${campoMonto('Importe', 'rgMonto', F.monto, monO)}`}`;
+  } else {
+    cuerpo = `${campoMonto('Importe', 'rgMonto', F.monto, a ? monO : 'L')}
+      <label>Grupal<select class="in" id="rgGrupal"><option value="">Elige</option>${cat.map(x => `<option value="${esc(x.nom)}" ${x.nom === F.grupal ? 'selected' : ''}>${esc(x.ver)}</option>`).join('')}</select></label>
+      <label>Subgrupal<select class="in" id="rgSub" ${g ? '' : 'disabled'}><option value="">${g ? 'Elige' : 'Primero el grupal'}</option>${(g ? g.hijos : []).map(x => `<option value="${esc(x.nom)}" ${x.nom === F.subgrupal ? 'selected' : ''}>${esc(x.ver)}</option>`).join('')}</select></label>
+      <label>Detalle<input class="in" id="rgDet" list="rgDetL" value="${esc(F.detalle)}" placeholder="Elige o escribe" autocomplete="off"><datalist id="rgDetL">${(sg ? sg.hijos : []).map(x => `<option value="${esc(x.nom)}">${esc(x.ver !== x.nom ? x.ver : '')}</option>`).join('')}</datalist></label>
+      ${a ? ctaSel('rgCuenta', F.cuenta, 'Cuenta') : '<div class="note">La cuenta la completa el administrador al aprobarlo.</div>'}`;
+  }
+  const ed = !!F.id; const r = ed ? regDe(F.id) : null;
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal rg-modal rg-${F.tipo}" role="dialog" aria-modal="true" aria-labelledby="rgT">
+    <div class="hd"><h2 id="rgT" style="margin-right:auto">${ed ? 'Editar registro' : a ? 'Nuevo registro' : 'Registrar para aprobación'}</h2>${!a && !ed ? `<button class="btn sm ghost" data-act="regMios">Mis registros</button>` : ''}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button></div>
+    <div class="bd rg-bd">
+      ${ed && r.tipo === 'traslado' ? '' : `<div class="rg-tipos" role="tablist">${tipos.map(t => `<button role="tab" class="rg-tt rg-tt-${t} ${F.tipo === t ? 'on' : ''}" data-act="regTipo" data-v="${t}" aria-selected="${F.tipo === t}">${REG_TIPOS[t][0].replace(' de saldo', '')}</button>`).join('')}</div>`}
+      <div class="rg-fh"><label>Fecha<input class="in" type="date" id="rgFecha" value="${esc(F.fecha)}"></label><label>Hora<input class="in" type="time" id="rgHora" value="${esc(F.hora)}"></label></div>
+      ${cuerpo}
+      <label>Descripción<textarea class="in" id="rgDesc" rows="2" placeholder="Opcional">${esc(F.desc)}</textarea></label>
+      <div id="rgMsg" class="note"></div>
+      ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
+    </div>
+    <div class="rg-pie">${ed && a && ['eliminado', 'rechazado'].includes(r.estado) ? `<button class="btn" data-act="regRestaurar" data-id="${esc(r.id)}">${r.estado === 'eliminado' ? 'Restaurar' : 'Volver a revisar'}</button>` : ''}${ed && ['eliminado', 'vinculado'].includes(r.estado) ? '' : ed ? (S.regConfElim === F.id ? `<button class="btn danger" data-act="regEliminar">¿Eliminar? Sí</button>` : `<button class="btn ghost danger" data-act="regEliminar">Eliminar</button>`) : `<button class="btn ghost" data-act="regGuardar" data-v="seguir">Continuar</button>`}<button class="btn pri" data-act="regGuardar">${ed ? 'Guardar cambios' : a ? 'Guardar' : 'Enviar para aprobación'}</button></div>
+  </div></div>`;
+  if (!ed) setTimeout(() => { const m = $('#rgMonto'); if (m && !m.value && !esTelefono()) m.focus(); }, 30);
+}
+function regAjDifTxt() { const F = S.regF; if (!F || !F.cuenta) return ''; const real = numDe(F.monto); if (!isFinite(real)) return 'Escribe el saldo que muestra tu banco o tu billetera.';
+  const d = ctaDatos(F.cuenta); const dif = crR2(real - d.saldo); const mon = ctaInfo(F.cuenta).mon;
+  return Math.abs(dif) < 0.005 ? 'El saldo ya coincide: no hace falta ajustar.' : `Se registrará un ajuste que <b>${dif > 0 ? 'suma' : 'resta'} ${ctaFmt(Math.abs(dif), mon)}</b>.`; }
+// regValidar: arma la fila a guardar o devuelve el mensaje de lo que falta.
+function regArmar() {
+  regLeerForm(); const F = S.regF; const a = esAdmin(); const monto = numDe(F.monto);
+  if (!F.fecha) return 'Falta la fecha.';
+  const row = {tipo: F.tipo, fecha: F.fecha, hora: F.hora || null, descripcion: (F.desc || '').trim() || null, grupal: null, subgrupal: null, detalle: (F.detalle || '').trim() || null, cuenta: null, cuenta_destino: null, monto_destino: null, comision: null, signo: null, tasa: null};
+  if (F.tipo === 'traslado') { if (!F.cuenta || !F.destino) return 'Elige las dos cuentas.'; if (F.cuenta === F.destino) return 'Las dos cuentas deben ser distintas.'; if (!(monto > 0)) return 'Escribe el importe.';
+    row.cuenta = F.cuenta; row.cuenta_destino = F.destino; row.monto = crR2(monto); const mo = ctaInfo(F.cuenta).mon, md = ctaInfo(F.destino).mon, ts = tasaUSD();
+    if (mo !== md) { let md2 = numDe(F.montoD); if (!(md2 > 0)) { if (!ts) return 'Escribe el importe que llega (no hay tasa del día).'; md2 = mo === 'USD' ? monto * ts : monto / ts; } row.monto_destino = crR2(md2); }
+    if (mo === 'USD' || md === 'USD') row.tasa = mo !== md ? crR2(Math.max(monto, row.monto_destino) / Math.min(monto, row.monto_destino) * 10000) / 10000 : ts;
+    const com = numDe(F.comision); if (com > 0) row.comision = crR2(com); }
+  else if (F.tipo === 'ajuste') { if (!F.cuenta) return 'Elige la cuenta.'; if (!isFinite(monto)) return 'Escribe el importe.'; row.cuenta = F.cuenta;
+    if (F.modoAj === 'saldo') { const dif = crR2(monto - ctaDatos(F.cuenta).saldo); if (Math.abs(dif) < 0.005) return 'El saldo ya coincide: no hace falta ajustar.'; row.monto = Math.abs(dif); row.signo = dif > 0 ? 1 : -1; }
+    else { if (!(monto > 0)) return 'Escribe el importe.'; row.monto = crR2(monto); row.signo = F.signo > 0 ? 1 : -1; }
+    if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = tasaUSD(); }
+  else { if (!(monto > 0)) return 'Escribe el importe.'; if (!F.grupal) return 'Elige el grupal.'; if (a && !F.cuenta) return 'Elige la cuenta.';
+    row.monto = crR2(monto); row.grupal = F.grupal; row.subgrupal = F.subgrupal || null; if (a) { row.cuenta = F.cuenta; if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = tasaUSD(); } }
+  return row;
+}
+async function regGuardar(seguir) {
+  const row = regArmar(); const msg = $('#rgMsg'); if (typeof row === 'string') { msg.innerHTML = `<span class="neg">${esc(row)}</span>`; return; }
+  const F = S.regF; const a = esAdmin();
+  if (!S.reg) { msg.innerHTML = '<span class="neg">Primero corre en Supabase el SQL de la fase 3 (fase3.sql).</span>'; return; }
+  try {
+    if (F.id) { const antes = Object.assign({}, regDe(F.id)); row.actualizado_el = new Date().toISOString(); const d = await q(sb.from('registros').update(row).eq('id', F.id).select(), 'Registro actualizado');
+      const nuevo = d && d[0] ? d[0] : Object.assign(antes, row); Object.assign(regDe(F.id), nuevo); await regHist(F.id, 'editado', antes, nuevo); }
+    else { row.id = crUid(); row.estado = a ? 'oficial' : 'pendiente'; row.creado_por = S.me.id; row.creado_el = new Date().toISOString(); if (a) { row.aprobado_por = S.me.id; row.aprobado_el = row.creado_el; }
+      const d = await q(sb.from('registros').insert(row).select(), a ? 'Registro guardado' : 'Enviado para aprobación'); const nuevo = d && d[0] ? d[0] : row; S.reg.push(nuevo); await regHist(nuevo.id, 'creado', null, nuevo);
+      S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino}; }
+    if (a) derive();
+    if (seguir) { Object.assign(F, {monto: '', montoD: '', comision: '', detalle: '', desc: '', id: undefined}); F.hora = ahoraHora(); pintarRegForm(); const m = $('#rgMonto'); if (m) m.focus(); $('#rgMsg').innerHTML = '<span class="pos">Guardado. Puedes registrar el siguiente.</span>'; render(); return; }
+    $('#modalRoot').innerHTML = ''; S.regF = null; render();
+  } catch (e) {}
+}
+async function regCambiarEstado(id, estado, extra, accion, okMsg) {
+  const r = regDe(id); if (!r) return; const antes = Object.assign({}, r); const campos = Object.assign({estado, actualizado_el: new Date().toISOString()}, extra || {});
+  try { const d = await q(sb.from('registros').update(campos).eq('id', id).select(), okMsg); Object.assign(r, d && d[0] ? d[0] : campos); await regHist(id, accion, antes, r); derive(); } catch (e) {}
+}
+/* --- Mis registros (usuarios) --- */
+function pintarRegMios() {
+  const l = (S.reg || []).filter(r => r.creado_por === S.me.id).sort((x, y) => String(y.creado_el).localeCompare(String(x.creado_el)));
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal rg-modal" role="dialog" aria-modal="true" aria-labelledby="rgMT">
+    <div class="hd"><h2 id="rgMT" style="margin-right:auto">Mis registros</h2><button class="btn sm pri" data-act="regNuevo">+ Nuevo</button><button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button></div>
+    <div class="bd rg-bd" style="gap:0">${l.map(r => regFilaHtml(r, true)).join('') || '<div class="note" style="padding:14px">Todavía no has registrado nada.</div>'}</div></div></div>`;
+}
+function regFilaHtml(r, mios) {
+  const e = REG_EST[r.estado] || ['', '']; const t = REG_TIPOS[r.tipo];
+  const cats = r.tipo === 'traslado' ? `${esc(ctaInfo(r.cuenta).nom)} → ${esc(ctaInfo(r.cuenta_destino).nom)}` : r.tipo === 'ajuste' ? `Ajuste de ${esc(ctaInfo(r.cuenta).nom)} (${r.signo > 0 ? 'suma' : 'resta'})` : esc([catG(r.grupal), r.subgrupal ? subG(r.grupal, r.subgrupal) : ''].filter(Boolean).join(' › '));
+  const mon = r.cuenta && ctaNombres().includes(r.cuenta) && ctaInfo(r.cuenta).mon === 'USD' ? 'USD' : 'L';
+  return `<div class="rc-it rg-it" ${mios && r.estado === 'pendiente' ? `data-act="regEditar" data-id="${esc(r.id)}"` : !mios && r.estado === 'oficial' ? `data-act="ctaMov" data-id="W${esc(r.id)}${r.tipo === 'traslado' ? '-o' : ''}"` : !mios ? `data-act="regEditar" data-id="${esc(r.id)}"` : ''} role="button" tabindex="0">
+    <div class="rc-c">${fFecha(r.fecha)}<br>${hora12(r.hora)}</div>
+    <div class="rc-m"><div class="rc-t"><b>${esc(r.detalle || t[0])}</b>${r.descripcion ? ' <span>' + esc(r.descripcion) + '</span>' : ''}</div><div class="rc-s">${cats}${mios ? '' : ' · ' + esc(nombreDe(r.creado_por))} · <span class="chip ${e[1]}">${e[0]}</span>${r.estado === 'rechazado' && r.motivo ? ' · ' + esc(r.motivo) : ''}</div></div>
+    <div class="rc-v"><span class="num ${t[1]}">${ctaFmt(+r.monto, mon)}</span><span class="rc-sl">${t[0]}</span></div></div>`;
+}
+/* --- Vista Cuentas → Registros web (administrador) --- */
+function vCtaRegistros() {
+  if (!S.reg) return `<div class="panel"><div class="bd note">Para registrar directamente en la plataforma corre en Supabase el SQL de la fase 3 (<b>fase3.sql</b>).</div></div>`;
+  const ver = S.regVer || 'oficial'; const dup = regDuplicados(); const qq = (S.regQ || '').trim().toUpperCase();
+  const cnt = k => S.reg.filter(r => r.estado === k).length;
+  let l = (ver === 'dup' ? dup.map(x => x.r) : S.reg.filter(r => r.estado === ver)).slice().sort((a, b) => (b.fecha + (b.hora || '')).localeCompare(a.fecha + (a.hora || '')));
+  if (qq) l = l.filter(r => [r.detalle, r.descripcion, r.grupal, r.subgrupal, r.cuenta, r.cuenta_destino, String(r.monto)].join(' ').toUpperCase().includes(qq));
+  const bt = (v, t, n) => `<button class="tj-tab ${ver === v ? 'on' : ''}" data-act="regVer" data-v="${v}">${t} <span class="tj-tc">${n}</span></button>`;
+  const dupHtml = ver === 'dup' ? l.map(r => { const x = dup.find(y => y.r.id === r.id); return `<div class="rg-dup">${regFilaHtml(r, false)}<div class="rg-dupb"><span class="note">En la app: ${x.app.map(t => `${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${L(t.montoApp)} · ${esc(t.nota || t.det || t.cat)}`).join(' / ')}</span><button class="btn sm pri" data-act="regVincular" data-id="${esc(r.id)}" data-t="${esc(x.app[0].id)}">Es el mismo: vincular</button></div></div>`; }).join('') : '';
+  const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; let ant = null;
+  const filas = ver === 'dup' ? dupHtml : l.map(r => { let h = ''; if (r.fecha !== ant) { ant = r.fecha; const dt = new Date(r.fecha + 'T12:00'); h = `<div class="rc-dia"><b>${r.fecha.slice(8, 10)}</b><span class="rc-wd ${dt.getDay() === 0 ? 'dom' : dt.getDay() === 6 ? 'sab' : ''}">${DS[dt.getDay()]}</span><span class="rc-my">${r.fecha.slice(5, 7)}/${r.fecha.slice(0, 4)}</span><span></span><span></span></div>`; } return h + regFilaHtml(r, false); }).join('');
+  return `${dup.length ? `<div class="tj-aviso"><b>${dup.length} ${dup.length === 1 ? 'registro web coincide' : 'registros web coinciden'} con uno de la app</b> (misma cuenta, fecha y monto). Si es el mismo, vincúlalo para que no cuente dos veces. <button class="btn sm" data-act="regVer" data-v="dup">Revisar</button></div>` : ''}
+    <div class="row cta-adbar"><div class="tj-tabs rg-vtabs">${bt('oficial', 'Oficiales', cnt('oficial'))}${bt('pendiente', 'Por aprobar', cnt('pendiente'))}${bt('dup', 'Posibles duplicados', dup.length)}${bt('vinculado', 'Vinculados', cnt('vinculado'))}${bt('rechazado', 'Rechazados', cnt('rechazado'))}${bt('eliminado', 'Eliminados', cnt('eliminado'))}</div>
+      <button class="btn sm pri" data-act="regNuevo">+ Nuevo registro</button></div>
+    <div class="panel"><div class="ct-bar"><input type="search" class="in" id="regQ" placeholder="Buscar registros web" value="${esc(S.regQ || '')}"></div>
+      <div class="rc-lst">${filas || '<div class="note" style="padding:14px">Nada en esta lista.</div>'}</div>
+      <div class="bd note">Los registros oficiales cuentan como cualquier registro de la app: saldos, tarjetas, Bandeja y controles. Mientras sigas sincronizando la app, si registras lo mismo en los dos lados aparece en <b>Posibles duplicados</b> para vincularlo.</div></div>`;
+}
+/* --- Por validar: registros de usuarios --- */
+function vValidarRegistros() {
+  const ps = (S.reg || []).filter(r => r.estado === 'pendiente').sort((a, b) => String(a.creado_el).localeCompare(String(b.creado_el)));
+  if (!ps.length) return '';
+  return `<div class="panel"><div class="hd"><h2 style="margin-right:auto">Registros por aprobar <span class="count warn-bg">${ps.length}</span></h2></div>${ps.map(r => {
+    const cands = D.txs.filter(t => Math.abs((+t.montoApp || 0) - (+r.monto || 0)) < 0.011 && Math.abs((Date.parse(t.fecha) - Date.parse(r.fecha)) / 864e5) <= 5 && ((t.code === 0) === (r.tipo === 'ingreso')) && !tjEsTras(t)).slice(0, 8);
+    return `<div class="rg-apr" data-id="${esc(r.id)}">${regFilaHtml(r, false)}
+      <div class="rg-aprb"><label>Cuenta<select class="in" id="apC-${esc(r.id)}"><option value="">Elige la cuenta</option>${regCuentasOpts('')}</select></label>
+        <button class="btn sm pri" data-act="regAprobar" data-id="${esc(r.id)}">Aprobar</button>
+        ${cands.length ? `<label>Ya está registrado<select class="in" id="apV-${esc(r.id)}">${cands.map(t => `<option value="${esc(t.id)}">${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${L(t.montoApp)} · ${esc(t.nota || t.det || t.cat)}</option>`).join('')}</select></label><button class="btn sm" data-act="regVincular" data-id="${esc(r.id)}">Vincular</button>` : ''}
+        <label>Motivo del rechazo<input class="in" id="apM-${esc(r.id)}" placeholder="Opcional"></label><button class="btn sm ghost danger" data-act="regRechazar" data-id="${esc(r.id)}">Rechazar</button></div></div>`; }).join('')}</div>`;
+}
+/* --- eventos --- */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act; if (!act.startsWith('reg')) return;
+  if (act === 'regNuevo') return abrirRegForm();
+  if (act === 'regMios') return pintarRegMios();
+  if (act === 'regEditar') { const r = regDe(b.dataset.id); if (!r) return; if (!esAdmin() && r.estado !== 'pendiente') return; S.regConfElim = null; return abrirRegForm(r.id); }
+  if (act === 'regTipo') { regLeerForm(); S.regF.tipo = b.dataset.v; if (b.dataset.v !== 'traslado') S.regF.conComision = false; return pintarRegForm(); }
+  if (act === 'regSwap') { regLeerForm(); [S.regF.cuenta, S.regF.destino] = [S.regF.destino, S.regF.cuenta]; return pintarRegForm(); }
+  if (act === 'regConCom') { regLeerForm(); S.regF.conComision = true; pintarRegForm(); const c = $('#rgComision'); if (c) c.focus(); return; }
+  if (act === 'regSinCom') { regLeerForm(); S.regF.conComision = false; S.regF.comision = ''; return pintarRegForm(); }
+  if (act === 'regModoAj') { regLeerForm(); S.regF.modoAj = b.dataset.v; S.regF.monto = ''; return pintarRegForm(); }
+  if (act === 'regSigno') { regLeerForm(); S.regF.signo = +b.dataset.v; return pintarRegForm(); }
+  if (act === 'regGuardar') return regGuardar(b.dataset.v === 'seguir');
+  if (act === 'regEliminar') { const id = S.regF && S.regF.id; if (!id) return; if (S.regConfElim !== id) { S.regConfElim = id; return pintarRegForm(); } S.regConfElim = null;
+    const r = regDe(id); if (!esAdmin() && r.estado === 'pendiente') { try { await q(sb.from('registros').delete().eq('id', id), 'Registro borrado'); S.reg = S.reg.filter(x => x.id !== id); } catch (er) {} }
+    else await regCambiarEstado(id, 'eliminado', null, 'eliminado', 'Registro eliminado (queda en Eliminados)');
+    $('#modalRoot').innerHTML = ''; S.regF = null; return render(); }
+  if (act === 'regRestaurar') { const r = regDe(b.dataset.id); if (!r) return; const est = r.estado === 'eliminado' && r.aprobado_por ? 'oficial' : 'pendiente';
+    await regCambiarEstado(r.id, est, null, 'restaurado', est === 'oficial' ? 'Registro restaurado' : 'Vuelve a Por aprobar'); $('#modalRoot').innerHTML = ''; S.regF = null; return render(); }
+  if (act === 'regVer') { S.regVer = b.dataset.v; if (S.view !== 'cuentas' || S.ctaTab !== 'reg') { S.ctaTab = 'reg'; location.hash = '#cuentas'; } return render(); }
+  if (act === 'regAprobar') { const id = b.dataset.id; const c = $('#apC-' + id); if (!c || !c.value) { toast('Elige la cuenta para aprobarlo.'); if (c) c.focus(); return; }
+    const extra = {cuenta: c.value, aprobado_por: S.me.id, aprobado_el: new Date().toISOString()}; if (ctaInfo(c.value).mon === 'USD') extra.tasa = tasaUSD();
+    await regCambiarEstado(id, 'oficial', extra, 'aprobado', 'Aprobado: ya cuenta en el registro oficial'); return render(); }
+  if (act === 'regVincular') { const id = b.dataset.id; const sel = $('#apV-' + id); const tId = b.dataset.t || (sel && sel.value); if (!tId) return;
+    await regCambiarEstado(id, 'vinculado', {vinculo: tId, aprobado_por: S.me.id, aprobado_el: new Date().toISOString()}, 'vinculado', 'Vinculado: no se cuenta dos veces'); return render(); }
+  if (act === 'regRechazar') { const id = b.dataset.id; const m = $('#apM-' + id); await regCambiarEstado(id, 'rechazado', {motivo: (m && m.value.trim()) || null}, 'rechazado', 'Rechazado'); return render(); }
+});
+document.addEventListener('change', e => {
+  const el = e.target; if (!S.regF || !el.id || !el.id.startsWith('rg')) return;
+  if (['rgGrupal', 'rgSub', 'rgCuenta', 'rgDestino'].includes(el.id)) { regLeerForm(); if (el.id === 'rgGrupal') { S.regF.subgrupal = ''; S.regF.detalle = ''; } if (el.id === 'rgSub') S.regF.detalle = ''; pintarRegForm(); const n = $('#' + el.id); if (n && !esTelefono()) n.focus(); }
+});
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'rgMonto' && S.regF && S.regF.tipo === 'ajuste') { S.regF.monto = el.value; const d = $('#rgAjDif'); if (d) d.innerHTML = regAjDifTxt(); }
+  if (el.id === 'regQ') { S.regQ = el.value; const pos = el.selectionStart; render(); const n = $('#regQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } }
+});
+
+const regPendientes = () => esAdmin() && S.reg ? S.reg.filter(r => r.estado === 'pendiente') : [];
+// regFab: botón + para registrar (iPhone: abajo a la derecha, fuera de la barra de inicio).
+const regFab = () => S.me && S.me.activo ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
+// regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
+function regDetalleHtml(t) {
+  const r = regWebDeTx(t); if (!r) return '';
+  const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
+  const ACC = {creado: 'Creado', editado: 'Editado', aprobado: 'Aprobado', vinculado: 'Vinculado', rechazado: 'Rechazado', eliminado: 'Eliminado', restaurado: 'Restaurado'};
+  const h = (S.regHist || []).filter(x => x.registro === r.id).sort((a, b) => String(a.el).localeCompare(String(b.el)));
+  return `<div class="eyebrow">Historial del registro</div><div class="rg-hist">
+      <div><span>Registrado por ${esc(nombreDe(r.creado_por))}</span><span>${cuando(r.creado_el)}</span></div>
+      ${r.aprobado_por && r.aprobado_por !== r.creado_por ? `<div><span>Aprobado por ${esc(nombreDe(r.aprobado_por))}</span><span>${cuando(r.aprobado_el)}</span></div>` : ''}
+      ${h.filter(x => x.accion !== 'creado').map(x => `<div><span>${ACC[x.accion] || esc(x.accion)} por ${esc(nombreDe(x.por))}</span><span>${cuando(x.el)}</span></div>`).join('')}</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn sm pri" data-act="regEditar" data-id="${esc(r.id)}">Editar registro</button></div>`;
+}
+// regPublicarCatalogo: los demás usuarios no leen los registros de la app, así que el catálogo vigente (el que sale de los datos y aún no validas)
+// se guarda en la tabla categorias como "sin validar" para que lo vean en su formulario. No cambia nombres ni orden; solo agrega lo que falta.
+async function regPublicarCatalogo() {
+  if (!esAdmin() || !S.cats || !D || !D.txs || !D.txs.length || S._catPub) return; S._catPub = true;
+  const filas = []; ['gasto', 'ingreso'].forEach(tipo => { const rec = (l, padre) => l.forEach(nd => { if (!nd.row) { nd.row = {id: crUid(), tipo, padre: padre ? padre.id : null, nombre: nd.nombre, app_nombre: nd.app || null, orden: 0, activa: true, origen: 'app', validada: false}; filas.push(nd.row); } rec(nd.hijos, nd.row); }); rec(catArbol(tipo), null); });
+  if (!filas.length) return;
+  try { for (let i = 0; i < filas.length; i += 300) { const d = await sb.from('categorias').insert(filas.slice(i, i + 300)).select(); if (d.error) throw d.error; S.cats.push(...(d.data || filas.slice(i, i + 300))); } catMapas(); } catch (e) { S._catPub = false; }
+}
 const enTj = () => S.view === 'cuentas' && S.ctaTab === 'tc';
 const enCred = () => S.view === 'cuentas' && S.ctaTab === 'pre';   // la pestaña Préstamos muestra el módulo de Créditos
 // ctaAlertas: cortes de tarjeta vencidos y cuotas de créditos atrasadas sin pago (para los contadores del menú y de las pestañas).
@@ -4676,7 +4975,7 @@ function ctaDatos(n) {
   const fuentes = [[n, '']]; ctaNombres().forEach(o => { if (o !== n && ctaInfo(o).pago === n) fuentes.push([o, o]); });
   const filas = []; fuentes.forEach(([c, via]) => (por.get(c) || []).forEach(o => { const m = ctaVal(o.t, i.mon, o.propia); // Monto negativo en la app (ej. un gasto de −0.53): queda en su columna (retiro) pero con signo contrario, así que SUMA al saldo, como en la app.
     const neg = o.t.neg && !tjEsTras(o.t) ? -1 : 1; filas.push({t: o.t, v: crR2(o.s * m.v * neg), lado: o.s > 0 ? 'd' : 'r', est: !!m.est, via, propia: o.propia}); }));
-  const fh = t => t.fecha + ' ' + ((trasX(t) || [])[2] || '');   // fecha y hora (la hora viene del Excel de la app)
+  const fh = t => t.fecha + ' ' + (t.hora || (trasX(t) || [])[2] || '');   // fecha y hora (la hora viene del Excel de la app)
   filas.sort((a, b) => fh(a.t).localeCompare(fh(b.t)));
   const base = crR2(+i.cfg.saldo_inicial || 0);   // saldo con que se abrió la cuenta (0 si no se indicó) + la suma de las transacciones
   let acc = base; filas.forEach(f => { acc = crR2(acc + f.v); f.saldo = acc; });
@@ -4735,6 +5034,7 @@ function vCuentas() {
   const bar = `<div class="cta-tabs" role="tablist">${CTA_TABS.map(([k, t]) => `<button class="tj-tab ${tab === k ? 'on' : ''}" role="tab" aria-selected="${tab === k}" data-act="ctaTab" data-v="${k}">${t}${nv[k] ? ` <span class="count bad-bg">${nv[k]}</span>` : ''}</button>`).join('')}</div>`;
   if (tab === 'tc') return `<div class="stack">${bar}${vTarjetas()}</div>`;
   if (tab === 'pre') return `<div class="stack">${bar}${vCreditos()}</div>`;
+  if (tab === 'reg') return `<div class="stack">${bar}<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>Registros hechos en la plataforma</h1></div></div>${vCtaRegistros()}</div>`;
   const head = `<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>${tab === 'adm' ? 'Administración de cuentas y categorías' : 'Saldos de tus cuentas'}</h1></div>${tab === 'adm' || S.cta === null ? '' : `<button class="btn sm ${S.ctaOrdenar ? 'pri' : 'ghost'}" data-act="ctaOrdenar" aria-pressed="${!!S.ctaOrdenar}"><span aria-hidden="true">⇅</span> ${S.ctaOrdenar ? 'Listo' : 'Ordenar'}</button>`}</div>`;
   if (S.cta === null) return `<div class="stack">${bar}${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de cuentas (<b>cuentas.sql</b>). Las pestañas Tarjetas de crédito y Préstamos ya funcionan.</div></div></div>`;
   return `<div class="stack">${bar}${head}${tab === 'adm' ? vCtaAdm() : vCtaLista(tab)}</div>`;
@@ -4795,7 +5095,7 @@ function pintarCtaFicha() {
     const fila = f => { const t = f.t; const tras = tjEsTras(t);
       const izq = tras ? 'Transferencia' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(subG(t.cat, t.sub)) : ''}`;
       const tit = (t.nota ? notaG(t.cat, t.sub, t.nota) : '') || (tras ? 'Traslado' : subG(t.cat, t.sub) || catG(t.cat) || 'Registro');
-      const hx = (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
+      const hx = t.hora || (trasX(t) || [])[2]; const hora = hx ? (((+hx.slice(0, 2) + 11) % 12) + 1) + ':' + hx.slice(3, 5) + (+hx.slice(0, 2) < 12 ? ' a. m. ' : ' p. m. ') : '';
       let lin2 = esc(tjCta(t.cuenta)); if (tras) { const o = (rev.get(t.id) || {}).otra || tjDestino(t) || '¿?'; lin2 = ctaSigno(t) < 0 ? `${esc(tjCta(t.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(t.cuenta))}`; }
       return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="Ver todo el detalle del movimiento"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
         <div class="rc-v"><span class="num ${f.lado === 'r' ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${sNum(f.lado === 'r' ? -f.v : f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
