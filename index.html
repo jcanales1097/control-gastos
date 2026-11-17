@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><!-- maximum-scale=1: el iPhone no hace zoom al tocar un campo (se puede seguir ampliando con dos dedos) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#052659" id="metaTheme">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default"><!-- barra de estado sólida (sin el difuminado que iOS pone cuando la app pasa por debajo) -->
 <meta name="apple-mobile-web-app-title" content="Gastos">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -758,6 +758,14 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .corte-post{border:1px solid var(--line);border-radius:12px;max-height:420px;overflow:auto}
 #offBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 6px);z-index:70;max-width:calc(100% - 24px);padding:7px 14px;border-radius:999px;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:auto}
 #offBar.off{background:#5A3F0B;color:#fff}#offBar.cola{background:var(--accent);color:var(--accent-ink)}#offBar .btn{min-height:28px;padding:3px 10px}
+.tj-fhd{flex-wrap:wrap;row-gap:10px}
+.tj-vico{flex-basis:100%;display:flex;gap:4px;background:var(--sunk);border-radius:12px;padding:3px}
+.tj-vico button{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:600;min-height:40px;border-radius:9px;cursor:pointer;padding:0 6px}
+/* Cada sección con un color de la paleta: movimientos azul, cortes y pagos verde, estado de cuenta celeste, financiamientos naranja (como en la barra del disponible), extensiones morado. */
+.tj-vico .tjv-mov{--tv:var(--azul)}.tj-vico .tjv-cortes{--tv:var(--good)}.tj-vico .tjv-estado{--tv:var(--ca)}.tj-vico .tjv-fin{--tv:var(--cc)}.tj-vico .tjv-ext{--tv:var(--cb)}
+.tj-vico button{color:var(--tv)}.tj-vico button:not(.on):hover{background:color-mix(in srgb,var(--tv) 10%,transparent)}
+.tj-vico button.on{flex:2.4 1 0;background:color-mix(in srgb,var(--tv) 14%,var(--panel));color:var(--tv);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tv) 55%,transparent)}.tj-vico button.on span{color:var(--fg)}.tj-vico button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:760px){.tj-fmodal .kpis.cr-sum{display:grid!important;grid-auto-flow:row!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}.tj-fmodal .kpis.cr-sum .kpi{border-bottom:1px solid var(--line)}.tj-fmodal .cr-sum .kpi{min-width:0}.tj-fmodal .cr-sum .note{overflow-wrap:anywhere}.tj-fmodal{overflow-x:hidden}}
 /* ===== Fase 4 ===== */
 .rg-star{font-size:20px;line-height:1;padding:4px 10px}.rg-star.on{color:#e0a400}
 .rg-mk{position:relative;padding:0!important;align-items:stretch!important}
@@ -4611,9 +4619,13 @@ function vTjFicha(t) {
   const pend = ps.filter(p => !p.abierto && !p.pagado && p.est[0] !== 'Sin cargos');
   const deudaL = crR2(pend.reduce((s, p) => s + p.sL, 0) + (act ? act.gL : 0)), deudaU = crR2(pend.reduce((s, p) => s + p.sU, 0) + (act ? act.gU : 0));
   const usadoU = tasa ? crR2(deudaU + deudaL / tasa) : null; const lim = +t.limite_usd || 0; const intraU = tjIntraPend(t);
-  return `<div class="panel"><div class="hd"><div class="row" style="gap:12px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><div style="min-width:0"><h2>${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2><span class="tj-ctas">${(t.cuentas || []).map(c => `<span>${esc(c)}</span>`).join('')}</span></div></div>
-      <div class="seg2 tj-vista" role="tablist">${[['mov', 'Movimientos'], ['cortes', 'Cortes y pagos'], ['estado', 'Estado de cuenta'], ['fin', 'Financiamientos'], ['ext', 'Extensiones']].map(([k, l]) => `<label><input type="radio" name="tjVista" data-act="tjVista" data-v="${k}" ${(S.tjVista || 'mov') === k ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
-      ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
+  const TJV = [['mov', 'Movimientos', '<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'], ['cortes', 'Cortes y pagos', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 15l2.5 2.5L16 13"/>'],
+    ['estado', 'Estado de cuenta', '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>'], ['fin', 'Financiamientos', '<circle cx="12" cy="12" r="9"/><path d="M9 15l6-6"/><circle cx="9.5" cy="9.5" r=".8"/><circle cx="14.5" cy="14.5" r=".8"/>'],
+    ['ext', 'Extensiones', '<rect x="2" y="7" width="15" height="11" rx="2"/><path d="M2 11h15M7 4h13a2 2 0 0 1 2 2v9"/>']];
+  const vAct = S.tjVista || 'mov';
+  return `<div class="panel"><div class="hd tj-fhd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><h2 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2></div>
+      ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar" title="Cerrar">✕</button>
+      <div class="tj-vico" role="tablist" aria-label="Secciones de la tarjeta">${TJV.map(([k, l, d]) => `<button type="button" role="tab" class="tjv-${k} ${vAct === k ? 'on' : ''}" aria-selected="${vAct === k}" data-act="tjVista" data-v="${k}" aria-label="${l}" title="${l}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>${vAct === k ? `<span>${({cortes: 'Cortes', estado: 'Estado', fin: 'Créditos'})[k] || l}</span>` : ''}</button>`).join('')}</div></div>
     <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Corte · pago</div><div class="v">día ${t.dia_corte} · ${t.dia_pago}</div><div class="note">${act ? 'período actual ' + fFecha(act.desde).slice(0, 5) + ' – ' + fFecha(act.corte).slice(0, 5) : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Límite</div><div class="v">${lim ? tjU(lim) : '—'}</div><div class="note">${lim && tasa ? '≈ ' + L(lim * tasa) + ' a tasa del día' : ''}</div></div>
@@ -4628,7 +4640,7 @@ function vTjFicha(t) {
         <td class="num">${tjD(p.sL, p.sU, usd, {negL: deb(p.sL), negU: deb(p.sU)})}</td>
         <td class="num tj-glob">${tjD(p.tL, p.tU, usd, {negL: p.tL > 0.004, negU: p.tU > 0.004, b: true})}</td></tr>`; }).join('') || '<tr><td colspan="5" class="note">Sin períodos todavía.</td></tr>'}
     </tbody></table></div>`}
-    <div class="bd note" style="border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px">${ps.length} períodos · toca uno para vincular sus pagos y marcarlo como pagado</div></div>`;
+    ${['cortes', 'estado'].includes(S.tjVista || 'mov') ? `<div class="bd note" style="border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px">${ps.length} períodos · toca uno para vincular sus pagos y marcarlo como pagado</div>` : ''}</div>`;
 }
 /* --- ventana del período --- */
 function tjCandidatos(t, p) {
