@@ -585,7 +585,7 @@ body:has(.graf-full){overflow:hidden}
 .tj-modal .cr-cand .num .cat{font-size:10px}
 .tj-modal .tj-it .btn.ico{width:26px;height:26px}
 /* Detalle de cuenta al estilo Registro Contable */
-.rc-modal{--rc-d:var(--azul);--rc-r:var(--bad)}
+.rc-modal,.tj-fmodal,.gen-p{--rc-d:var(--azul);--rc-r:var(--bad)}
 .rc-modal>.hd{flex-wrap:nowrap!important;gap:4px!important}.rc-modal>.hd>.row{min-width:0;flex:1}.rc-modal>.hd h2,.rc-modal>.hd .note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rc-modal>.hd .btn{flex:none}
 .rc-bd{gap:0!important;padding:0!important}.rc-bd>.tj-aviso,.rc-bd>.panel,.rc-bd>#ctaQ{margin:10px 12px 0}
 .rc-nav{display:flex;align-items:center;justify-content:space-between;padding:8px 6px 4px}.rc-nav b{font-size:15px;font-weight:600}.rc-nav .btn{font-size:20px;width:40px;height:32px;padding:0}
@@ -766,6 +766,12 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .tj-vico button{color:var(--tv)}.tj-vico button:not(.on):hover{background:color-mix(in srgb,var(--tv) 10%,transparent)}
 .tj-vico button.on{flex:2.4 1 0;background:color-mix(in srgb,var(--tv) 14%,var(--panel));color:var(--tv);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tv) 55%,transparent)}.tj-vico button.on span{color:var(--fg)}.tj-vico button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:760px){.tj-fmodal .kpis.cr-sum{display:grid!important;grid-auto-flow:row!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}.tj-fmodal .kpis.cr-sum .kpi{border-bottom:1px solid var(--line)}.tj-fmodal .cr-sum .kpi{min-width:0}.tj-fmodal .cr-sum .note{overflow-wrap:anywhere}.tj-fmodal{overflow-x:hidden}}
+/* Ficha de la tarjeta: se desplaza dentro de la ventana (encabezado fijo arriba). */
+.modal.tj-fmodal{display:flex;flex-direction:column;max-height:calc(100vh - 40px)}
+.tj-fmodal>.panel{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.tj-fmodal .tj-fhd{position:sticky;top:0;z-index:3;background:var(--panel)}
+.tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
+.tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
 /* ===== Fase 4 ===== */
 .rg-star{font-size:20px;line-height:1;padding:4px 10px}.rg-star.on{color:#e0a400}
 .rg-mk{position:relative;padding:0!important;align-items:stretch!important}
@@ -5435,21 +5441,59 @@ function tjFilaCta(tar) {
 }
 
 /* --- Ficha de la tarjeta: Movimientos, Financiamientos, Extensiones --- */
+// tjDatos: los registros de todas las cuentas de la tarjeta (titular y extensiones) en una moneda, con el saldo acumulado de la tarjeta.
+// Un traslado entre dos cuentas de la misma tarjeta y la misma moneda no mueve el saldo de la tarjeta: se omite.
+function tjDatos(t, mon) {
+  const ns = [...tjSet(t)].filter(n => ctaNombres().includes(n) && !ctaInfo(n).elim && ctaInfo(n).mon === mon); const set = new Set(ns); const rev = ctaTrasRev();
+  const fh = x => x.fecha + ' ' + (x.hora || (trasX(x) || [])[2] || '');
+  const filas = []; let base = 0;
+  ns.forEach(n => { const d = ctaDatos(n); base += d.base; d.filas.forEach(f => { if (tjEsTras(f.t)) { const o = (rev.get(f.t.id) || {}).otra || tjDestino(f.t); if (o && set.has(tjCta(o)) && tjCta(o) !== n) return; } filas.push(Object.assign({}, f, {cta: n})); }); });
+  filas.sort((a, b) => fh(a.t).localeCompare(fh(b.t))); let acc = crR2(base); filas.forEach(f => { acc = crR2(acc + f.v); f.saldo = acc; });
+  const hasta = filas.filter(f => f.t.fecha <= hoy()); return {ns, filas, base: crR2(base), saldo: hasta.length ? hasta[hasta.length - 1].saldo : crR2(base)};
+}
 function vTjMov(t) {
-  const set = tjSet(t); const mon = S.tjMovMon || 'todo'; const pl = S.tjMovPl || ''; const exts = tjExts(t);
+  const monsT = ['L', 'USD'].filter(m => [...tjSet(t)].some(n => ctaNombres().includes(n) && ctaInfo(n).mon === m)); if (!monsT.length) return '<div class="bd note">Esta tarjeta no tiene cuentas.</div>';
+  const mon = monsT.includes(S.tjMovMon) ? S.tjMovMon : monsT[0]; const d = tjDatos(t, mon); const exts = tjExts(t); const pl = S.tjMovPl || '';
   const plDe = n => { const p = tjDeCuenta(n); return p && p.titular ? p : null; };
-  let l = tjTxs(t).filter(x => !x.borradoApp); if (mon !== 'todo') l = l.filter(x => (tjMonDe(x.cuenta) === 'USD') === (mon === 'USD'));
-  if (pl) l = l.filter(x => { const p = plDe(x.cuenta); return pl === 'tit' ? !p : p && p.id === pl; });
-  const mes = S.tjMovMes || hoy().slice(0, 7); const lm = l.filter(x => x.mes === mes).sort((a, b) => (b.fecha + (b.hora || '')).localeCompare(a.fecha + (a.hora || '')));
+  const vis = pl ? d.filas.filter(f => { const p = plDe(f.cta); return pl === 'tit' ? !p : p && p.id === pl; }) : d.filas;
+  const num = v => (mon === 'USD' ? '$ ' : '') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); const sNum = v => (v < -0.004 ? '-' : '') + num(v);
+  const vista = S.tjMovVista || 'd'; const mHoy = hoy().slice(0, 7);
+  const mIni = d.filas.length ? d.filas[0].t.mes : mHoy; const mFin = [d.filas.length ? d.filas[d.filas.length - 1].t.mes : mHoy, mHoy].sort().pop();
+  const conMov = new Set(d.filas.map(f => f.t.mes)); const mDef = conMov.has(mHoy) || !d.filas.length ? mHoy : [...conMov].filter(m => m <= mHoy).sort().pop() || mHoy;
+  const mes = S.tjMovMes && S.tjMovMes >= mIni && S.tjMovMes <= mFin ? S.tjMovMes : mDef; const anio = S.tjMovAnio || mes.slice(0, 4);
+  const saldoAl = fin => { let s = d.base; for (const f of d.filas) { if (f.t.fecha > fin) break; s = f.saldo; } return s; };
+  const resumen = (l, fin) => { const dep = crR2(l.filter(f => f.lado === 'd').reduce((s, f) => s + f.v, 0)), ret = crR2(-l.filter(f => f.lado === 'r').reduce((s, f) => s + f.v, 0)); return {dep, ret, bal: crR2(dep - ret), saldo: saldoAl(fin)}; };
+  const finMes = m => tjFechaDia(+m.slice(0, 4), +m.slice(5, 7) - 1, 31); const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  let lab, prev = '', next = '', actNav = 'tjMovMes', R, cuerpo;
+  if (vista === 'd') {
+    const l = vis.filter(f => f.t.mes === mes); R = resumen(l, finMes(mes)); lab = MES[+mes.slice(5, 7) - 1].slice(0, 3).toLowerCase() + ' ' + mes.slice(0, 4);
+    if (mes > mIni) prev = tjMesAdd(mes, -1); if (mes < mFin) next = tjMesAdd(mes, 1);
+    const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); }); const rev = ctaTrasRev();
+    const fila = f => { const x = f.t; const tras = tjEsTras(x); const p = plDe(f.cta);
+      const izq = (tras ? (f.lado === 'd' ? 'Pago / abono' : 'Transferencia') : `${esc(catG(x.cat))}${x.sub ? '<br>' + esc(subG(x.cat, x.sub)) : ''}`) + `<br><span class="tjm-pl ${p ? 'ext' : ''}">${p ? esc(tjNomPl(p)) : 'Titular'}</span>`;
+      const tit = (x.nota ? notaG(x.cat, x.sub, x.nota) : '') || (tras ? (f.lado === 'd' ? 'Pago a la tarjeta' : 'Traslado') : subG(x.cat, x.sub) || catG(x.cat) || 'Registro');
+      let lin2 = esc(tjCta(x.cuenta)); if (tras) { const o = (rev.get(x.id) || {}).otra || tjDestino(x) || '¿?'; lin2 = ctaSigno(x) < 0 ? `${esc(tjCta(x.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(x.cuenta))}`; }
+      return `<div class="rc-it" data-act="ctaMov" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${x.det ? ' <span>' + esc(x.det) + '</span>' : ''}</div><div class="rc-s">${hora12(x.hora || (trasX(x) || [])[2] || '')} ${lin2}${x.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}</div></div>
+        <div class="rc-v"><span class="num ${f.lado === 'r' ? 'rc-r' : 'rc-d'}">${f.est ? '≈ ' : ''}${sNum(f.lado === 'r' ? -f.v : f.v)}</span><span class="num rc-sl" title="Saldo de la tarjeta después de este registro">${sNum(f.saldo)}</span></div></div>`; };
+    cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const r = resumen(ls, fe); const wd = dt.getDay(); const {corte} = tjCorteDe(t, fe);
+      return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">corte ${fFecha(corte).slice(0, 5)}</span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
+      || '<div class="note" style="padding:14px">Sin movimientos en este mes.</div>';
+  } else if (vista === 'm') {
+    actNav = 'tjMovAnio'; lab = anio; if (anio > mIni.slice(0, 4)) prev = String(+anio - 1); if (anio < mFin.slice(0, 4)) next = String(+anio + 1);
+    R = resumen(vis.filter(f => f.t.fecha.slice(0, 4) === anio), anio + '-12-31'); const ms = []; for (let k = 12; k >= 1; k--) { const m = anio + '-' + String(k).padStart(2, '0'); if (m >= mIni && m <= mFin) ms.push(m); }
+    cuerpo = `<div class="rc-th"><span></span><span>Depósito</span><span>Retiro</span><span>Balance</span><span>Saldo</span></div>` + ms.map(m => { const r = resumen(vis.filter(f => f.t.mes === m), finMes(m));
+      return `<div class="rc-pr" data-act="tjMovIr" data-vista="d" data-v="${m}" role="button" tabindex="0"><b>${MES[+m.slice(5, 7) - 1].slice(0, 3).toLowerCase()}</b><span class="num rc-d">${num(r.dep)}</span><span class="num rc-r">${num(r.ret)}</span><span class="num">${sNum(r.bal)}</span><span class="num rc-sl2">${sNum(r.saldo)}</span></div>`; }).join('');
+  } else {
+    lab = 'Todos los años'; const anios = [...new Set(d.filas.map(f => f.t.fecha.slice(0, 4)))].sort().reverse(); R = resumen(vis, hoy());
+    cuerpo = `<div class="rc-th"><span></span><span>Depósito</span><span>Retiro</span><span>Balance</span><span>Saldo</span></div>` + anios.map(a => { const r = resumen(vis.filter(f => f.t.fecha.slice(0, 4) === a), a + '-12-31');
+      return `<div class="rc-pr" data-act="tjMovIr" data-vista="m" data-v="${a}" role="button" tabindex="0"><b>${a}</b><span class="num rc-d">${num(r.dep)}</span><span class="num rc-r">${num(r.ret)}</span><span class="num">${sNum(r.bal)}</span><span class="num rc-sl2">${sNum(r.saldo)}</span></div>`; }).join('') || '<div class="note" style="padding:14px">Sin movimientos.</div>';
+  }
   const chip = (k, v, txt) => `<button class="chip ${(k === 'm' ? mon : pl) === v ? 'on' : ''}" data-act="tjMovF" data-k="${k}" data-v="${esc(v)}">${txt}</button>`;
-  let ant = ''; const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
-  const filas = lm.map(x => { const dir = tjDir(x, set); const m = dir === 'abono' ? tjPagoMonto(x, set) : tjMonto(x); const usd = m.usd && !m.l; const v = usd ? tjU(Math.abs(m.usd)) : L(Math.abs(m.l || m.hnl || 0));
-    const p = plDe(x.cuenta); const tit = tjEsTras(x) ? (dir === 'abono' ? 'Pago a la tarjeta' : 'Avance / traslado') : ((x.nota ? notaG(x.cat, x.sub, x.nota) : '') || subG(x.cat, x.sub) || catG(x.cat) || 'Registro');
-    let h = ''; if (x.fecha !== ant) { ant = x.fecha; const dt = new Date(x.fecha + 'T12:00'); const {corte} = tjCorteDe(t, x.fecha); h = `<div class="rc-dia tjm-dia"><b>${x.fecha.slice(8, 10)}</b><span class="rc-wd">${DS[dt.getDay()]}</span><span class="rc-my">corte ${fFecha(corte).slice(0, 5)}</span><span></span><span></span></div>`; }
-    return h + `<div class="rc-it" data-act="ctaMov" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="rc-c">${tjEsTras(x) ? 'Transferencia' : esc(catG(x.cat))}<br>${p ? esc(tjNomPl(p)) : 'Titular'}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${x.det ? ' <span>' + esc(x.det) + '</span>' : ''}</div><div class="rc-s">${hora12(x.hora || (trasX(x) || [])[2] || '')} ${esc(tjCta(x.cuenta))}${x.web ? ' · web' : ''}</div></div><div class="rc-v"><span class="num ${dir === 'abono' ? 'rc-d' : 'rc-r'}">${v}</span></div></div>`; }).join('');
-  return `<div class="tjm-f"><div class="rc-nav"><button class="btn sm ghost" data-act="tjMovMes" data-v="${tjMesAdd(mes, -1)}" aria-label="Mes anterior">‹</button><b>${MES[+mes.slice(5, 7) - 1].slice(0, 1) + MES[+mes.slice(5, 7) - 1].slice(1).toLowerCase()} ${mes.slice(0, 4)}</b><button class="btn sm ghost" data-act="tjMovMes" data-v="${tjMesAdd(mes, 1)}" aria-label="Mes siguiente">›</button></div>
-    <div class="gen-etq">${chip('m', 'todo', 'Todo')}${chip('m', 'L', 'Lempiras')}${chip('m', 'USD', 'Dólares')}${exts.length ? '<span class="note">·</span>' + chip('p', '', 'Todos') + chip('p', 'tit', 'Titular') + exts.map(x => chip('p', x.id, esc(tjNomPl(x)))).join('') : ''}</div></div>
-    <div class="rc-lst">${filas || '<div class="note" style="padding:14px">Sin movimientos en este mes.</div>'}</div>
+  return `<div class="tjm-f">${monsT.length > 1 || exts.length ? `<div class="gen-etq">${monsT.length > 1 ? chip('m', 'L', 'Lempiras') + chip('m', 'USD', 'Dólares') : ''}${exts.length ? (monsT.length > 1 ? '<span class="note">·</span>' : '') + chip('p', '', 'Todos') + chip('p', 'tit', 'Titular') + exts.map(x => chip('p', x.id, esc(tjNomPl(x)))).join('') : ''}</div>` : ''}
+      <div class="rc-nav"><button class="btn sm ghost" data-act="${actNav}" data-v="${prev}" ${prev ? '' : 'disabled'} aria-label="Anterior">‹</button><b>${lab}</b><button class="btn sm ghost" data-act="${actNav}" data-v="${next}" ${next ? '' : 'disabled'} aria-label="Siguiente">›</button></div>
+      <div class="rc-tabs" role="tablist">${[['d', 'Diario'], ['m', 'Mensual'], ['a', 'Anual']].map(([k, x]) => `<button class="${vista === k ? 'on' : ''}" role="tab" aria-selected="${vista === k}" data-act="tjMovVista" data-v="${k}">${x}</button>`).join('')}</div>
+      <div class="rc-sum"><div><span>Depósito</span><b class="num rc-d">${num(R.dep)}</b></div><div><span>Retiro</span><b class="num rc-r">${num(R.ret)}</b></div><div><span>Balance</span><b class="num">${sNum(R.bal)}</b></div><div><span>Saldo</span><b class="num rc-sl2">${sNum(R.saldo)}</b></div></div></div>
+    <div class="rc-lst">${cuerpo}</div>
     <div class="bd"><button class="btn sm pri" data-act="tjRegistrar" data-id="${esc(t.id)}">+ Registrar con esta tarjeta</button></div>`;
 }
 function vTjFin(t) {
@@ -5557,7 +5601,10 @@ async function crPagarCuota(qid) {
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
   if (act === 'tjMovF') { if (b.dataset.k === 'm') S.tjMovMon = b.dataset.v; else S.tjMovPl = b.dataset.v; return pintarTjFicha(); }
-  if (act === 'tjMovMes') { S.tjMovMes = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjMovMes') { if (!b.dataset.v) return; S.tjMovMes = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjMovAnio') { if (!b.dataset.v) return; S.tjMovAnio = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjMovVista') { S.tjMovVista = b.dataset.v; return pintarTjFicha(); }
+  if (act === 'tjMovIr') { S.tjMovVista = b.dataset.vista; if (b.dataset.vista === 'd') S.tjMovMes = b.dataset.v; else S.tjMovAnio = b.dataset.v; return pintarTjFicha(); }
   if (act === 'tjRegistrar') { const t = tjById(b.dataset.id); abrirRegForm(); regTjElegir(S.regF, 'cta', t.id); S.regF.tipo = 'gasto'; return pintarRegForm(); }
   if (act === 'tjNuevaExt') { S.tjExtDe = b.dataset.id; return abrirTjForm(null); }
   if (act === 'crPagarCuota') return crPagarCuota(b.dataset.id);
