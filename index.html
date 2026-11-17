@@ -731,6 +731,41 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .ctt-pie{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}.ctt-pie .note{margin-right:auto}
 .ctt-pie .btn{min-height:40px}
 .ctt-it.arrastrando{background:var(--panel)}
+/* ===== Fase 4 ===== */
+.rg-star{font-size:20px;line-height:1;padding:4px 10px}.rg-star.on{color:#e0a400}
+.rg-mk{position:relative;padding:0!important;align-items:stretch!important}
+.rg-mk-b{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:2px;width:100%;padding:10px 12px;cursor:pointer;text-align:left}
+.rg-mk-b b{font-size:15px}.rg-mk-s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rg-mk-x{position:absolute;top:4px;right:4px;border:0;background:var(--bad);color:#fff;border-radius:999px;min-width:24px;height:24px;font-size:12px;cursor:pointer;z-index:1;padding:0 6px}
+.rg-mkn{display:grid;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}.rg-mkn .in{width:100%!important;max-width:none!important;font-size:16px}
+.rg-etqw{width:100%;display:grid;gap:4px}.rg-etqs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:6px}.rg-etqs .chip{cursor:pointer;font-size:12.5px}.chip.on{background:var(--accent);color:var(--bg, #fff);border-color:var(--accent)}
+.rg-rep{display:grid;gap:12px;padding:12px}
+.rg-repn{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px}
+.rg-step{display:flex;align-items:center;gap:4px}.rg-step .in{width:64px!important;text-align:center;font-size:17px}.rg-step .btn{min-width:40px;min-height:40px;font-size:20px}
+.rg-repv{line-height:1.45}
+.gen-p{overflow:hidden}.gen-tabs{margin:0;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}.gen-tabs button{font-size:14px;padding-inline:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gen-etq{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}.gen-etq .chip{flex:none;cursor:pointer}
+.gen-sum{grid-template-columns:repeat(3,1fr)!important}
+.gen-dia-f{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--sunk);font-size:14px}
+.gen-nb{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px}
+.gen-nota{padding:8px 14px;background:color-mix(in srgb,#e0a400 12%,var(--panel));font-size:14px;border-bottom:1px solid var(--line);cursor:pointer;white-space:pre-wrap}
+.gen-nota.ed{display:grid;gap:6px;cursor:default}.gen-nota .in{width:100%!important;max-width:none!important;font-size:16px}
+.gen-tag{font-size:11.5px;color:var(--accent);font-weight:600}.gen-t{color:var(--muted)}
+.gcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line)}
+.gc-h{font-size:11px;color:var(--muted);text-align:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.gc{all:unset;box-sizing:border-box;min-height:64px;padding:4px 3px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:flex-end;gap:1px;cursor:pointer;position:relative;font-size:11px;font-family:var(--f-num);overflow:hidden}
+.gc:nth-child(7n){border-right:0}.gc b{font-family:var(--f-sans, inherit);font-size:13px;align-self:flex-start;font-weight:600}.gc.dom b{color:var(--bad)}.gc.sab b{color:var(--azul)}
+.gc.hoy{background:color-mix(in srgb,var(--accent) 14%,transparent)}.gc[data-vacio]{cursor:default}.gc:not([data-vacio]):active{background:var(--sunk)}.gc-v{cursor:default}
+.gc-n{position:absolute;left:4px;bottom:4px;width:6px;height:6px;border-radius:50%;background:#e0a400}
+.gen-th,.gen-pr{grid-template-columns:52px repeat(3,minmax(0,1fr))!important}
+.gst-f{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;padding:8px 12px}.gst-f .dm-seg{flex:1 1 140px}
+.gst-tot{display:grid;gap:2px;padding:10px 14px;border-bottom:1px solid var(--line)}.gst-tot b{font-size:22px}.gst-tot>span:first-child{font-size:13px;color:var(--muted)}
+.gst-ruta{padding:6px 8px;border-bottom:1px solid var(--line)}
+.gst-it{display:grid;gap:4px;padding:10px 14px;border-bottom:1px solid var(--line)}.gst-it[data-act]{cursor:pointer}.gst-it[data-act]:active{background:var(--sunk)}
+.gst-n{display:flex;justify-content:space-between;gap:10px;font-size:14.5px}.gst-n b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.gst-bar{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}.gst-bar i{display:block;height:100%;border-radius:4px}.gst-bar i.r{background:var(--bad)}.gst-bar i.d{background:var(--azul)}
+.gst-s{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}.gst-go{margin-left:auto;font-size:16px}
+.gst-d{font-weight:600}.gst-d.sube{color:var(--bad)}.gst-d.baja{color:#2e9d5b}
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
@@ -1341,6 +1376,9 @@ async function cargarTodo() {
   }
   // Registros hechos en la plataforma (fase3.sql). Sin la tabla, S.reg queda en null y el botón + lo avisa.
   try { S.reg = await todo('registros', 'creado_el'); S.regHist = esAdmin() ? await todo('registro_hist', 'el') : []; } catch (e) { S.reg = null; S.regHist = []; }
+  // Fase 4 (fase4.sql): marcadores, series de repetición y notas del día. Sin la tabla, cada función se esconde.
+  try { S.marc = await todo('marcadores', 'orden'); } catch (e) { S.marc = null; }
+  if (esAdmin()) { try { S.notasDia = new Map((await todo('notas_dia', 'fecha')).map(r => [r.fecha, r])); } catch (e) { S.notasDia = null; } try { S.series = await todo('registro_series', 'creado_el'); } catch (e) { S.series = null; } }
   if (esAdmin()) setTimeout(regPublicarCatalogo, 1500);
 }
 // guardarAjuste: Guarda un ajuste general (tabla ajustes).
@@ -4718,7 +4756,7 @@ const CTA_DEUDA = new Set(['credito', 'prestamo']);
 const CTA_TIPOS_APP = [['efectivo', 'Dinero en efectivo', 'efectivo'], ['banco', 'Banco', 'banco'], ['banco_alt', 'Banco - Alternativa', 'banco'], ['debito', 'Tarjetas de débito', 'debito'],
   ['tc_amex', 'TC BAC AMEX', 'credito'], ['tc_visa', 'TC BAC VISA', 'credito'], ['tc', 'Tarjetas de crédito', 'credito'], ['activos', '5. Activos', 'ahorro'], ['pago_e', 'Pago electrónico', 'otros'],
   ['inversion', 'Inversion', 'ahorro'], ['linea', 'Linea de crédito', 'prestamo'], ['prestamo', 'Préstamo', 'prestamo'], ['seguro', 'Seguro', 'otros'], ['otros', 'Otros', 'otros']];
-const CTA_TABS = [['res', 'Resumen'], ['ban', 'Efectivo y bancos'], ['tc', 'Tarjetas de crédito'], ['aho', 'Ahorro e inversión'], ['pre', 'Préstamos'], ['reg', 'Registros web'], ['adm', 'Administración']];
+const CTA_TABS = [['res', 'Resumen'], ['gen', 'General'], ['ban', 'Efectivo y bancos'], ['tc', 'Tarjetas de crédito'], ['aho', 'Ahorro e inversión'], ['pre', 'Préstamos'], ['reg', 'Registros web'], ['adm', 'Administración']];
 const CTA_TAB_CLASES = {ban: ['efectivo', 'banco', 'debito', 'otros'], aho: ['ahorro']};
 /* ===================== Fase 3: registro directo en la plataforma =====================
    Tabla registros (fase3.sql). El administrador registra en firme (estado "oficial"); los demás usuarios registran
@@ -4732,7 +4770,7 @@ const REG_EST = {oficial: ['Oficial', 'ok'], pendiente: ['Por aprobar', 'warn'],
 const regDe = id => (S.reg || []).find(r => r.id === id);
 // regATx: filas (formato de la app) de un registro oficial.
 function regATx(r) {
-  const base = {fecha: r.fecha, hora: r.hora || '', mes: String(r.fecha).slice(0, 7), web: r.id, det: r.descripcion || '', neg: false};
+  const base = {fecha: r.fecha, hora: r.hora || '', mes: String(r.fecha).slice(0, 7), web: r.id, det: r.descripcion || '', neg: false, etiquetas: r.etiquetas || [], serie: r.serie || null, cuota: r.cuota || null};
   const enUSD = c => { try { return ctaInfo(c).mon === 'USD'; } catch (e) { return tjEsUSD(c); } };
   const amt = (c, m) => { m = Math.abs(+m || 0); if (!enUSD(c)) return {monto: m, montoApp: m}; const ts = +r.tasa || tasaUSD() || 0; const h = crR2(m * ts); return {monto: h, montoApp: h, moneda: 'USD', original: m, tasa: ts}; };
   const fila = (suf, o) => Object.assign({id: 'W' + r.id + suf}, base, o);
@@ -4775,13 +4813,13 @@ function abrirRegForm(id) {
   const r = id ? regDe(id) : null; const a = esAdmin();
   const prev = S.regUlt || {};
   S.regF = r ? {id: r.id, tipo: r.tipo, fecha: r.fecha, hora: r.hora || '', cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, comision: r.comision, signo: r.signo || 1, modoAj: 'monto',
-      grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || ''}
-    : {tipo: prev.tipo || 'gasto', fecha: hoy(), hora: ahoraHora(), cuenta: prev.cuenta || '', destino: prev.destino || '', monto: '', montoD: '', comision: '', signo: 1, modoAj: 'saldo', grupal: '', subgrupal: '', detalle: '', desc: ''};
+      grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || '', etq: (r.etiquetas || []).join(', ')}
+    : {tipo: prev.tipo || 'gasto', fecha: hoy(), hora: ahoraHora(), cuenta: prev.cuenta || '', destino: prev.destino || '', monto: '', montoD: '', comision: '', signo: 1, modoAj: 'saldo', grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null};
   if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
-  S.regVista = 'form'; S.regPick = null; S.regPickG = null; S.regConfX = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
+  S.regVista = 'form'; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
-  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); }
+  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); }
 const numDe = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : NaN; };
 /* Formulario con la mecánica de Registro Contable: filas "etiqueta · valor"; al tocar Categoría o Cuenta se abre abajo un panel
    en cuadrícula de 3 columnas. Al tocar un Grupal se despliegan sus Subgrupales debajo de su fila; al elegir uno pasa solo a Cuenta.
@@ -4802,7 +4840,9 @@ function regPickHtml() {
   const F = S.regF; const pk = S.regPick; if (!pk) return '';
   const cel = (act, v, txt, on, extra) => `<button type="button" class="rg-cel ${on ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}" ${extra || ''}>${txt}</button>`;
   let titulo, cuerpo;
-  if (pk === 'det') {
+  if (pk === 'marc') { titulo = 'Marcadores'; cuerpo = marcPanelHtml(); }
+  else if (pk === 'rep') { titulo = 'Repetir'; cuerpo = repPanelHtml(); }
+  else if (pk === 'det') {
     titulo = 'Detalle'; const l = regDetalles(F);
     cuerpo = `<div class="rg-grid rg-grid2">${l.map(d => cel('regPickD', d.nom, esc(d.ver), d.nom === F.detalle)).join('')}${cel('regPickD', '', '<span class="muted">Sin detalle</span>', false)}</div>`;
   } else if (pk === 'cat') {
@@ -4818,7 +4858,7 @@ function regPickHtml() {
     const g = new Map(); l.forEach(i => { const k = i.tipo ? i.tipo.nombre : 'Sin tipo'; if (!g.has(k)) g.set(k, []); g.get(k).push(i); });
     cuerpo = [...g].map(([k, xs]) => `<div class="rg-gt">${esc(k)}</div><div class="rg-grid">${xs.map(i => cel('regPickC', i.n, `<span>${esc(i.nom)}</span>${i.mon === 'USD' ? '<span class="rg-chev">US$</span>' : ''}`, i.n === sel)).join('')}</div>`).join('');
   }
-  return `<div class="rg-pick" role="dialog" aria-label="${titulo}"><div class="rg-pickh"><b>${titulo}</b>${pk === 'det' ? '<button type="button" class="btn sm ghost" data-act="regDetEsc">✎ Escribir otro</button>' : ''}<button type="button" class="btn sm ghost ico" data-act="regPickX" aria-label="Cerrar">✕</button></div><div class="rg-pickb">${cuerpo}</div></div>`;
+  return `<div class="rg-pick" role="dialog" aria-label="${titulo}"><div class="rg-pickh"><b>${titulo}</b>${pk === 'det' ? '<button type="button" class="btn sm ghost" data-act="regDetEsc">✎ Escribir otro</button>' : ''}${pk === 'marc' ? `<span class="row" style="gap:4px;margin-left:auto">${(S.marc || []).length ? `<button type="button" class="btn sm ghost" data-act="marcEditar">${S.marcEdit ? 'Listo' : 'Editar'}</button>` : ''}${S.marcNuevo ? '' : '<button type="button" class="btn sm ghost" data-act="marcNuevo">☆ Guardar este</button>'}</span>` : ''}<button type="button" class="btn sm ghost ico" data-act="regPickX" aria-label="Cerrar">✕</button></div><div class="rg-pickb">${cuerpo}</div></div>`;
 }
 function pintarRegForm() {
   const F = S.regF; const a = esAdmin(); const tipos = a ? ['ingreso', 'gasto', 'traslado', 'ajuste'] : ['ingreso', 'gasto'];
@@ -4857,12 +4897,14 @@ function pintarRegForm() {
   }
   const ed = !!F.id; const r = ed ? regDe(F.id) : null;
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal rg-modal rg-${F.tipo} ${pk ? 'picking' : ''}" role="dialog" aria-modal="true" aria-labelledby="rgT">
-    <div class="hd">${S.regConfX ? `<h2 id="rgT" style="margin-right:auto">¿Descartar lo escrito?</h2><button class="btn sm ghost" data-act="regSeguirX">Seguir aquí</button><button class="btn sm danger" data-act="regDescartar">Descartar</button>` : `<h2 id="rgT" style="margin-right:auto">${ed ? 'Editar registro' : a ? 'Nuevo registro' : 'Registrar para aprobación'}</h2>${!a && !ed ? `<button class="btn sm ghost" data-act="regMios">Mis registros</button>` : ''}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button>`}</div>
+    <div class="hd">${S.regConfX ? `<h2 id="rgT" style="margin-right:auto">¿Descartar lo escrito?</h2><button class="btn sm ghost" data-act="regSeguirX">Seguir aquí</button><button class="btn sm danger" data-act="regDescartar">Descartar</button>` : `<h2 id="rgT" style="margin-right:auto">${ed ? 'Editar registro' : a ? 'Nuevo registro' : 'Registrar para aprobación'}</h2>${!ed && S.marc ? `<button class="btn sm ghost rg-star ${pk === 'marc' ? 'on' : ''}" data-act="regPick" data-v="marc" aria-label="Marcadores" title="Marcadores">☆</button>` : ''}${!a && !ed ? `<button class="btn sm ghost" data-act="regMios">Mis registros</button>` : ''}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button>`}</div>
     <div class="bd rg-bd">
       ${ed && r.tipo === 'traslado' ? '' : `<div class="rg-tipos" role="tablist">${tipos.map(t => `<button type="button" role="tab" class="rg-tt rg-tt-${t} ${F.tipo === t ? 'on' : ''}" data-act="regTipo" data-v="${t}" aria-selected="${F.tipo === t}">${t === 'traslado' ? 'Transferencia' : REG_TIPOS[t][0].replace(' de saldo', '')}</button>`).join('')}</div>`}
       <div class="rg-filas">
         ${fila('Fecha', `<input class="rg-in" type="date" id="rgFecha" value="${esc(F.fecha)}"><input class="rg-in rg-hora" type="time" id="rgHora" value="${esc(F.hora)}">`, 'rg-fh')}
         ${filas}
+        ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', `<div class="rg-etqw"><input class="rg-in" id="rgEtq" value="${esc(F.etq || '')}" placeholder="ej. Viaje Roatán, Navidad" autocomplete="off">${(() => { const ya = etqLista(F.etq); const sug = etqUsadas().filter(x => !ya.includes(x)).slice(0, 6); return ya.length || sug.length ? `<div class="rg-etqs">${ya.map(x => `<button type="button" class="chip on" data-act="etqTog" data-v="${esc(x)}">#${esc(x)} ✕</button>`).join('')}${sug.map(x => `<button type="button" class="chip" data-act="etqTog" data-v="${esc(x)}">+ ${esc(x)}</button>`).join('')}</div>` : ''; })()}</div>`)}
+        ${a && !ed && F.tipo !== 'ajuste' && S.series !== null ? fila('Repetir', `<button type="button" class="rg-sel ${F.rep && F.rep.frec ? '' : 'vacio'}" data-act="regPick" data-v="rep">↻ ${repTxt(F)}</button>`, pk === 'rep' ? 'activo' : '') : ''}
         ${fila('Descripción', `<textarea class="rg-in" id="rgDesc" rows="1" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
       </div>
       <div id="rgMsg" class="note"></div>
@@ -4921,7 +4963,7 @@ function regAjDifTxt() { const F = S.regF; if (!F || !F.cuenta) return ''; const
 function regArmar() {
   regLeerForm(); const F = S.regF; const a = esAdmin(); const monto = numDe(F.monto);
   if (!F.fecha) return 'Falta la fecha.';
-  const row = {tipo: F.tipo, fecha: F.fecha, hora: F.hora || null, descripcion: (F.desc || '').trim() || null, grupal: null, subgrupal: null, detalle: (F.detalle || '').trim() || null, cuenta: null, cuenta_destino: null, monto_destino: null, comision: null, signo: null, tasa: null};
+  const etqs = etqLista(F.etq); const row = {etiquetas: etqs.length ? etqs : null, tipo: F.tipo, fecha: F.fecha, hora: F.hora || null, descripcion: (F.desc || '').trim() || null, grupal: null, subgrupal: null, detalle: (F.detalle || '').trim() || null, cuenta: null, cuenta_destino: null, monto_destino: null, comision: null, signo: null, tasa: null};
   if (F.tipo === 'traslado') { if (!F.cuenta || !F.destino) return 'Elige las dos cuentas.'; if (F.cuenta === F.destino) return 'Las dos cuentas deben ser distintas.'; if (!(monto > 0)) return 'Escribe el importe.';
     row.cuenta = F.cuenta; row.cuenta_destino = F.destino; row.monto = crR2(monto); const mo = ctaInfo(F.cuenta).mon, md = ctaInfo(F.destino).mon, ts = tasaUSD();
     if (mo !== md) { let md2 = numDe(F.montoD); if (!(md2 > 0)) { if (!ts) return 'Escribe el importe que llega (no hay tasa del día).'; md2 = mo === 'USD' ? monto * ts : monto / ts; } row.monto_destino = crR2(md2); }
@@ -4951,12 +4993,21 @@ async function regGuardar(seguir) {
   try {
     if (F.id) { const antes = Object.assign({}, regDe(F.id)); row.actualizado_el = new Date().toISOString(); const d = await q(sb.from('registros').update(row).eq('id', F.id).select(), 'Registro actualizado');
       const nuevo = d && d[0] ? d[0] : Object.assign(antes, row); Object.assign(regDe(F.id), nuevo); await regHist(F.id, 'editado', antes, nuevo); }
+    else if (a && F.rep && F.rep.frec && F.tipo !== 'ajuste') {   // repetir / cuotas: una serie con todos sus registros
+      if (S.series === null) { toast('Para repetir corre primero en Supabase el SQL de la fase 4 (fase4.sql).'); throw 0; }
+      const plan = repPlan(F, row.monto); const ahora = new Date().toISOString(); const sr = {id: crUid(), frecuencia: F.rep.frec, veces: plan.length, cuotas: !!F.rep.cuotas, monto_total: F.rep.cuotas ? row.monto : crR2(row.monto * plan.length), creado_por: S.me.id, creado_el: ahora};
+      await q(sb.from('registro_series').insert(sr)); (S.series || (S.series = [])).push(sr);
+      const filas = plan.map(p => Object.assign({}, row, {id: crUid(), fecha: p.fecha, monto: p.monto, serie: sr.id, cuota: p.k, detalle: F.rep.cuotas ? `${row.detalle || 'Cuota'} (${p.k}/${p.n})` : row.detalle,
+        monto_destino: row.monto_destino != null && F.rep.cuotas ? crR2(row.monto_destino / plan.length) : row.monto_destino, estado: 'oficial', creado_por: S.me.id, creado_el: ahora, aprobado_por: S.me.id, aprobado_el: ahora}));
+      const d = await q(sb.from('registros').insert(filas).select(), seguir ? '' : `${filas.length} registros creados (${repTxt(F)})`); const nuevos = d && d.length ? d : filas; S.reg.push(...nuevos);
+      for (const n of nuevos) await regHist(n.id, 'creado', null, n);
+      S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino}; S._regDupOk = null; S._regN = (S._regN || 0) + nuevos.length; }
     else { row.id = crUid(); row.estado = a ? 'oficial' : 'pendiente'; row.creado_por = S.me.id; row.creado_el = new Date().toISOString(); if (a) { row.aprobado_por = S.me.id; row.aprobado_el = row.creado_el; }
       const d = await q(sb.from('registros').insert(row).select(), seguir ? '' : a ? 'Registro guardado' : 'Enviado para aprobación'); const nuevo = d && d[0] ? d[0] : row; S.reg.push(nuevo); await regHist(nuevo.id, 'creado', null, nuevo);
       S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino}; S._regDupOk = null; S._regN = (S._regN || 0) + 1; }
     if (a) derive();
     if (seguir) { const res = regResumen(row);
-      Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
+      Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null, id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
       pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); return; }
     $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; render();
   } catch (e) {} finally { S._regGuardando = false; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = false); }
@@ -5021,6 +5072,11 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act; if (!act.startsWith('reg')) return;
   if (act === 'regNuevo') return abrirRegForm();
   if (act === 'regMios') { S.regF = null; S.regPick = null; return pintarRegMios(); }
+  if (act === 'regSerieElim') { const r = regDe(b.dataset.id); if (!r) return; const t = S.detAbierto && D.byId.get(S.detAbierto.id);
+    if (S.serieConf !== r.id) { S.serieConf = r.id; if (t) abrirDetalleTx(t.id); return; } S.serieConf = null;
+    const ls = S.reg.filter(x => x.serie === r.serie && x.estado === 'oficial' && x.fecha >= r.fecha); const ahora = new Date().toISOString();
+    for (const x of ls) { const antes = Object.assign({}, x); try { const {error} = await sb.from('registros').update({estado: 'eliminado', actualizado_el: ahora}).eq('id', x.id); if (error) throw error; x.estado = 'eliminado'; await regHist(x.id, 'eliminado', antes, x); } catch (er) { toast(errMsg(er)); break; } }
+    toast(`${ls.length} registros de la serie eliminados`); derive(); S._ctaVer = (S._ctaVer || 0) + 1; if (S.ctaVolver) cerrarCapa(); else $('#modalRoot').innerHTML = ''; return render(); }
   if (act === 'regElimDetNo') { const t = S.detAbierto && D.byId.get(S.detAbierto.id); S.regConfElimDet = null; if (t) abrirDetalleTx(t.id); return; }
   if (act === 'regElimDet') { const id = b.dataset.id; const t = S.detAbierto && D.byId.get(S.detAbierto.id);
     if (S.regConfElimDet !== id) { S.regConfElimDet = id; if (t) abrirDetalleTx(t.id); return; }
@@ -5067,7 +5123,10 @@ function regDetalleHtml(t) {
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
   const ACC = {creado: 'Creado', editado: 'Editado', aprobado: 'Aprobado', vinculado: 'Vinculado', rechazado: 'Rechazado', eliminado: 'Eliminado', restaurado: 'Restaurado'};
   const h = (S.regHist || []).filter(x => x.registro === r.id).sort((a, b) => String(a.el).localeCompare(String(b.el)));
-  return `<div class="eyebrow">Historial del registro</div><div class="rg-hist">
+  const sr = r.serie ? (S.reg || []).filter(x => x.serie === r.serie && x.estado === 'oficial') : []; const sigs = sr.filter(x => x.fecha >= r.fecha);
+  const serieHtml = r.serie ? `<div class="eyebrow">Repetición</div><div class="rg-hist"><div><span>${(S.series || []).find(x => x.id === r.serie) ? esc(((s0) => s0.cuotas ? 'Cuota ' + r.cuota + ' de ' + s0.veces : REP_FREC[s0.frecuencia][0] + ' · ' + r.cuota + ' de ' + s0.veces)((S.series || []).find(x => x.id === r.serie))) : 'Parte de una serie (' + r.cuota + ')'}</span><span>${sr.length} activos en la serie</span></div></div>
+    ${sigs.length > 1 ? `<div class="row" style="justify-content:flex-end">${S.serieConf === r.id ? `<span class="note">¿Eliminar este y los ${sigs.length - 1} siguientes?</span><button class="btn sm danger" data-act="regSerieElim" data-id="${esc(r.id)}">Sí, eliminar ${sigs.length}</button>` : `<button class="btn sm ghost danger" data-act="regSerieElim" data-id="${esc(r.id)}">Eliminar este y los siguientes (${sigs.length})</button>`}</div>` : ''}` : '';
+  return `${(r.etiquetas || []).length ? `<div class="eyebrow">Etiquetas</div><div class="rg-etqs">${r.etiquetas.map(x => `<span class="chip">#${esc(x)}</span>`).join('')}</div>` : ''}${serieHtml}<div class="eyebrow">Historial del registro</div><div class="rg-hist">
       <div><span>Registrado por ${esc(nombreDe(r.creado_por))}</span><span>${cuando(r.creado_el)}</span></div>
       ${r.aprobado_por && r.aprobado_por !== r.creado_por ? `<div><span>Aprobado por ${esc(nombreDe(r.aprobado_por))}</span><span>${cuando(r.aprobado_el)}</span></div>` : ''}
       ${h.filter(x => x.accion !== 'creado').map(x => `<div><span>${ACC[x.accion] || esc(x.accion)} por ${esc(nombreDe(x.por))}</span><span>${cuando(x.el)}</span></div>`).join('')}</div>
@@ -5081,6 +5140,173 @@ async function regPublicarCatalogo() {
   if (!filas.length) return;
   try { for (let i = 0; i < filas.length; i += 300) { const d = await sb.from('categorias').insert(filas.slice(i, i + 300)).select(); if (d.error) throw d.error; S.cats.push(...(d.data || filas.slice(i, i + 300))); } catMapas(); } catch (e) { S._catPub = false; }
 }
+/* ===================== Fase 4: comodidades de Registro Contable =====================
+   Marcadores (plantillas de registro), repetir / cuotas, etiquetas y notas del día, y las vistas generales de todas las
+   cuentas: Diario, Calendario, Mensual y Estadísticas (Cuentas → General). */
+const REP_FREC = {semana: ['Cada semana', 'semanal'], quincena: ['Cada 2 semanas', 'quincenal'], mes: ['Cada mes', 'mensual'], anio: ['Cada año', 'anual']};
+function repFecha(f0, frec, k) {
+  const y = +f0.slice(0, 4), m = +f0.slice(5, 7) - 1, d = +f0.slice(8, 10);
+  if (frec === 'semana' || frec === 'quincena') { const dt = new Date(Date.UTC(y, m, d + k * (frec === 'semana' ? 7 : 14))); return dt.toISOString().slice(0, 10); }
+  if (frec === 'mes') return tjFechaDia(y, m + k, d);
+  return tjFechaDia(y + k, m, d);
+}
+// repPlan: las fechas e importes que va a generar la repetición del formulario.
+function repPlan(F, total) {
+  const R = F.rep; if (!R || !R.frec || !(R.n >= 2)) return null; const n = Math.min(120, Math.max(2, Math.round(R.n)));
+  const t = Math.abs(+total || 0); const base = R.cuotas ? Math.floor(t / n * 100) / 100 : t;
+  return Array.from({length: n}, (_, k) => ({fecha: repFecha(F.fecha || hoy(), R.frec, k), monto: R.cuotas && k === n - 1 ? crR2(t - base * (n - 1)) : base, k: k + 1, n}));
+}
+const repTxt = F => { const R = F.rep; if (!R || !R.frec) return 'No se repite'; return R.cuotas ? `${R.n} cuotas ${REP_FREC[R.frec][1]}es` : `${REP_FREC[R.frec][0]} · ${R.n} veces`; };
+// Etiquetas: texto separado por comas; se guardan sin repetir.
+const etqLista = x => [...new Set(String(x || '').split(',').map(s2 => s2.trim()).filter(Boolean))];
+function etqUsadas() { const m = new Map(); (S.reg || []).forEach(r => (r.etiquetas || []).forEach(e => m.set(e, (m.get(e) || 0) + 1))); (S.marc || []).forEach(r => (r.etiquetas || []).forEach(e => m.set(e, (m.get(e) || 0) + 1)));
+  return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es')).map(x => x[0]); }
+
+/* --- Marcadores en el formulario (la ⭐ de la app) --- */
+function marcPanelHtml() {
+  const F = S.regF; const l = (S.marc || []).filter(m => esAdmin() || m.tipo !== 'traslado').sort((a, b) => (+a.orden || 0) - (+b.orden || 0) || a.nombre.localeCompare(b.nombre, 'es'));
+  const tit = m => { const det = m.tipo === 'traslado' ? `${esc(ctaInfo(m.cuenta || '').nom || '')} → ${esc(ctaInfo(m.cuenta_destino || '').nom || '')}` : esc(m.subgrupal ? subG(m.grupal, m.subgrupal) : catG(m.grupal || '') || ''); return `<b>${esc(m.nombre)}</b><span class="rg-mk-s">${REG_TIPOS[m.tipo][0]}${m.monto ? ' · ' + L(+m.monto) : ''}</span><span class="rg-mk-s">${det}</span>`; };
+  const guardar = S.marcNuevo ? `<div class="rg-mkn"><input class="in" id="mkNom" placeholder="Nombre del marcador (ej. Gasolina Ford)" value="${esc(S.marcNom || '')}" autocomplete="off"><label class="note" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="mkMonto" ${F.monto ? 'checked' : ''}> Guardar también el importe</label><div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn sm ghost" data-act="marcNuevoX">Cancelar</button><button type="button" class="btn sm pri" data-act="marcGuardar">Guardar marcador</button></div></div>` : '';
+  return `${guardar}<div class="rg-grid rg-grid2">${l.map(m => `<div class="rg-cel rg-mk ${S.marcEdit ? 'ed' : ''}">${S.marcEdit ? `<button type="button" class="rg-mk-x" data-act="marcBorrar" data-id="${esc(m.id)}" aria-label="Borrar marcador">✕</button>` : ''}<button type="button" class="rg-mk-b" data-act="marcUsar" data-id="${esc(m.id)}">${tit(m)}</button></div>`).join('') || `<div class="note" style="padding:14px;grid-column:1/-1">Todavía no tienes marcadores. Llena el formulario con lo que repites seguido (categoría, cuenta, detalle) y toca <b>☆ Guardar este</b>.</div>`}</div>`;
+}
+function marcUsar(id) {
+  const m = (S.marc || []).find(x => x.id === id); if (!m) return; const F = S.regF; regLeerForm();
+  Object.assign(F, {tipo: m.tipo, cuenta: m.cuenta && ctaNombres().includes(m.cuenta) && ctaInfo(m.cuenta).estado === 'activa' ? m.cuenta : F.cuenta, destino: m.cuenta_destino || '', grupal: m.grupal || '', subgrupal: m.subgrupal || '', detalle: m.detalle || '', desc: m.descripcion || '', etq: (m.etiquetas || []).join(', ')});
+  if (m.monto) F.monto = String(+m.monto); S.regPick = null; S._regFoco = true; pintarRegForm(); $('#rgMsg').innerHTML = `<span class="pos">Marcador «${esc(m.nombre)}» aplicado${m.monto ? '' : ': escribe el importe'}.</span>`;
+  const mm = $('#rgMonto'); if (mm && !m.monto) mm.focus();
+}
+async function marcGuardar() {
+  regLeerForm(); const F = S.regF; const nom = (($('#mkNom') || {}).value || '').trim(); if (!nom) { toast('Escribe el nombre del marcador.'); return $('#mkNom') && $('#mkNom').focus(); }
+  if (F.tipo === 'ajuste') return toast('Los ajustes no se guardan como marcador.');
+  const conMonto = ($('#mkMonto') || {}).checked; const mo = numDe(F.monto);
+  const row = {id: crUid(), nombre: nom, tipo: F.tipo, cuenta: F.cuenta || null, cuenta_destino: F.tipo === 'traslado' ? F.destino || null : null, monto: conMonto && mo > 0 ? crR2(mo) : null,
+    grupal: F.tipo === 'traslado' ? null : F.grupal || null, subgrupal: F.tipo === 'traslado' ? null : F.subgrupal || null, detalle: (F.detalle || '').trim() || null, descripcion: (F.desc || '').trim() || null, etiquetas: etqLista(F.etq).length ? etqLista(F.etq) : null,
+    orden: (Math.max(0, ...(S.marc || []).map(m => +m.orden || 0)) + 10), creado_por: S.me.id};
+  try { const d = await q(sb.from('marcadores').insert(row).select(), 'Marcador guardado: ' + nom); S.marc.push(d && d[0] ? d[0] : row); S.marcNuevo = false; S.marcNom = ''; S._regFoco = true; pintarRegForm(); } catch (e) {}
+}
+/* --- Repetir / cuotas (panel del formulario) --- */
+function repPanelHtml() {
+  const F = S.regF; const R = F.rep || (F.rep = {frec: '', n: 12, cuotas: false}); const plan = repPlan(F, numDe(F.monto)); const mon = F.cuenta ? ctaInfo(F.cuenta).mon : 'L';
+  return `<div class="rg-rep">
+    <div class="ctt-cls">${[['', 'No se repite'], ...Object.entries(REP_FREC).map(([k, v]) => [k, v[0]])].map(([k, t]) => `<button type="button" class="ctt-c ${R.frec === k ? 'on' : ''}" data-act="repFrec" data-v="${k}">${t}</button>`).join('')}</div>
+    ${R.frec ? `<div class="rg-repn"><span>Cuántas veces en total</span><div class="rg-step"><button type="button" class="btn sm ghost" data-act="repN" data-v="-1" aria-label="Menos">−</button><input class="in num" id="rgRepN" inputmode="numeric" value="${R.n}"><button type="button" class="btn sm ghost" data-act="repN" data-v="1" aria-label="Más">+</button></div></div>
+      ${F.tipo !== 'ajuste' ? `<label class="ctt-sw"><span><b>Dividir el importe en cuotas</b><span class="note">${R.cuotas ? 'El importe escrito es el total; cada registro lleva su parte y el detalle dice (1/' + R.n + '), (2/' + R.n + ')…' : 'Cada registro lleva el importe completo.'}</span></span><input type="checkbox" class="sw" id="rgRepC" ${R.cuotas ? 'checked' : ''}></label>` : ''}
+      <div class="note rg-repv">${plan ? `Se crearán <b>${plan.length} registros</b> del ${fFecha(plan[0].fecha)} al ${fFecha(plan[plan.length - 1].fecha)}${numDe(F.monto) > 0 ? ` · ${R.cuotas ? ctaFmt(plan[0].monto, mon) + ' c/u' : ctaFmt(plan[0].monto, mon) + ' cada uno'}` : ''}. Los de fechas futuras aparecen como <span class="chip warn">programado</span>.` : ''}</div>` : ''}
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn sm pri" data-act="regPickX">Listo</button></div></div>`;
+}
+/* --- Vistas generales: Cuentas → General --- */
+// genFilas: registros de todas las cuentas para las vistas generales. Un traslado se muestra una vez (el lado que sale).
+function genFilas() {
+  if (S._genD === D.txs && S._gen) return S._gen; const rev = ctaTrasRev();
+  const l = []; D.txs.forEach(t => { if (t.borradoApp) return; const tras = tjEsTras(t), aj = !tras && tjEsAjuste(t);
+    if (tras) { const e = rev.get(t.id) || {}; if (e.esp && ctaSigno(t) > 0) return; }
+    const m = tjMonto(t); const hnl = crR2(m.hnl != null ? m.hnl : m.usd ? m.usd * (tasaUSD() || 0) : m.l); const sg = tras ? 0 : aj ? (ajusteOrigen(t)[1] || 1) : t.code === 0 ? 1 : -1;
+    l.push({t, tras, aj, v: Math.abs(hnl), lado: tras ? 't' : (sg * Math.sign(hnl || 1)) > 0 ? 'd' : 'r', otra: tras ? ((rev.get(t.id) || {}).otra || tjDestino(t) || '') : ''}); });
+  l.sort((a, b) => (a.t.fecha + (a.t.hora || '')).localeCompare(b.t.fecha + (b.t.hora || '')));
+  S._genD = D.txs; S._gen = l; return l;
+}
+const genSum = l => { const dep = crR2(l.filter(f => f.lado === 'd' && !f.aj).reduce((s, f) => s + f.v, 0)), ret = crR2(l.filter(f => f.lado === 'r' && !f.aj).reduce((s, f) => s + f.v, 0)); return {dep, ret, bal: crR2(dep - ret)}; };
+const gNum = v => Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const gCorto = v => { v = Math.abs(v); return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e4 ? Math.round(v / 1e3) + 'k' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : Math.round(v).toString(); };
+function vCtaGeneral() {
+  const vista = S.genVista || 'd'; const todas = genFilas(); const mHoy = hoy().slice(0, 7);
+  const etqs = [...new Set(todas.flatMap(f => f.t.etiquetas || []))].sort((a, b) => a.localeCompare(b, 'es'));
+  const etq = S.genEtq && etqs.includes(S.genEtq) ? S.genEtq : ''; const filas = etq ? todas.filter(f => (f.t.etiquetas || []).includes(etq)) : todas;
+  const mes = S.genMes || mHoy; const anio = S.genAnio || mes.slice(0, 4); const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const tabs = `<div class="rc-tabs gen-tabs" role="tablist">${[['d', 'Diario'], ['c', 'Calendario'], ['m', 'Mensual'], ['e', 'Estadísticas']].map(([k, t]) => `<button class="${vista === k ? 'on' : ''}" role="tab" aria-selected="${vista === k}" data-act="genVista" data-v="${k}">${t}</button>`).join('')}</div>`;
+  const nav = (lab, prev, next, act) => `<div class="rc-nav"><button class="btn sm ghost" data-act="${act}" data-v="${prev}" aria-label="Anterior">‹</button><b>${lab}</b><button class="btn sm ghost" data-act="${act}" data-v="${next}" aria-label="Siguiente">›</button></div>`;
+  const labMes = m => MES[+m.slice(5, 7) - 1].slice(0, 1) + MES[+m.slice(5, 7) - 1].slice(1).toLowerCase() + ' ' + m.slice(0, 4);
+  const franja = R => `<div class="rc-sum gen-sum"><div><span>Ingresos</span><b class="num rc-d">${gNum(R.dep)}</b></div><div><span>Gastos</span><b class="num rc-r">${gNum(R.ret)}</b></div><div><span>Balance</span><b class="num ${R.bal < 0 ? 'rc-r' : ''}">${R.bal < 0 ? '-' : ''}${gNum(R.bal)}</b></div></div>`;
+  const etqBar = etqs.length ? `<div class="gen-etq"><span class="note">Etiqueta:</span>${['', ...etqs].map(e => `<button class="chip ${etq === e ? 'on' : ''}" data-act="genEtq" data-v="${esc(e)}">${e ? '#' + esc(e) : 'Todas'}</button>`).join('')}</div>` : '';
+  let cuerpo = '', cab = '';
+  if (vista === 'd') {
+    const dia = S.genDia && S.genDia.slice(0, 7) === mes ? S.genDia : ''; const l = filas.filter(f => dia ? f.t.fecha === dia : f.t.mes === mes);
+    cab = nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes') + franja(genSum(l)) + (dia ? `<div class="gen-dia-f"><span>Solo el ${fFecha(dia)}</span><button class="btn sm ghost" data-act="genDia" data-v="">Ver todo el mes</button></div>` : '');
+    const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); });
+    const dias = [...porDia.keys()]; if (S.notasDia) S.notasDia.forEach((n, fe) => { if (fe.slice(0, 7) === mes && (!dia || fe === dia) && !porDia.has(fe)) dias.push(fe); });
+    const fila = f => { const t = f.t; const izq = f.tras ? 'Transferencia' : f.aj ? 'Ajuste' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(subG(t.cat, t.sub)) : ''}`;
+      const tit = (t.nota ? notaG(t.cat, t.sub, t.nota) : '') || (f.tras ? 'Traslado' : subG(t.cat, t.sub) || catG(t.cat) || 'Registro'); const hora = hora12(t.hora || (trasX(t) || [])[2] || '');
+      const ct = f.tras ? `${esc(tjCta(t.cuenta))} → ${esc(f.otra || '¿?')}` : esc(tjCta(t.cuenta));
+      return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora ? hora + ' ' : ''}${ct}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${(t.etiquetas || []).map(e => ` <span class="gen-tag">#${esc(e)}</span>`).join('')}</div></div>
+        <div class="rc-v"><span class="num ${f.lado === 'd' ? 'rc-d' : f.lado === 'r' ? 'rc-r' : 'gen-t'}">${gNum(f.v)}</span>${t.web ? '<span class="rc-sl">web</span>' : ''}</div></div>`; };
+    cuerpo = dias.sort().reverse().map(fe => { const ls = porDia.get(fe) || []; const dt = new Date(fe + 'T12:00'); const r = genSum(ls); const wd = dt.getDay(); const nd = S.notasDia && S.notasDia.get(fe);
+      const ed = S.genNotaEd === fe;
+      return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}${S.notasDia ? ` <button class="gen-nb" data-act="genNota" data-v="${fe}" title="Nota del día" aria-label="Nota del día">✎</button>` : ''}</span><span class="num rc-d">${r.dep ? gNum(r.dep) : ''}</span><span class="num rc-r">${r.ret ? gNum(r.ret) : ''}</span></div>`
+        + (ed ? `<div class="gen-nota ed"><textarea class="in" id="genNotaT" rows="2" placeholder="Nota de este día">${esc(nd ? nd.texto : '')}</textarea><div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm ghost" data-act="genNotaX">Cancelar</button><button class="btn sm pri" data-act="genNotaG" data-v="${fe}">Guardar nota</button></div></div>` : nd ? `<div class="gen-nota" data-act="genNota" data-v="${fe}" role="button">📝 ${esc(nd.texto)}</div>` : '')
+        + [...ls].reverse().map(fila).join(''); }).join('') || '<div class="note" style="padding:14px">Sin movimientos en este mes.</div>';
+  } else if (vista === 'c') {
+    const l = filas.filter(f => f.t.mes === mes); cab = nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes') + franja(genSum(l));
+    const porDia = new Map(); l.forEach(f => { const k = f.t.fecha; if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(f); });
+    const y = +mes.slice(0, 4), m0 = +mes.slice(5, 7) - 1; const ini = (new Date(Date.UTC(y, m0, 1)).getUTCDay() + 6) % 7; const nd = new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
+    const celdas = []; for (let k = 0; k < ini; k++) celdas.push('<div class="gc gc-v"></div>');
+    for (let d = 1; d <= nd; d++) { const fe = mes + '-' + String(d).padStart(2, '0'); const r = genSum(porDia.get(fe) || []); const n = (porDia.get(fe) || []).length; const wd = (ini + d - 1) % 7;
+      celdas.push(`<button class="gc ${fe === hoy() ? 'hoy' : ''} ${wd === 6 ? 'dom' : wd === 5 ? 'sab' : ''}" data-act="genDia" data-v="${fe}" ${n ? '' : 'data-vacio="1"'} aria-label="${fFecha(fe)}: ${n} registros"><b>${d}</b>${r.dep ? `<span class="rc-d">${gCorto(r.dep)}</span>` : ''}${r.ret ? `<span class="rc-r">${gCorto(r.ret)}</span>` : ''}${S.notasDia && S.notasDia.get(fe) ? '<i class="gc-n" title="Tiene nota"></i>' : ''}</button>`); }
+    cuerpo = `<div class="gcal"><div class="gc-h">lun</div><div class="gc-h">mar</div><div class="gc-h">mié</div><div class="gc-h">jue</div><div class="gc-h">vie</div><div class="gc-h">sáb</div><div class="gc-h">dom</div>${celdas.join('')}</div><div class="bd note">Toca un día para ver sus registros. Azul: ingresos · rojo: gastos (k = miles).</div>`;
+  } else if (vista === 'm') {
+    const l = filas.filter(f => f.t.fecha.slice(0, 4) === anio); cab = nav(anio, String(+anio - 1), String(+anio + 1), 'genAnio') + franja(genSum(l));
+    cuerpo = `<div class="rc-th gen-th"><span></span><span>Ingresos</span><span>Gastos</span><span>Balance</span></div>` + Array.from({length: 12}, (_, k) => anio + '-' + String(12 - k).padStart(2, '0')).map(m => { const ls = l.filter(f => f.t.mes === m); if (!ls.length) return '';
+      const r = genSum(ls); return `<div class="rc-pr gen-pr" data-act="genIrMes" data-v="${m}" role="button" tabindex="0"><b>${MES[+m.slice(5, 7) - 1].slice(0, 3).toLowerCase()}</b><span class="num rc-d">${gNum(r.dep)}</span><span class="num rc-r">${gNum(r.ret)}</span><span class="num ${r.bal < 0 ? 'rc-r' : ''}">${r.bal < 0 ? '-' : ''}${gNum(r.bal)}</span></div>`; }).join('') || '<div class="note" style="padding:14px">Sin movimientos este año.</div>';
+  } else {
+    const per = S.genPer || 'm'; const tipo = S.genTipo || 'r'; const enPer = (f, p) => per === 'm' ? f.t.mes === p : f.t.fecha.slice(0, 4) === p;
+    const pAct = per === 'm' ? mes : anio, pAnt = per === 'm' ? tjMesAdd(mes, -1) : String(+anio - 1);
+    const base = (p) => filas.filter(f => enPer(f, p) && !f.tras && !f.aj && f.lado === tipo);
+    const G = S.genStG, Sg = S.genStS; const nivel = Sg != null && G != null ? 3 : G != null ? 2 : 1;
+    const clave = f => nivel === 1 ? f.t.cat || '' : nivel === 2 ? f.t.sub || '' : f.t.nota || '';
+    const filt = l => l.filter(f => (nivel < 2 || (f.t.cat || '') === G) && (nivel < 3 || (f.t.sub || '') === Sg));
+    const agr = l => { const m = new Map(); filt(l).forEach(f => m.set(clave(f), crR2((m.get(clave(f)) || 0) + f.v))); return m; };
+    const act = agr(base(pAct)), ant = agr(base(pAnt)); const tot = crR2([...act.values()].reduce((s, v) => s + v, 0)); const totAnt = crR2([...ant.values()].reduce((s, v) => s + v, 0));
+    const nom = k => !k ? (nivel === 1 ? 'Sin categoría' : nivel === 2 ? 'Sin subgrupal' : 'Sin detalle') : nivel === 1 ? catG(k) : nivel === 2 ? subG(G, k) : notaG(G, Sg, k);
+    const l = [...act].sort((a, b) => b[1] - a[1]); const max = l.length ? l[0][1] : 1;
+    const delta = (a, b) => !b ? '<span class="note">nuevo</span>' : `<span class="gst-d ${a > b ? (tipo === 'r' ? 'sube' : 'baja') : (tipo === 'r' ? 'baja' : 'sube')}">${a >= b ? '▲' : '▼'} ${Math.abs(Math.round((a - b) / b * 100))}%</span>`;
+    cab = (per === 'm' ? nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes') : nav(anio, String(+anio - 1), String(+anio + 1), 'genAnio'))
+      + `<div class="gst-f"><div class="dm-seg"><button class="${tipo === 'r' ? 'on' : ''}" data-act="genTipo" data-v="r">Gastos</button><button class="${tipo === 'd' ? 'on' : ''}" data-act="genTipo" data-v="d">Ingresos</button></div><div class="dm-seg"><button class="${per === 'm' ? 'on' : ''}" data-act="genPer" data-v="m">Mes</button><button class="${per === 'a' ? 'on' : ''}" data-act="genPer" data-v="a">Año</button></div></div>`
+      + `<div class="gst-tot"><span>${nivel === 1 ? (tipo === 'r' ? 'Total de gastos' : 'Total de ingresos') : esc(nivel === 2 ? catG(G) : subG(G, Sg))}</span><b class="num ${tipo === 'r' ? 'rc-r' : 'rc-d'}">L ${gNum(tot)}</b><span class="note">${per === 'm' ? 'vs. ' + labMes(pAnt) : 'vs. ' + pAnt}: L ${gNum(totAnt)} ${tot || totAnt ? delta(tot, totAnt) : ''}</span></div>`
+      + (nivel > 1 ? `<div class="gst-ruta"><button class="btn sm ghost" data-act="genStUp">‹ ${nivel === 3 ? esc(catG(G)) : 'Todas las categorías'}</button></div>` : '');
+    cuerpo = l.map(([k, v]) => `<div class="gst-it" ${nivel < 3 ? `data-act="genStIn" data-v="${esc(k)}" role="button" tabindex="0"` : ''}><div class="gst-n"><b>${esc(nom(k))}</b><span class="num">L ${gNum(v)}</span></div><div class="gst-bar"><i class="${tipo === 'r' ? 'r' : 'd'}" style="width:${Math.max(1, v / max * 100).toFixed(1)}%"></i></div><div class="gst-s"><span>${tot ? Math.round(v / tot * 100) : 0}% del total</span>${delta(v, ant.get(k) || 0)}${nivel < 3 ? '<span class="gst-go">›</span>' : ''}</div></div>`).join('')
+      || '<div class="note" style="padding:14px">Sin registros en este período.</div>';
+  }
+  return `<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>Todas las cuentas</h1></div></div>
+    <div class="panel gen-p">${tabs}${etqBar}${cab}<div class="rc-lst">${cuerpo}</div></div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
+  if (act.startsWith('gen')) {
+    const v = b.dataset.v;
+    if (act === 'genVista') { S.genVista = v; S.genDia = ''; return render(); }
+    if (act === 'genMes') { S.genMes = v; S.genDia = ''; S.genAnio = v.slice(0, 4); return render(); }
+    if (act === 'genAnio') { S.genAnio = v; return render(); }
+    if (act === 'genIrMes') { S.genMes = v; S.genVista = 'd'; S.genDia = ''; return render(); }
+    if (act === 'genDia') { if (!v) { S.genDia = ''; return render(); } S.genDia = v; S.genMes = v.slice(0, 7); S.genVista = 'd'; render(); return window.scrollTo(0, 0); }
+    if (act === 'genEtq') { S.genEtq = v; return render(); }
+    if (act === 'genTipo') { S.genTipo = v; S.genStG = null; S.genStS = null; return render(); }
+    if (act === 'genPer') { S.genPer = v; return render(); }
+    if (act === 'genStIn') { if (S.genStG == null) S.genStG = v; else S.genStS = v; return render(); }
+    if (act === 'genStUp') { if (S.genStS != null) S.genStS = null; else S.genStG = null; return render(); }
+    if (act === 'genNota') { S.genNotaEd = v; render(); const t = $('#genNotaT'); if (t) t.focus(); return; }
+    if (act === 'genNotaX') { S.genNotaEd = null; return render(); }
+    if (act === 'genNotaG') { const tx = (($('#genNotaT') || {}).value || '').trim();
+      try { if (tx) { const row = {fecha: v, texto: tx, actualizado_por: S.me.id, actualizado_el: new Date().toISOString()}; const d = await q(sb.from('notas_dia').upsert(row).select(), 'Nota guardada'); S.notasDia.set(v, d && d[0] ? d[0] : row); }
+        else if (S.notasDia.has(v)) { await q(sb.from('notas_dia').delete().eq('fecha', v), 'Nota borrada'); S.notasDia.delete(v); } } catch (er) {}
+      S.genNotaEd = null; return render(); }
+    return;
+  }
+  if (!S.regF) return; const F = S.regF;
+  if (act === 'marcUsar') return marcUsar(b.dataset.id);
+  if (act === 'marcNuevo') { regLeerForm(); S.marcNuevo = true; S._regFoco = true; pintarRegForm(); const n = $('#mkNom'); if (n) n.focus(); return; }
+  if (act === 'marcNuevoX') { S.marcNuevo = false; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'marcGuardar') return marcGuardar();
+  if (act === 'marcEditar') { S.marcEdit = !S.marcEdit; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'marcBorrar') { const m = (S.marc || []).find(x => x.id === b.dataset.id); if (!m) return;
+    if (S.marcConf !== m.id) { S.marcConf = m.id; b.textContent = '¿Sí?'; b.classList.add('conf'); return; } S.marcConf = null;
+    try { await q(sb.from('marcadores').delete().eq('id', m.id), 'Marcador borrado'); S.marc = S.marc.filter(x => x.id !== m.id); } catch (er) {} S._regFoco = true; return pintarRegForm(); }
+  if (act === 'repFrec') { regLeerForm(); F.rep = Object.assign(F.rep || {n: 12, cuotas: false}, {frec: b.dataset.v}); S._regFoco = true; return pintarRegForm(); }
+  if (act === 'repN') { regLeerForm(); F.rep.n = Math.min(120, Math.max(2, (+F.rep.n || 2) + (+b.dataset.v))); S._regFoco = true; return pintarRegForm(); }
+  if (act === 'etqTog') { regLeerForm(); const l = etqLista(F.etq); const v = b.dataset.v; F.etq = (l.includes(v) ? l.filter(x => x !== v) : [...l, v]).join(', '); S._regFoco = true; return pintarRegForm(); }
+});
+document.addEventListener('change', e => { const F = S.regF; if (!F || !F.rep) return;
+  if (e.target.id === 'rgRepN') { F.rep.n = Math.min(120, Math.max(2, Math.round(+e.target.value || 2))); regLeerForm(); S._regFoco = true; pintarRegForm(); }
+  if (e.target.id === 'rgRepC') { F.rep.cuotas = e.target.checked; regLeerForm(); S._regFoco = true; pintarRegForm(); } });
+
 const enTj = () => S.view === 'cuentas' && S.ctaTab === 'tc';
 const enCred = () => S.view === 'cuentas' && S.ctaTab === 'pre';   // la pestaña Préstamos muestra el módulo de Créditos
 // ctaAlertas: cortes de tarjeta vencidos y cuotas de créditos atrasadas sin pago (para los contadores del menú y de las pestañas).
@@ -5256,6 +5482,7 @@ function vCuentas() {
   const bar = `<div class="cta-tabs" role="tablist">${CTA_TABS.map(([k, t]) => `<button class="tj-tab ${tab === k ? 'on' : ''}" role="tab" aria-selected="${tab === k}" data-act="ctaTab" data-v="${k}">${t}${nv[k] ? ` <span class="count bad-bg">${nv[k]}</span>` : ''}</button>`).join('')}</div>`;
   if (tab === 'tc') return `<div class="stack">${bar}${vTarjetas()}</div>`;
   if (tab === 'pre') return `<div class="stack">${bar}${vCreditos()}</div>`;
+  if (tab === 'gen') return `<div class="stack">${bar}${vCtaGeneral()}</div>`;
   if (tab === 'reg') return `<div class="stack">${bar}<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>Registros hechos en la plataforma</h1></div></div>${vCtaRegistros()}</div>`;
   const head = `<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>${tab === 'adm' ? 'Administración de cuentas y categorías' : 'Saldos de tus cuentas'}</h1></div>${tab === 'adm' || S.cta === null ? '' : `<button class="btn sm ${S.ctaOrdenar ? 'pri' : 'ghost'}" data-act="ctaOrdenar" aria-pressed="${!!S.ctaOrdenar}"><span aria-hidden="true">⇅</span> ${S.ctaOrdenar ? 'Listo' : 'Ordenar'}</button>`}</div>`;
   if (S.cta === null) return `<div class="stack">${bar}${head}<div class="panel"><div class="bd note">Para usar este apartado, corre en Supabase el SQL de cuentas (<b>cuentas.sql</b>). Las pestañas Tarjetas de crédito y Préstamos ya funcionan.</div></div></div>`;
