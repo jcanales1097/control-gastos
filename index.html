@@ -647,6 +647,43 @@ body:has(.graf-full){overflow:hidden}
   .rg-aprb .btn,.rg-dupb .btn{flex:1 1 auto}
 }
 
+/* formulario tipo Registro Contable */
+.rg-filas{display:grid;border-top:1px solid var(--line)}
+.rg-row{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:start;gap:8px;min-height:54px;border-bottom:1px solid var(--line);padding:4px 2px}
+.rg-row.activo{border-bottom:2px solid var(--bad)}
+.rg-lab{font-size:15px;color:var(--muted);padding-top:15px}.rg-val{min-height:46px}
+.rg-val{display:flex;align-items:center;gap:8px;min-width:0;position:relative}
+.rg-in{border:0;background:transparent;color:var(--fg);font:inherit;font-size:17px;padding:8px 0;width:100%;min-width:0;outline:none;resize:none}
+.rg-in:focus{box-shadow:inset 0 -2px 0 var(--bad)}
+.rg-fh .rg-in[type=date]{flex:1.4}.rg-fh .rg-hora{flex:1}
+.rg-fh input{-webkit-appearance:none;appearance:none;min-height:38px}
+.rg-imp .rg-mon{font-size:15px;color:var(--muted)}
+.rg-in.rg-num{font-size:26px!important;font-weight:600;font-family:var(--f-num);text-align:right}
+.rg-ingreso .rg-num{color:var(--rc-d)}.rg-gasto .rg-num{color:var(--rc-r)}
+.rg-sel{border:0;background:transparent;color:var(--fg);font:inherit;font-size:17px;text-align:left;padding:10px 0;width:100%;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rg-sel.vacio{color:var(--muted)}.rg-sel:has(.rg-cg){white-space:normal;padding:6px 0;line-height:1.25}.rg-cg{display:block;font-size:12px;color:var(--muted)}.rg-sep{color:var(--muted)}
+.rg-chev{font-size:11px;color:var(--muted);margin-left:4px}
+.rg-swapw{display:flex;justify-content:center;padding:2px 0;border-bottom:1px solid var(--line)}
+.rg-nota{padding:6px 2px;border-bottom:1px solid var(--line)}
+.rg-seg{margin:8px 0}
+.rg-detw{position:relative;width:100%}
+.rg-dl{position:static;margin:2px 0 8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:240px;overflow:auto;-webkit-overflow-scrolling:touch}
+.rg-dli{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;font-size:15px;padding:11px 12px;cursor:pointer}
+.rg-dli:last-child{border-bottom:0}.rg-dli:active,.rg-dli:hover{background:var(--sunk)}
+.rg-pick{flex:none;border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;max-height:56vh}
+.rg-pickh{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--sunk)}.rg-pickh b{font-size:16px;font-weight:600}
+.rg-pickb{overflow:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,0px)}
+.rg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.rg-cel{min-height:64px;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;font-size:14px;line-height:1.25;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;word-break:break-word}
+.rg-cel:nth-child(3n){border-right:0}
+.rg-cel.on{color:var(--bad);font-weight:600}.rg-cel:active{background:var(--sunk)}
+.rg-subs{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--sunk)}
+.rg-subs .rg-cel{background:var(--sunk)}.rg-subs .rg-cel:nth-child(3n){border-right:0}
+.rg-grid>.rg-cel:nth-child(3n){border-right:1px solid var(--line)}
+.rg-gt{font-size:12px;color:var(--muted);font-weight:600;padding:8px 12px 4px;background:var(--panel)}
+.rg-modal.picking .rg-pick{max-height:56vh}
+@media (min-width:761px){.rg-pick{max-height:360px}}
+@media (max-width:760px){.rg-modal.m-full .rg-bd{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}.rg-modal.m-full{overflow:hidden}}
 /* ===== Cuentas ===== */
 .cta-tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .cta-tabs::-webkit-scrollbar{display:none}.cta-tabs .tj-tab{flex:1 0 auto;white-space:nowrap;flex-wrap:nowrap}
@@ -4694,54 +4731,125 @@ function abrirRegForm(id) {
       grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || ''}
     : {tipo: prev.tipo || 'gasto', fecha: hoy(), hora: ahoraHora(), cuenta: prev.cuenta || '', destino: prev.destino || '', monto: '', montoD: '', comision: '', signo: 1, modoAj: 'saldo', grupal: '', subgrupal: '', detalle: '', desc: ''};
   if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
-  S.regVista = 'form'; pintarRegForm();
+  S.regVista = 'form'; S.regPick = null; S.regPickG = null; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
   [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); }
 const numDe = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : NaN; };
+/* Formulario con la mecánica de Registro Contable: filas "etiqueta · valor"; al tocar Categoría o Cuenta se abre abajo un panel
+   en cuadrícula de 3 columnas. Al tocar un Grupal se despliegan sus Subgrupales debajo de su fila; al elegir uno pasa solo a Cuenta.
+   Detalle: se escribe y debajo aparece la lista de los detalles ya usados en ese Grupal / Subgrupal, filtrada mientras se escribe. */
+const sinAc = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function regDetalles(F) {
+  const cat = regCatalogo(F.tipo); const g = cat.find(x => x.nom === F.grupal); if (!g) return [];
+  const subs = F.subgrupal ? g.hijos.filter(x => x.nom === F.subgrupal) : g.hijos; const set = new Map();
+  subs.forEach(s2 => s2.hijos.forEach(d => set.set(d.nom, d.ver)));
+  (S.reg || []).forEach(r => { if (r.grupal === F.grupal && (!F.subgrupal || r.subgrupal === F.subgrupal) && r.detalle && !set.has(r.detalle)) set.set(r.detalle, r.detalle); });
+  return [...set].map(([nom, ver]) => ({nom, ver})).sort((a, b) => a.ver.localeCompare(b.ver, 'es', {numeric: true}));
+}
+function regDetListaHtml() {
+  const F = S.regF; const q0 = sinAc((($('#rgDet') || {}).value) || ''); const l = regDetalles(F).filter(d => !q0 || sinAc(d.ver + ' ' + d.nom).includes(q0)).slice(0, 40);
+  return l.map(d => `<button type="button" class="rg-dli" data-act="regDetSel" data-v="${esc(d.nom)}">${esc(d.ver)}</button>`).join('');
+}
+function regPickHtml() {
+  const F = S.regF; const pk = S.regPick; if (!pk) return '';
+  const cel = (act, v, txt, on, extra) => `<button type="button" class="rg-cel ${on ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}" ${extra || ''}>${txt}</button>`;
+  let titulo, cuerpo;
+  if (pk === 'cat') {
+    titulo = 'Categoría'; const cat = regCatalogo(F.tipo); const abierto = S.regPickG != null ? S.regPickG : F.grupal; const n = cat.length; const out = [];
+    const ia = cat.findIndex(g => g.nom === abierto); const finFila = ia < 0 ? -1 : Math.min(Math.ceil((ia + 1) / 3) * 3, n) - 1;
+    cat.forEach((g, i) => { const on = g.nom === abierto;
+      out.push(cel('regPickG', g.nom, `<span>${esc(g.ver)}</span>${g.hijos.length ? `<span class="rg-chev">${on ? '⌃' : '⌄'}</span>` : ''}`, on || g.nom === F.grupal, 'data-hoja="' + (g.hijos.length ? '' : '1') + '"'));
+      if (i === finFila) { const ga = cat[ia]; out.push(`<div class="rg-subs">${ga.hijos.map(s2 => cel('regPickS', s2.nom, esc(s2.ver), ga.nom === F.grupal && s2.nom === F.subgrupal)).join('')}</div>`); } });
+    cuerpo = `<div class="rg-grid">${out.join('') || '<div class="note" style="padding:14px">No hay categorías activas.</div>'}</div>`;
+  } else {
+    titulo = pk === 'dest' ? 'Cuenta destino' : F.tipo === 'traslado' ? 'Cuenta de origen' : 'Cuenta'; const sel = pk === 'dest' ? F.destino : F.cuenta; const excl = F.tipo === 'traslado' ? (pk === 'dest' ? F.cuenta : F.destino) : '';
+    const l = ctaNombres().map(ctaInfo).filter(i => i.estado === 'activa' && i.n !== excl).sort((a, b) => { const ta = a.tipo ? +a.tipo.orden || 0 : 1e6, tb = b.tipo ? +b.tipo.orden || 0 : 1e6; return ta - tb || ctaOrdCmp(a, b); });
+    const g = new Map(); l.forEach(i => { const k = i.tipo ? i.tipo.nombre : 'Sin tipo'; if (!g.has(k)) g.set(k, []); g.get(k).push(i); });
+    cuerpo = [...g].map(([k, xs]) => `<div class="rg-gt">${esc(k)}</div><div class="rg-grid">${xs.map(i => cel('regPickC', i.n, `<span>${esc(i.nom)}</span>${i.mon === 'USD' ? '<span class="rg-chev">US$</span>' : ''}`, i.n === sel)).join('')}</div>`).join('');
+  }
+  return `<div class="rg-pick" role="dialog" aria-label="${titulo}"><div class="rg-pickh"><b>${titulo}</b><button type="button" class="btn sm ghost ico" data-act="regPickX" aria-label="Cerrar">✕</button></div><div class="rg-pickb">${cuerpo}</div></div>`;
+}
 function pintarRegForm() {
   const F = S.regF; const a = esAdmin(); const tipos = a ? ['ingreso', 'gasto', 'traslado', 'ajuste'] : ['ingreso', 'gasto'];
   const cat = regCatalogo(F.tipo); const g = cat.find(x => x.nom === F.grupal); const sg = g && g.hijos.find(x => x.nom === F.subgrupal);
   const monO = F.cuenta ? ctaInfo(F.cuenta).mon : 'L', monD = F.destino ? ctaInfo(F.destino).mon : 'L'; const tasa = tasaUSD();
-  let cuerpo = '';
-  const campoMonto = (lab, id, val, mon) => `<label class="rg-monto">${lab}<span class="rg-mon">${mon === 'USD' ? 'US$' : 'L'}</span><input class="in num" id="${id}" inputmode="decimal" value="${esc(val == null ? '' : String(val))}" placeholder="0.00" autocomplete="off"></label>`;
-  const ctaSel = (id, val, lab, excl) => `<label>${lab}<select class="in" id="${id}"><option value="">Elige la cuenta</option>${regCuentasOpts(val, excl)}</select></label>`;
+  const pk = S.regPick; const bdPrev = document.querySelector('.rg-bd'); const scr = bdPrev ? bdPrev.scrollTop : 0;
+  const fila = (lab, val, extra) => `<div class="rg-row ${extra || ''}"><span class="rg-lab">${lab}</span><div class="rg-val">${val}</div></div>`;
+  const monto = (id, val, mon) => `<span class="rg-mon">${mon === 'USD' ? 'US$' : 'L'}</span><input class="rg-in rg-num" id="${id}" inputmode="decimal" value="${esc(val == null ? '' : String(val))}" placeholder="0.00" autocomplete="off">`;
+  const ctaBtn = (k, n, ph) => `<button type="button" class="rg-sel ${n ? '' : 'vacio'}" data-act="regPick" data-v="${k}">${n ? esc(ctaInfo(n).nom) + (ctaInfo(n).mon === 'USD' ? ' <span class="rg-chev">US$</span>' : '') : ph}</button>`;
+  const det = `<div class="rg-detw"><input class="rg-in" id="rgDet" value="${esc(F.detalle)}" placeholder="${F.tipo === 'traslado' ? 'ej. Traslado de fondos' : 'Escribe o elige'}" autocomplete="off" autocapitalize="sentences"><div class="rg-dl" id="rgDetL" hidden></div></div>`;
+  let filas = '';
   if (F.tipo === 'traslado') {
     const cruce = F.cuenta && F.destino && monO !== monD;
-    cuerpo = `<div class="rg-tras">${ctaSel('rgCuenta', F.cuenta, 'De', F.destino)}<button class="btn sm ghost rg-swap" data-act="regSwap" aria-label="Invertir cuentas" title="Invertir">⇅</button>${ctaSel('rgDestino', F.destino, 'A', F.cuenta)}</div>
-      ${campoMonto('Importe que sale', 'rgMonto', F.monto, monO)}
-      ${cruce ? campoMonto('Importe que llega', 'rgMontoD', F.montoD, monD) + `<div class="note">Monedas distintas. ${tasa ? 'Tasa del día: L ' + tasa.toFixed(4) + ' por dólar (el importe que llega se calcula solo si lo dejas vacío).' : ''}</div>` : ''}
-      ${F.conComision || +F.comision ? `<div class="rg-com">${campoMonto('Comisión', 'rgComision', F.comision, monO)}<button class="btn sm ghost" data-act="regSinCom" aria-label="Quitar comisión">✕</button></div>` : '<button class="btn sm ghost" data-act="regConCom" style="justify-self:start">+ Comisión</button>'}
-      <label>Detalle<input class="in" id="rgDet" value="${esc(F.detalle)}" placeholder="ej. Traslado de fondos"></label>`;
+    filas = fila('Importe', monto('rgMonto', F.monto, monO), 'rg-imp')
+      + fila('De', ctaBtn('cta', F.cuenta, 'Elige la cuenta'), pk === 'cta' ? 'activo' : '')
+      + `<div class="rg-swapw"><button type="button" class="btn sm ghost" data-act="regSwap" aria-label="Invertir cuentas">⇅</button></div>`
+      + fila('A', ctaBtn('dest', F.destino, 'Elige la cuenta'), pk === 'dest' ? 'activo' : '')
+      + (cruce ? fila('Llega', monto('rgMontoD', F.montoD, monD), 'rg-imp') + `<div class="note rg-nota">Monedas distintas.${tasa ? ' Si lo dejas vacío se calcula con L ' + tasa.toFixed(4) + ' por dólar.' : ''}</div>` : '')
+      + (F.conComision || +F.comision ? fila('Comisión', monto('rgComision', F.comision, monO) + '<button type="button" class="btn sm ghost ico" data-act="regSinCom" aria-label="Quitar comisión">✕</button>') : `<div class="rg-swapw" style="justify-content:flex-start"><button type="button" class="btn sm ghost" data-act="regConCom">+ Comisión</button></div>`)
+      + fila('Detalle', det);
   } else if (F.tipo === 'ajuste') {
     const d = F.cuenta ? ctaDatos(F.cuenta) : null;
-    cuerpo = `${ctaSel('rgCuenta', F.cuenta, 'Cuenta')}
-      ${d ? `<div class="note">Saldo actual en la plataforma: <b class="num">${ctaFmt(d.saldo, monO)}</b></div>` : ''}
-      <div class="dm-seg rg-seg"><button class="${F.modoAj === 'saldo' ? 'on' : ''}" data-act="regModoAj" data-v="saldo">Escribir el saldo real</button><button class="${F.modoAj === 'monto' ? 'on' : ''}" data-act="regModoAj" data-v="monto">Sumar o restar</button></div>
-      ${F.modoAj === 'saldo' ? campoMonto('Saldo real de la cuenta', 'rgMonto', F.monto, monO) + `<div class="note" id="rgAjDif">${regAjDifTxt()}</div>`
-        : `<div class="dm-seg rg-seg"><button class="${F.signo > 0 ? 'on' : ''}" data-act="regSigno" data-v="1">Suma</button><button class="${F.signo < 0 ? 'on' : ''}" data-act="regSigno" data-v="-1">Resta</button></div>${campoMonto('Importe', 'rgMonto', F.monto, monO)}`}`;
+    filas = fila('Cuenta', ctaBtn('cta', F.cuenta, 'Elige la cuenta'), pk === 'cta' ? 'activo' : '')
+      + (d ? `<div class="note rg-nota">Saldo en la plataforma: <b class="num">${ctaFmt(d.saldo, monO)}</b></div>` : '')
+      + `<div class="dm-seg rg-seg"><button type="button" class="${F.modoAj === 'saldo' ? 'on' : ''}" data-act="regModoAj" data-v="saldo">Escribir el saldo real</button><button type="button" class="${F.modoAj === 'monto' ? 'on' : ''}" data-act="regModoAj" data-v="monto">Sumar o restar</button></div>`
+      + (F.modoAj === 'saldo' ? fila('Saldo real', monto('rgMonto', F.monto, monO), 'rg-imp') + `<div class="note rg-nota" id="rgAjDif">${regAjDifTxt()}</div>`
+        : `<div class="dm-seg rg-seg"><button type="button" class="${F.signo > 0 ? 'on' : ''}" data-act="regSigno" data-v="1">Suma</button><button type="button" class="${F.signo < 0 ? 'on' : ''}" data-act="regSigno" data-v="-1">Resta</button></div>` + fila('Importe', monto('rgMonto', F.monto, monO), 'rg-imp'));
   } else {
-    cuerpo = `${campoMonto('Importe', 'rgMonto', F.monto, a ? monO : 'L')}
-      <label>Grupal<select class="in" id="rgGrupal"><option value="">Elige</option>${cat.map(x => `<option value="${esc(x.nom)}" ${x.nom === F.grupal ? 'selected' : ''}>${esc(x.ver)}</option>`).join('')}</select></label>
-      <label>Subgrupal<select class="in" id="rgSub" ${g ? '' : 'disabled'}><option value="">${g ? 'Elige' : 'Primero el grupal'}</option>${(g ? g.hijos : []).map(x => `<option value="${esc(x.nom)}" ${x.nom === F.subgrupal ? 'selected' : ''}>${esc(x.ver)}</option>`).join('')}</select></label>
-      <label>Detalle<input class="in" id="rgDet" list="rgDetL" value="${esc(F.detalle)}" placeholder="Elige o escribe" autocomplete="off"><datalist id="rgDetL">${(sg ? sg.hijos : []).map(x => `<option value="${esc(x.nom)}">${esc(x.ver !== x.nom ? x.ver : '')}</option>`).join('')}</datalist></label>
-      ${a ? ctaSel('rgCuenta', F.cuenta, 'Cuenta') : '<div class="note">La cuenta la completa el administrador al aprobarlo.</div>'}`;
+    const catTxt = g ? (sg ? `<span class="rg-cg">${esc(g.ver)}</span>${esc(sg.ver)}` : esc(g.ver)) : '';
+    filas = fila('Importe', monto('rgMonto', F.monto, a ? monO : 'L'), 'rg-imp')
+      + fila('Categoría', `<button type="button" class="rg-sel ${g ? '' : 'vacio'}" data-act="regPick" data-v="cat">${catTxt || 'Elige la categoría'}</button>`, pk === 'cat' ? 'activo' : '')
+      + (a ? fila('Cuenta', ctaBtn('cta', F.cuenta, 'Elige la cuenta'), pk === 'cta' ? 'activo' : '') : '')
+      + fila('Detalle', det)
+      + (a ? '' : '<div class="note rg-nota">La cuenta la completa el administrador al aprobarlo.</div>');
   }
   const ed = !!F.id; const r = ed ? regDe(F.id) : null;
-  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal rg-modal rg-${F.tipo}" role="dialog" aria-modal="true" aria-labelledby="rgT">
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal rg-modal rg-${F.tipo} ${pk ? 'picking' : ''}" role="dialog" aria-modal="true" aria-labelledby="rgT">
     <div class="hd"><h2 id="rgT" style="margin-right:auto">${ed ? 'Editar registro' : a ? 'Nuevo registro' : 'Registrar para aprobación'}</h2>${!a && !ed ? `<button class="btn sm ghost" data-act="regMios">Mis registros</button>` : ''}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button></div>
     <div class="bd rg-bd">
-      ${ed && r.tipo === 'traslado' ? '' : `<div class="rg-tipos" role="tablist">${tipos.map(t => `<button role="tab" class="rg-tt rg-tt-${t} ${F.tipo === t ? 'on' : ''}" data-act="regTipo" data-v="${t}" aria-selected="${F.tipo === t}">${REG_TIPOS[t][0].replace(' de saldo', '')}</button>`).join('')}</div>`}
-      <div class="rg-fh"><label>Fecha<input class="in" type="date" id="rgFecha" value="${esc(F.fecha)}"></label><label>Hora<input class="in" type="time" id="rgHora" value="${esc(F.hora)}"></label></div>
-      ${cuerpo}
-      <label>Descripción<textarea class="in" id="rgDesc" rows="2" placeholder="Opcional">${esc(F.desc)}</textarea></label>
+      ${ed && r.tipo === 'traslado' ? '' : `<div class="rg-tipos" role="tablist">${tipos.map(t => `<button type="button" role="tab" class="rg-tt rg-tt-${t} ${F.tipo === t ? 'on' : ''}" data-act="regTipo" data-v="${t}" aria-selected="${F.tipo === t}">${t === 'traslado' ? 'Transferencia' : REG_TIPOS[t][0].replace(' de saldo', '')}</button>`).join('')}</div>`}
+      <div class="rg-filas">
+        ${fila('Fecha', `<input class="rg-in" type="date" id="rgFecha" value="${esc(F.fecha)}"><input class="rg-in rg-hora" type="time" id="rgHora" value="${esc(F.hora)}">`, 'rg-fh')}
+        ${filas}
+        ${fila('Descripción', `<textarea class="rg-in" id="rgDesc" rows="1" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
+      </div>
       <div id="rgMsg" class="note"></div>
       ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
     </div>
-    <div class="rg-pie">${ed && a && ['eliminado', 'rechazado'].includes(r.estado) ? `<button class="btn" data-act="regRestaurar" data-id="${esc(r.id)}">${r.estado === 'eliminado' ? 'Restaurar' : 'Volver a revisar'}</button>` : ''}${ed && ['eliminado', 'vinculado'].includes(r.estado) ? '' : ed ? (S.regConfElim === F.id ? `<button class="btn danger" data-act="regEliminar">¿Eliminar? Sí</button>` : `<button class="btn ghost danger" data-act="regEliminar">Eliminar</button>`) : `<button class="btn ghost" data-act="regGuardar" data-v="seguir">Continuar</button>`}<button class="btn pri" data-act="regGuardar">${ed ? 'Guardar cambios' : a ? 'Guardar' : 'Enviar para aprobación'}</button></div>
+    ${pk ? regPickHtml() : `<div class="rg-pie">${ed && a && ['eliminado', 'rechazado'].includes(r.estado) ? `<button class="btn" data-act="regRestaurar" data-id="${esc(r.id)}">${r.estado === 'eliminado' ? 'Restaurar' : 'Volver a revisar'}</button>` : ''}${ed && ['eliminado', 'vinculado'].includes(r.estado) ? '' : ed ? (S.regConfElim === F.id ? `<button class="btn danger" data-act="regEliminar">¿Eliminar? Sí</button>` : `<button class="btn ghost danger" data-act="regEliminar">Eliminar</button>`) : `<button class="btn ghost" data-act="regGuardar" data-v="seguir">Continuar</button>`}<button class="btn pri" data-act="regGuardar">${ed ? 'Guardar cambios' : a ? 'Guardar' : 'Enviar para aprobación'}</button></div>`}
   </div></div>`;
-  if (!ed) setTimeout(() => { const m = $('#rgMonto'); if (m && !m.value && !esTelefono()) m.focus(); }, 30);
+  const bd = document.querySelector('.rg-bd'); if (bd && scr) bd.scrollTop = scr;
+  if (pk) { const on = document.querySelector('.rg-pick .rg-cel.on, .rg-pick .rg-subs'); if (on) on.scrollIntoView({block: 'nearest'}); const act = document.querySelector('.rg-row.activo'); if (act) act.scrollIntoView({block: 'nearest'}); }
+  else if (!ed && !S._regFoco) setTimeout(() => { const m = $('#rgMonto'); if (m && !m.value) m.focus(); }, 30);
+  S._regFoco = false;
 }
+// regPickSig: después de elegir, abre lo que sigue (como la app): categoría → cuenta → detalle.
+function regPickSig(despues) {
+  const F = S.regF; S.regPick = null; S.regPickG = null;
+  if (despues === 'cat' && esAdmin() && !F.cuenta) S.regPick = 'cta';
+  else if (despues === 'cta' && F.tipo === 'traslado' && !F.destino) S.regPick = 'dest';
+  S._regFoco = true; pintarRegForm();
+  if (!S.regPick && ['cat', 'cta'].includes(despues) && ['gasto', 'ingreso'].includes(F.tipo)) { const d = $('#rgDet'); if (d) { d.focus({preventScroll: true}); regDetMostrar(); } }
+}
+function regDetMostrar() { const l = $('#rgDetL'); if (!l) return; const h = regDetListaHtml(); l.innerHTML = h; l.hidden = !h; }
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || !S.regF) return; const act = b.dataset.act; const F = S.regF;
+  if (act === 'regPick') { regLeerForm(); S.regPick = S.regPick === b.dataset.v ? null : b.dataset.v; S.regPickG = null; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'regPickX') { regLeerForm(); S.regPick = null; S.regPickG = null; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'regPickG') { regLeerForm(); const v = b.dataset.v;
+    if (b.dataset.hoja) { F.grupal = v; F.subgrupal = ''; F.detalle = ''; return regPickSig('cat'); }
+    const ab = S.regPickG != null ? S.regPickG : F.grupal; S.regPickG = ab === v ? '' : v; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'regPickS') { regLeerForm(); const gN = S.regPickG != null && S.regPickG !== '' ? S.regPickG : F.grupal; if (F.grupal !== gN || F.subgrupal !== b.dataset.v) F.detalle = ''; F.grupal = gN; F.subgrupal = b.dataset.v; return regPickSig('cat'); }
+  if (act === 'regPickC') { regLeerForm(); if (S.regPick === 'dest') F.destino = b.dataset.v; else F.cuenta = b.dataset.v; return regPickSig(S.regPick === 'dest' ? 'dest' : 'cta'); }
+  if (act === 'regDetSel') { const d = $('#rgDet'); if (d) d.value = b.dataset.v; F.detalle = b.dataset.v; const l = $('#rgDetL'); if (l) l.hidden = true; return; }
+});
+document.addEventListener('focusin', e => { if (e.target.id === 'rgDet' && S.regF) regDetMostrar(); });
+document.addEventListener('input', e => { if (e.target.id === 'rgDet' && S.regF) regDetMostrar(); });
+document.addEventListener('focusout', e => { if (e.target.id === 'rgDet') setTimeout(() => { const l = $('#rgDetL'); if (l && document.activeElement !== e.target) l.hidden = true; }, 180); });
+// La lista no debe quitarle el foco al campo antes de que el toque llegue a la opción.
+document.addEventListener('pointerdown', e => { if (e.target.closest('.rg-dli')) e.preventDefault(); });
+
 function regAjDifTxt() { const F = S.regF; if (!F || !F.cuenta) return ''; const real = numDe(F.monto); if (!isFinite(real)) return 'Escribe el saldo que muestra tu banco o tu billetera.';
   const d = ctaDatos(F.cuenta); const dif = crR2(real - d.saldo); const mon = ctaInfo(F.cuenta).mon;
   return Math.abs(dif) < 0.005 ? 'El saldo ya coincide: no hace falta ajustar.' : `Se registrará un ajuste que <b>${dif > 0 ? 'suma' : 'resta'} ${ctaFmt(Math.abs(dif), mon)}</b>.`; }
@@ -4759,7 +4867,7 @@ function regArmar() {
     if (F.modoAj === 'saldo') { const dif = crR2(monto - ctaDatos(F.cuenta).saldo); if (Math.abs(dif) < 0.005) return 'El saldo ya coincide: no hace falta ajustar.'; row.monto = Math.abs(dif); row.signo = dif > 0 ? 1 : -1; }
     else { if (!(monto > 0)) return 'Escribe el importe.'; row.monto = crR2(monto); row.signo = F.signo > 0 ? 1 : -1; }
     if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = tasaUSD(); }
-  else { if (!(monto > 0)) return 'Escribe el importe.'; if (!F.grupal) return 'Elige el grupal.'; if (a && !F.cuenta) return 'Elige la cuenta.';
+  else { if (!(monto > 0)) return 'Escribe el importe.'; if (!F.grupal) return 'Elige la categoría.'; if (a && !F.cuenta) return 'Elige la cuenta.';
     row.monto = crR2(monto); row.grupal = F.grupal; row.subgrupal = F.subgrupal || null; if (a) { row.cuenta = F.cuenta; if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = tasaUSD(); } }
   return row;
 }
@@ -4834,7 +4942,7 @@ document.addEventListener('click', async e => {
   if (act === 'regNuevo') return abrirRegForm();
   if (act === 'regMios') return pintarRegMios();
   if (act === 'regEditar') { const r = regDe(b.dataset.id); if (!r) return; if (!esAdmin() && r.estado !== 'pendiente') return; S.regConfElim = null; return abrirRegForm(r.id); }
-  if (act === 'regTipo') { regLeerForm(); S.regF.tipo = b.dataset.v; if (b.dataset.v !== 'traslado') S.regF.conComision = false; return pintarRegForm(); }
+  if (act === 'regTipo') { regLeerForm(); S.regPick = null; S.regPickG = null; S.regF.tipo = b.dataset.v; if (b.dataset.v !== 'traslado') S.regF.conComision = false; return pintarRegForm(); }
   if (act === 'regSwap') { regLeerForm(); [S.regF.cuenta, S.regF.destino] = [S.regF.destino, S.regF.cuenta]; return pintarRegForm(); }
   if (act === 'regConCom') { regLeerForm(); S.regF.conComision = true; pintarRegForm(); const c = $('#rgComision'); if (c) c.focus(); return; }
   if (act === 'regSinCom') { regLeerForm(); S.regF.conComision = false; S.regF.comision = ''; return pintarRegForm(); }
