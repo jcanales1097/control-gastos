@@ -1288,14 +1288,15 @@ function decisionDe(id) {
 }
 // derive: Recalcula D: arma la lista de registros de la app (txs) a partir de los meses sincronizados y cuánto de cada uno ya está asignado.
 function derive() {
-  const txs = []; const corte = corteApp(); const post = [];
+  const txs = []; const corte = corteApp(); const post = []; const elim = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
     const t = reclasificar(rowToTx(appAplicarEd(r))); const dc = decisionDe(t.id); if (appEds()[t.id]) t.edWeb = appEds()[t.id];
+    if (t.edWeb && t.edWeb.elim) { elim.push(t); continue; }   // registro de la app eliminado en la web: no cuenta (se restaura desde Registros web → Eliminados)
     if (dc.borrado) t.borradoApp = dc.borrado.at; if (dc.web) t.versionWeb = dc.web;
     if (corte && t.fecha > corte) { if (!t.borradoApp) post.push(t); continue; }   // después del corte con la app solo cuenta lo registrado en la web
     txs.push(t);
   }
-  S._postCorte = post;
+  S._postCorte = post; S._appElim = elim;
   // Registros oficiales hechos en la plataforma: entran como filas iguales a las de la app (los vinculados, pendientes o rechazados no cuentan).
   if (esAdmin() && S.reg) S.reg.forEach(r => { if (r.estado === 'oficial') regATx(r).forEach(t => txs.push(reclasificar(t))); });
   txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
@@ -4188,6 +4189,10 @@ function appParche(m, t, cambios) { const prev = m[t.id] || {}; const app = prev
   ['fecha', 'cuenta', 'cat', 'sub', 'nota', 'det'].forEach(k => { if (k in o && (o[k] || '') !== (app[k] || '')) { n[k] = o[k] || ''; hay = true; } });
   if (o.monto != null && cents(o.monto) !== cents(app.monto)) { n.monto = +o.monto; hay = true; }
   if (hay) m[t.id] = n; else delete m[t.id]; return m; }
+// appMarcarElim: marca (o quita la marca de) eliminado en la web a registros de la app, sin perder sus otras ediciones.
+function appMarcarElim(m, ts, on) { ts.forEach(t => { const prev = m[t.id] || {}; const o = Object.assign({}, prev);
+  if (on) { Object.assign(o, {elim: true, elim_por: S.me.id, elim_el: new Date().toISOString()}); if (!o.app) o.app = {fecha: t.fecha, cuenta: t.cuenta, cat: t.cat, sub: t.sub, nota: t.nota, det: t.det, monto: t.monto}; if (!o.por) { o.por = S.me.id; o.el = o.elim_el; } m[t.id] = o; }
+  else { delete o.elim; delete o.elim_por; delete o.elim_el; if (['fecha', 'cuenta', 'cat', 'sub', 'nota', 'det', 'monto'].some(k => k in o)) m[t.id] = o; else delete m[t.id]; } }); return m; }
 async function appGuardarEds(m) { await guardarAjuste('appEdits', m); S.aj.appEdits = m; derive(); S._ctaVer = (S._ctaVer || 0) + 1; }
 // appEdHtml: en el detalle de un registro de la app: quién lo editó en la web, el botón Editar y el formulario.
 function appEdHtml(t) {
@@ -4196,7 +4201,8 @@ function appEdHtml(t) {
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
   const antes = o ? [o.fecha && ['fecha', fFecha(o.app.fecha)], o.cuenta && ['cuenta', o.app.cuenta], ('cat' in o || 'sub' in o || 'nota' in o) && ['categoría', [o.app.cat, o.app.sub, o.app.nota].filter(Boolean).join(' › ') || '—'], 'det' in o && ['descripción', o.app.det || '—'], o.monto != null && ['monto', L(o.app.monto)]].filter(Boolean) : [];
   const nota = o ? `<div class="app-ed-n"><b>Editado en la web</b> por ${esc(nombreDe(o.por))} · ${cuando(o.el)}${antes.length ? `<div class="cat">En la app era: ${antes.map(([k, v]) => k + ' ' + esc(v)).join(' · ')}</div>` : ''}</div>` : '';
-  if (S.appEd !== t.id) return `${nota}<div class="row" style="justify-content:flex-end;gap:8px"><button class="btn sm" data-act="regCopiaQ" data-id="${esc(t.id)}">Copiar</button>${o ? (S.appEdQ === t.id ? `<span class="note">¿Volver a como está en la app?</span><button class="btn sm ghost" data-act="appEdQ" data-id="">No</button><button class="btn sm" data-act="appEdRev" data-id="${esc(t.id)}">Sí, volver</button>` : `<button class="btn sm ghost" data-act="appEdQ" data-id="${esc(t.id)}">Volver a lo de la app</button>`) : ''}<button class="btn sm pri" data-act="appEdAbrir" data-id="${esc(t.id)}">Editar</button></div>`;
+  if (S.appEd !== t.id) return `${nota}<div class="row" style="justify-content:flex-end;gap:8px"><button class="btn sm" data-act="regCopiaQ" data-id="${esc(t.id)}">Copiar</button>${o ? (S.appEdQ === t.id ? `<span class="note">¿Volver a como está en la app?</span><button class="btn sm ghost" data-act="appEdQ" data-id="">No</button><button class="btn sm" data-act="appEdRev" data-id="${esc(t.id)}">Sí, volver</button>` : `<button class="btn sm ghost" data-act="appEdQ" data-id="${esc(t.id)}">Volver a lo de la app</button>`) : ''}${S.appElimQ === t.id ? '' : `<button class="btn sm ghost danger" data-act="appEdElimQ" data-id="${esc(t.id)}">Eliminar</button>`}<button class="btn sm pri" data-act="appEdAbrir" data-id="${esc(t.id)}">Editar</button></div>
+    ${S.appElimQ === t.id ? `<div class="copia-q"><b>¿Eliminar este registro?</b><span class="note">Deja de contar en saldos, tarjetas y controles. Queda en Registros web → Eliminados, donde se puede restaurar.</span><div class="row" style="gap:8px"><button class="btn sm ghost" data-act="appEdElimNo" data-id="${esc(t.id)}">No</button><button class="btn sm danger" data-act="appEdElim" data-id="${esc(t.id)}">Sí, eliminar</button></div></div>` : ''}`;
   const vMon = usd ? tjMonto(t).usd : t.monto; const catV = [t.cat, t.sub, t.nota].join('|'); let ops = '';
   if (tipo === 'gasto' || tipo === 'ingreso') { ops = catOpcs(tipo, catV); if (!ops.includes(`value="${esc(catV)}"`)) ops = `<option value="${esc(catV)}" selected>${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › ') || 'Sin categoría')} (actual)</option>` + ops; }
   const ctaOps = regCuentasOpts(tjCta(t.cuenta)); const enLista = ctaOps.includes(`value="${esc(tjCta(t.cuenta))}"`);
@@ -4222,6 +4228,11 @@ async function appEdGuardar(id) {
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || !b.dataset.act.startsWith('appEd')) return; const act = b.dataset.act;
+  if (act === 'appEdElimQ') { S.appElimQ = b.dataset.id; abrirDetalleTx(b.dataset.id); const q = document.querySelector('.copia-q'); if (q) q.scrollIntoView({block: 'center', behavior: 'smooth'}); return; }
+  if (act === 'appEdElimNo') { S.appElimQ = null; return abrirDetalleTx(b.dataset.id); }
+  if (act === 'appEdElim') { const id = b.dataset.id; const t = D.byId.get(id); if (!t) return; S.appElimQ = null;
+    try { await appGuardarEds(appMarcarElim(Object.assign({}, appEds()), [t], true)); toast('Registro eliminado (queda en Registros web → Eliminados)'); } catch (er) { return; }
+    cerrarCapa(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); return; }
   if (act === 'appEdAbrir') { S.appEd = b.dataset.id; S.appEdQ = null; abrirDetalleTx(b.dataset.id); const f = document.querySelector('.app-ed'); if (f) f.scrollIntoView({block: 'start', behavior: 'smooth'}); return; }
   if (act === 'appEdCerrar') { const id = S.appEd; S.appEd = null; return abrirDetalleTx(id); }
   if (act === 'appEdGuardar') return appEdGuardar(b.dataset.id);
@@ -5263,12 +5274,18 @@ function vCtaRegistros() {
   const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; let ant = null;
   const filas = ver === 'dup' ? dupHtml : l.map(r => { let h = ''; if (r.fecha !== ant) { ant = r.fecha; const dt = new Date(r.fecha + 'T12:00'); h = `<div class="rc-dia"><b>${r.fecha.slice(8, 10)}</b><span class="rc-wd ${dt.getDay() === 0 ? 'dom' : dt.getDay() === 6 ? 'sab' : ''}">${DS[dt.getDay()]}</span><span class="rc-my">${r.fecha.slice(5, 7)}/${r.fecha.slice(0, 4)}</span><span></span><span></span></div>`; } return h + regFilaHtml(r, false); }).join('');
   return `${dup.length ? `<div class="tj-aviso"><b>${dup.length} ${dup.length === 1 ? 'registro web coincide' : 'registros web coinciden'} con uno de la app</b> (misma cuenta, fecha y monto). Si es el mismo, vincúlalo para que no cuente dos veces. <button class="btn sm" data-act="regVer" data-v="dup">Revisar</button></div>` : ''}
-    <div class="row cta-adbar"><div class="tj-tabs rg-vtabs">${bt('oficial', 'Oficiales', cnt('oficial'))}${bt('pendiente', 'Por aprobar', cnt('pendiente'))}${bt('dup', 'Posibles duplicados', dup.length)}${bt('vinculado', 'Vinculados', cnt('vinculado'))}${bt('rechazado', 'Rechazados', cnt('rechazado'))}${bt('eliminado', 'Eliminados', cnt('eliminado'))}</div>
+    <div class="row cta-adbar"><div class="tj-tabs rg-vtabs">${bt('oficial', 'Oficiales', cnt('oficial'))}${bt('pendiente', 'Por aprobar', cnt('pendiente'))}${bt('dup', 'Posibles duplicados', dup.length)}${bt('vinculado', 'Vinculados', cnt('vinculado'))}${bt('rechazado', 'Rechazados', cnt('rechazado'))}${bt('eliminado', 'Eliminados', cnt('eliminado') + (S._appElim || []).length)}</div>
       <button class="btn sm pri" data-act="regNuevo">+ Nuevo registro</button></div>
     <div class="panel"><div class="ct-bar"><input type="search" class="in" id="regQ" placeholder="Buscar registros web" value="${esc(S.regQ || '')}"></div>
-      <div class="rc-lst">${filas || '<div class="note" style="padding:14px">Nada en esta lista.</div>'}</div>
+      <div class="rc-lst">${filas || (ver === 'eliminado' && (S._appElim || []).length ? '' : '<div class="note" style="padding:14px">Nada en esta lista.</div>')}${ver === 'eliminado' ? appElimHtml() : ''}</div>
       <div class="bd note">Los registros oficiales cuentan como cualquier registro de la app: saldos, tarjetas, Bandeja y controles. Mientras sigas sincronizando la app, si registras lo mismo en los dos lados aparece en <b>Posibles duplicados</b> para vincularlo.</div></div>`;
 }
+// appElimHtml: registros de Registro Contable eliminados en la web (Registros web → Eliminados), con Restaurar.
+function appElimHtml() { const l = (S._appElim || []).slice().sort((a, b) => b.fecha.localeCompare(a.fecha)); if (!l.length) return '';
+  return `<div class="rc-dia"><b>App</b><span class="rc-wd"></span><span class="rc-my">De Registro Contable · ${l.length}</span><span></span><span></span></div>` + l.map(t => `<div class="rc-it"><div class="rc-c">${esc(catG(t.cat) || 'Registro')}${t.sub ? '<br>' + esc(subG(t.cat, t.sub)) : ''}</div><div class="rc-m"><div class="rc-t"><b>${esc((t.nota ? notaG(t.cat, t.sub, t.nota) : '') || subG(t.cat, t.sub) || catG(t.cat) || 'Registro')}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${fFecha(t.fecha)} · ${esc(tjCta(t.cuenta))} · eliminado por ${esc(nombreDe(t.edWeb.elim_por))}</div></div>
+    <div class="rc-v"><span class="num">${L(+t.montoApp || +t.monto || 0)}</span><button class="btn sm" data-act="appRestaurar" data-id="${esc(t.id)}">Restaurar</button></div></div>`).join(''); }
+document.addEventListener('click', async e => { const b = e.target.closest('[data-act=appRestaurar]'); if (!b) return; const t = (S._appElim || []).find(x => x.id === b.dataset.id); if (!t) return;
+  try { await appGuardarEds(appMarcarElim(Object.assign({}, appEds()), [t], false)); toast('Registro restaurado'); } catch (er) { return; } render(); });
 /* --- Por validar: registros de usuarios --- */
 function vValidarRegistros() {
   const ps = (S.reg || []).filter(r => r.estado === 'pendiente').sort((a, b) => String(a.creado_el).localeCompare(String(b.creado_el)));
@@ -6237,13 +6254,13 @@ function ctaSelInfo() {
 function ctaSelBarra() {
   const I = ctaSelInfo(); const TR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
   return `<div class="hd sel-hd"><button class="btn sm ghost ico" data-act="selSalir" aria-label="Salir de la selección">✕</button><h2 id="ctaT" style="margin-right:auto">Editar</h2>
-      <button class="btn sm ghost ico" data-act="selMenu" data-v="borrar" aria-label="Eliminar seleccionados" ${I.web.length ? '' : 'disabled'}>${TR}</button><button class="btn sm ghost ico" data-act="selMenu" data-v="menu" aria-label="Más acciones" ${I.filas.length && esAdmin() ? '' : 'disabled'}>⋮</button></div>
+      <button class="btn sm ghost ico" data-act="selMenu" data-v="borrar" aria-label="Eliminar seleccionados" ${I.web.length || (I.app && esAdmin()) ? '' : 'disabled'}>${TR}</button><button class="btn sm ghost ico" data-act="selMenu" data-v="menu" aria-label="Más acciones" ${I.filas.length && esAdmin() ? '' : 'disabled'}>⋮</button></div>
     <div class="sel-sub"><span>${I.filas.length} ${I.filas.length === 1 ? 'seleccionado' : 'seleccionados'}${I.app ? ` <span class="note">· ${I.app} de la app</span>` : ''}</span><b class="num">${ctaFmt(I.total, I.mon)}</b></div>`;
 }
 // Hoja inferior con las acciones (menú, confirmación de borrar y los formularios de cada cambio).
 function ctaSelHoja() {
-  const m = S.ctaSelMenu; if (!m) return ''; const I = ctaSelInfo(); const n = m === 'borrar' ? I.web.length : I.filas.length;
-  const avisoApp = I.app && m === 'borrar' ? `<div class="note">${I.app} ${I.app === 1 ? 'registro es' : 'registros son'} de Registro Contable: no se eliminan aquí (se pueden editar).</div>` : '';
+  const m = S.ctaSelMenu; if (!m) return ''; const I = ctaSelInfo(); const n = m === 'borrar' && !esAdmin() ? I.web.length : I.filas.length;
+  const avisoApp = I.app && m === 'borrar' && !esAdmin() ? `<div class="note">${I.app} ${I.app === 1 ? 'registro es' : 'registros son'} de Registro Contable: no se eliminan aquí (se pueden editar).</div>` : '';
   let c;
   if (m === 'menu') c = `<div class="sheet-l">${[['fecha', 'Editar todas las fechas'], ['cat', 'Editar todas las categorías'], ['cta', 'Editar todas las cuentas'], ['det', 'Editar todos los detalles']].map(([k, t]) => `<button data-act="selMenu" data-v="${k}">${t}</button>`).join('')}</div>${avisoApp}`;
   else if (m === 'borrar') c = `<div class="sheet-t">¿Eliminar ${n} ${n === 1 ? 'registro' : 'registros'}?</div><div class="note">Dejan de contar en los saldos. Quedan en Cuentas → Registros web → Eliminados y se pueden restaurar.</div>${avisoApp}<button class="btn danger sheet-b" data-act="selAplicar" data-v="borrar">Eliminar ${n}</button>`;
@@ -6261,7 +6278,7 @@ function ctaSelHoja() {
   return `<div class="sheet-bg" data-act="selMenuX"></div><div class="sheet" role="dialog" aria-label="Acciones">${c}<button class="btn ghost sheet-b" data-act="selMenuX">No</button></div>`;
 }
 async function ctaSelAplicar(k) {
-  const I = ctaSelInfo(); if (!I.web.length && !(k !== 'borrar' && I.app)) return; let campos, appC = () => null;
+  const I = ctaSelInfo(); if (!I.web.length && !(I.app && esAdmin())) return; let campos, appC = () => null;
   if (k === 'fecha') { const v = ($('#selFecha') || {}).value; if (!v) return toast('Elige la fecha.'); if (I.app && corteApp() && v > corteApp()) return toast('Los registros de la app llegan hasta el corte (' + fFecha(corteApp()) + ').'); campos = () => ({fecha: v}); appC = () => ({fecha: v}); }
   else if (k === 'cta') { const v = ($('#selCta') || {}).value; if (!v) return toast('Elige la cuenta.'); campos = (r, t) => /-d$/.test(t.id) ? (v === r.cuenta ? null : {cuenta_destino: v}) : (v === r.cuenta_destino ? null : {cuenta: v}); appC = () => ({cuenta: v}); }
   else if (k === 'det') { const v = ((($('#selDet') || {}).value) || '').trim() || null; campos = () => ({detalle: v}); appC = () => ({nota: v || ''}); }
@@ -6273,10 +6290,11 @@ async function ctaSelAplicar(k) {
     if (r.tipo === 'ajuste' && k === 'cta') delete c.cuenta_destino;
     try { const {data, error} = await sb.from('registros').update(c).eq('id', r.id).select(); if (error) throw error; Object.assign(r, data && data[0] ? data[0] : c); await regHist(r.id, k === 'borrar' ? 'eliminado' : 'editado', antes, r); ok++; } catch (e) { toast(errMsg(e)); break; } }
   // Registros de la app: el cambio se guarda como edición web encima de lo sincronizado.
-  let okA = 0; if (k !== 'borrar' && I.app) { const m = Object.assign({}, appEds()); I.appF.forEach(f => { const c = appC(f.t); if (c) { appParche(m, f.t, c); okA++; } });
+  let okA = 0; if (k === 'borrar' && I.app && esAdmin()) { try { await appGuardarEds(appMarcarElim(Object.assign({}, appEds()), I.appF.map(f => f.t), true)); okA = I.app; } catch (e) {} }
+  else if (k !== 'borrar' && I.app) { const m = Object.assign({}, appEds()); I.appF.forEach(f => { const c = appC(f.t); if (c) { appParche(m, f.t, c); okA++; } });
     if (okA) try { await appGuardarEds(m); } catch (e) { okA = 0; } }
   ctaSel().clear(); derive(); S._ctaVer = (S._ctaVer || 0) + 1;
-  toast(`${k === 'borrar' ? 'Eliminados' : 'Cambiados'}: ${ok + okA}${salt ? ` · ${salt} sin cambio (la cuenta sería la misma de los dos lados)` : ''}${I.app && (k === 'borrar' || okA < I.app) ? ` · ${I.app - (k === 'borrar' ? 0 : okA)} de la app sin tocar` : ''}`);
+  toast(`${k === 'borrar' ? 'Eliminados' : 'Cambiados'}: ${ok + okA}${salt ? ` · ${salt} sin cambio (la cuenta sería la misma de los dos lados)` : ''}${I.app && okA < I.app ? ` · ${I.app - okA} de la app sin tocar` : ''}`);
   pintarCtaFicha(); render();
 }
 // Mantener presionado (dedo o mouse): medio segundo sin moverse.
