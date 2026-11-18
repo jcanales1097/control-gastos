@@ -782,6 +782,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .app-ed-n{font-size:12.5px;border-left:3px solid var(--good);padding:4px 10px;margin:6px 0}
 .tjm-2{display:grid;justify-items:end;gap:1px;min-width:0}.tjm-pr{column-gap:8px}@media (max-width:760px){.tjm-pr .tjm-2{font-size:10.5px}}.tjm-2 .u{font-size:.86em;opacity:.85}.rc-sum .tjm-2{justify-items:center}.tjm-2 .neg{color:var(--bad)}
 .vgd{display:flex;gap:6px;align-items:center}.vgd input{flex:1;min-width:0}
+.cuo-2{display:inline-flex;flex-wrap:wrap;gap:4px}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
 /* ===== Fase 4 ===== */
@@ -2683,9 +2684,11 @@ function realCuota(qid) { const o = {cap: 0, int: 0, seg: 0, com: 0, mor: 0}; en
 // crTot: Suma de los cuatro conceptos.
 const crTot = o => crR2(o.cap + o.int + o.seg + o.com + (o.mor || 0));
 // estadoCuota: Estado de una cuota: Conciliada (marcada a mano), Parcial, Cuadra, Con diferencia, Sin registros, Próxima o Pendiente.
+// En un intra o extra de tarjeta la cuota tiene dos estados aparte: el de pago (este, que sale del corte) y el de conciliación (conciliaCuota).
+const credEsTj = q => { const cr = credById(q.credito); return cr && cr.tarjeta && cr.tipo !== 'prestamo' && S.tj && tjById(cr.tarjeta) ? cr : null; };
 function estadoCuota(q) {
+  { const cr = credEsTj(q); if (cr) { const e = credTjEstado(cr, q); if (e) return e; } }   // intra / extra de tarjeta: lo dice el corte del registro vinculado
   if (q.conciliada) return ['Conciliada', 'ok'];
-  { const cr = credById(q.credito); if (cr && cr.tarjeta && cr.tipo !== 'prestamo' && S.tj) { const e = credTjEstado(cr, q); if (e) return e; } }   // intra / extra de tarjeta: lo dice su corte
   const re = crTot(realCuota(q.id)), pr = +q.cuota || 0;
   if (re > 0) return re < pr - 0.004 ? ['Parcial', 'warn'] : Math.abs(re - pr) <= 0.004 ? ['Pagada · por conciliar', 'ok'] : ['Con diferencia', 'bad'];
   const dias = (new Date(q.fecha + 'T12:00') - new Date(hoy() + 'T12:00')) / 864e5;
@@ -2693,6 +2696,13 @@ function estadoCuota(q) {
   if (dias <= 5) return ['Próxima', 'warn'];
   return ['Pendiente', ''];
 }
+// conciliaCuota: estado de conciliación de una cuota de intra/extra: si sus registros están vinculados al plan y cuadran.
+function conciliaCuota(q) { if (q.conciliada) return ['Conciliada', 'ok']; const re = crTot(realCuota(q.id)), pr = +q.cuota || 0;
+  if (re > 0) return re < pr - 0.004 ? ['Vinculada parcial', 'warn'] : Math.abs(re - pr) <= 0.004 ? ['Vinculada · por conciliar', ''] : ['Vinculada con diferencia', 'bad'];
+  return q.fecha <= hoy() ? ['Sin vincular', 'warn'] : null; }
+// cuoChips: chips de estado de una cuota (en intra/extra: conciliación y pago).
+function cuoChips(q) { const e = estadoCuota(q); if (!credEsTj(q)) return `<span class="chip ${e[1]}">${e[0]}</span>`; const k = conciliaCuota(q);
+  return `<span class="cuo-2">${k ? `<span class="chip ${k[1]}" title="Conciliación: registros vinculados al plan">${k[0]}</span>` : ''}<span class="chip ${e[1]}" title="Pago: según el corte de la tarjeta">${e[0]}</span></span>`; }
 // resumenCred: Indicadores de un crédito: saldo de capital real, interés pagado, conciliadas, próxima cuota.
 function resumenCred(c) {
   const cs = cuotasDe(c.id); const enl = (S.cenl || []).filter(e => e.credito === c.id);
@@ -2815,7 +2825,7 @@ function vCredFicha(c) {
     <div class="cr-split" aria-hidden="true">${CONV.map(k => `<i class="cr-${k}" style="width:${(tot[k] / TT * 100).toFixed(2)}%"></i>`).join('')}</div>
     <div class="leg" style="padding:0 14px 10px">${CONV.map(k => `<span><i class="cr-${k}"></i>${CR_N[k]} ${L(tot[k])}</span>`).join('')}</div>
     <div class="tbl-wrap cr-plan-wrap" data-c="${c.id}"><table class="cr-plan cr-pl"><thead><tr><th>#</th><th>Fecha</th><th class="num">Capital</th><th class="num">Interés</th><th class="num">Seguro</th><th class="num">Comisiones</th>${conMora ? '<th class="num">Mora</th>' : ''}<th class="num">Cuota</th><th class="num">Saldo</th><th class="num">Real</th><th>Estado</th><th></th></tr></thead><tbody>
-      ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num q-n">${x.numero}</td><td class="num q-f">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td>${conMora ? `<td class="num ${+x.mora ? 'neg' : 'muted'}">${+x.mora ? L(+x.mora) : '—'}</td>` : ''}<td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td class="q-e"><span class="chip ${e[1]}">${e[0]}</span>${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}${+x.mora || realCuota(x.id).mor ? ' <span class="chip bad" title="Esta cuota tiene mora">mora</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
+      ${rows.map(x => { const e = estadoCuota(x); const re = crTot(realCuota(x.id)); return `<tr class="cr-row ${x.numero === ks ? 'cr-sel' : ''}" data-act="cuoSel" data-c="${c.id}" data-n="${x.numero}" tabindex="0"><td class="num q-n">${x.numero}</td><td class="num q-f">${fFecha(x.fecha)}</td><td class="num">${L(+x.capital)}</td><td class="num">${L(+x.interes)}</td><td class="num">${L(+x.seguro)}</td><td class="num">${L(+x.comisiones)}</td>${conMora ? `<td class="num ${+x.mora ? 'neg' : 'muted'}">${+x.mora ? L(+x.mora) : '—'}</td>` : ''}<td class="num"><b>${L(+x.cuota)}</b></td><td class="num muted">${L(+x.saldo)}</td><td class="num">${re ? L(re) : '<span class="muted">—</span>'}</td><td class="q-e">${cuoChips(x)}${x.editada ? ' <span class="chip" title="Corregida a mano o pegada del banco">editada</span>' : ''}${+x.mora || realCuota(x.id).mor ? ' <span class="chip bad" title="Esta cuota tiene mora">mora</span>' : ''}</td><td class="acc"><div class="acc-row">${icoBtn('editar', 'Corregir cuota', 'cuoForm')}</div></td></tr>`; }).join('')}
     </tbody></table></div>
     <div class="bd row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px"><span class="note">${cs.length} cuotas · toca una cuota para vincular sus registros</span><button class="btn sm ghost" data-act="planHoy" data-c="${c.id}">Ir a la cuota actual</button></div>
   </div>
@@ -2842,7 +2852,7 @@ function vConciliar(c, q) {
   const ctab = S.concTab === 'vinc' ? 'vinc' : 'cand';
   return `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal tj-modal cr-cmodal" role="dialog" aria-modal="true" aria-labelledby="ccT">
     <div class="hd"><div style="margin-right:auto;min-width:0"><h2 id="ccT">${esc(c.nombre)} · cuota ${q.numero} de ${cs.length}</h2><div class="note">Vence el ${fFecha(q.fecha)} · proyectado ${L(+q.cuota || 0)}</div></div>
-      <span class="chip ${e[1]}">${e[0]}</span>
+      ${cuoChips(q)}
       ${crNavBtns(cs, iq, false)}
       <button class="btn sm ${q.conciliada ? '' : 'pri'}" data-act="cuoConc" data-id="${q.id}">${q.conciliada ? 'Quitar conciliación' : 'Marcar conciliada'}</button><button class="btn sm ghost" data-act="cerrarModal">Cerrar</button></div>
     ${crPagarHtml(c, q)}
@@ -5529,7 +5539,10 @@ function tjUso(tar) { const ps = tjPerC(tar); const act = ps.find(p => p.abierto
   const usado = ts ? crR2(dU + dL / ts) : null; const intra = tjIntraPend(tar); const lim = +tar.limite_usd || 0;
   return {act, pend, dL, dU, usado, intra, lim, disp: lim && usado != null ? crR2(lim - usado - intra) : null}; }
 // credTjEstado: estado de una cuota de intra / extra financiamiento según el corte donde cae.
-function credTjEstado(c, q) { const tar = tjById(c.tarjeta); if (!tar) return null; const tit = tjTit(tar); const {corte} = tjCorteDe(tit, q.fecha); const p = tjPerC(tit).find(x => x.corte === corte); const dm = fFecha(corte).slice(0, 5);
+// credTjEstado: estado de pago de una cuota de intra/extra. Sale del corte donde cayó el registro vinculado (el cargo de la cuota en la tarjeta):
+// pagada si ese corte ya está pagado. Sin registro vinculado se usa el corte que le toca por la fecha de la cuota.
+function credTjEstado(c, q) { const tar = tjById(c.tarjeta); if (!tar) return null; const tit = tjTit(tar);
+  const fs = enlCuota(q.id).map(e => crRefInfo(e).fecha).filter(Boolean).sort(); const {corte} = tjCorteDe(tit, fs.length ? fs[fs.length - 1] : q.fecha); const p = tjPerC(tit).find(x => x.corte === corte); const dm = tjNom(corte);
   if (!p) return q.fecha > hoy() ? ['Programada · corte ' + dm, ''] : ['Por pagar · corte ' + dm, 'warn'];
   if (p.pagado) return ['Pagada · corte ' + dm, 'ok']; if (p.abierto) return ['En el corte actual', '']; return [(p.venc ? 'Vencida' : 'Por pagar') + ' · corte ' + dm, p.venc ? 'bad' : 'warn']; }
 
