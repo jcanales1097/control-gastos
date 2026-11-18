@@ -4684,12 +4684,14 @@ function vTarjetas() {
   const tasa = tasaUSD(); let kSL = 0, kSU = 0, kGL = 0, kGU = 0, kV = 0, prox = null;
   const filMT = [];   // filas compactas para el teléfono
   const filas = lista.map(t => { const ps = tjPeriodos(t); const act = ps.find(p => p.abierto); const ult = [...ps].reverse().find(p => !p.abierto);
-    const pend = ps.filter(p => !p.abierto && !p.pagado && p.est[0] !== 'Sin cargos'); const sL = crR2(pend.reduce((s, p) => s + p.sL, 0)), sU = crR2(pend.reduce((s, p) => s + p.sU, 0));
+    const pend = ps.filter(p => !p.abierto && !p.pagado && p.est[0] !== 'Sin cargos');
+    // Por pagar = saldo global de la tarjeta (lo que dicen sus cuentas) menos lo cargado en el corte en curso, que todavía no se cobra.
+    const sC = tjSaldos(t); const sL = crR2(Math.max(0, -sC.l - (act ? act.gL : 0))), sU = crR2(Math.max(0, -sC.u - (act ? act.gU : 0)));
     const vivo = t.estado !== 'cerrada';
     if (vivo) { kSL += sL; kSU += sU; kGL += act ? act.gL : 0; kGU += act ? act.gU : 0; kV += ps.filter(p => p.venc).length; const pf = pend.find(p => p.fpago >= hoy()); if (pf && (!prox || pf.fpago < prox.f)) prox = {f: pf.fpago, t, sL: pf.sL, sU: pf.sU}; }
     const pp = pend[0]; const deudaU = crR2(sU + (act ? act.gU : 0) + (tasa ? (sL + (act ? act.gL : 0)) / tasa : 0)); const uso = +t.limite_usd && tasa ? Math.round(deudaU / +t.limite_usd * 100) : null;
     // Teléfono: tarjeta con dos cajas iguales — lo que se debe de cortes cerrados (y hasta cuándo pagar) y el corte en curso (lo que va del período).
-    { const venc = pend.some(p => p.venc); const deb = sL > 0.004 || sU > 0.004; const pv = pend.find(p => p.venc);
+    { const deb = sL > 0.004 || sU > 0.004; const venc = deb && pend.some(p => p.venc); const pv = pend.find(p => p.venc);
       const fp = venc ? null : ult && !ult.pagado && !ult.vacio ? ult.vHasta : pp ? pp.vHasta : null;
       const est = venc ? ['Vencido', 'bad'] : deb ? (ult && !ult.vacio && !ult.pagado ? ult.est : ['Por pagar', 'warn']) : ['Al día', 'ok']; const mon = (l, u) => `<b class="num">${L(l)}</b>${u ? `<span class="num tjc-u">${tjU(u)}</span>` : ''}`;
       filMT.push(`<div class="tjc" data-act="tjSel" data-id="${t.id}" role="button" tabindex="0"><div class="tjc-h"><span class="tj-plastic" aria-hidden="true"></span><div class="tjc-n"><b>${esc(t.banco || '')} · ${esc(t.nombre || '')}</b><span class="cat">•••• ${esc(t.ultimos4 || '')} · corte ${t.dia_corte} · pago ${t.dia_pago}${vivo ? '' : ' · cerrada'}</span></div><span class="chip ${est[1]}">${est[0]}</span><span class="pr-ir" aria-hidden="true">›</span></div>
