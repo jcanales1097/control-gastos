@@ -781,6 +781,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .app-ed{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk)}.app-ed label{display:grid;gap:4px;font-size:12px;color:var(--muted)}.app-ed .in{width:100%!important;max-width:none;font-size:16px}
 .app-ed-n{font-size:12.5px;border-left:3px solid var(--good);padding:4px 10px;margin:6px 0}
 .tjm-2{display:grid;justify-items:end;gap:1px;min-width:0}.tjm-pr{column-gap:8px}@media (max-width:760px){.tjm-pr .tjm-2{font-size:10.5px}}.tjm-2 .u{font-size:.86em;opacity:.85}.rc-sum .tjm-2{justify-items:center}.tjm-2 .neg{color:var(--bad)}
+.vgd{display:flex;gap:6px;align-items:center}.vgd input{flex:1;min-width:0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
 /* ===== Fase 4 ===== */
@@ -2457,6 +2458,8 @@ function vFormReg(v, tipo, r) {
         <label style="grid-column:span 2">Descripción<input id="vfDesc" value="${esc(ed.descripcion || '')}" placeholder="Qué se hizo, repuestos, observaciones"></label>`}
       ${comb ? `<label id="vfCostoL">Costo (L)<input id="vfCosto" inputmode="decimal" value="${ed.costo != null ? ed.costo : ''}"></label>` : ''}
       ${vehNatHtml(v, tipo, ed)}
+      ${comb ? `<label id="vfGDescL" style="grid-column:1/-1">Descripción del gasto<span class="vgd"><input id="vfGDesc" autocomplete="off" value="${esc((ed.tx_id && D.byId.get(ed.tx_id) || {}).det || '')}" ${ed.tx_id ? 'data-man="1"' : ''}><button type="button" class="btn sm ghost" id="vfGDescAuto" title="Escribir con el formato del vehículo">Formato</button></span>
+        <span class="note" id="vfGDescN"></span></label>` : ''}
       ${comb ? `<div class="fuelbox"><div class="fuelg" id="vfNivel" role="slider" tabindex="0" aria-label="Nivel del tanque al terminar de cargar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"></div>
         <div class="fuelinfo"><span class="note" style="font-weight:600">Nivel del tanque al terminar</span><b id="vfNivelTxt"></b><span class="note" id="vfNivelSub"></span><span class="note">Arrastra la aguja a la posición que ves en el tablero; las flechas la mueven de a 1%.</span>
         <div class="btns">${[[100, 'F'], [75, '¾'], [50, '½'], [25, '¼']].map(([n, t]) => `<button type="button" data-vnivel="${n}">${t}</button>`).join('')}</div></div></div>` : ''}
@@ -2505,6 +2508,11 @@ function montarFormReg() {
     }
     const gid = $('#vfGasto').value; const t = gid && D.byId.get(gid);
     $('#vfCosto').disabled = !!t; if (t) $('#vfCosto').value = t.monto.toFixed(2);
+    { // Descripción del gasto: con el formato "VEHÍCULO | odómetro km km recorridos - GASOLINERA" mientras no se escriba a mano.
+      const gd = $('#vfGDesc'), nat = $('#vnOn') && $('#vnOn').checked && !t; if (gd) { $('#vfGDescL').hidden = !(t || nat);
+        const auto = vehNatDet(v, true, parseFloat(($('#vfOdo').value || '').replace(/,/g, '')), $('#vfProv').value.trim()); gd._auto = auto;
+        if (gd.dataset.man !== '1') gd.value = auto; if (!gd.placeholder || gd.placeholder !== auto) gd.placeholder = auto;
+        $('#vfGDescN').textContent = t ? (t.web ? 'Se guarda en el gasto vinculado.' : 'Se guarda en el gasto vinculado (registro de la app, como edición web).') : 'Así queda la descripción del gasto en la cuenta.'; } }
     const odo = parseFloat(($('#vfOdo').value || '').replace(/,/g, '')); let lit = parseFloat(($('#vfLit').value || '').replace(/,/g, '')) || 0; if (vUnidad() === 'G') lit *= GALON;
     const costo = parseFloat(($('#vfCosto').value || '').replace(/,/g, '')) || 0; const tq = +v.tanque_l || 0;
     const prev = recargas(v).filter(x => x.id !== (r && r.id) && x.fecha <= $('#vfFecha').value && x.odometro != null).pop();
@@ -2515,10 +2523,12 @@ function montarFormReg() {
     if (el) { $('#vfNivelTxt').textContent = nivTxt(nivel); $('#vfNivelSub').textContent = tq ? (nivel >= 99 ? `${nf(vVol(tq), 1)} ${vU()} en el tanque` : `≈ ${nf(vVol(tq * nivel / 100), 1)} ${vU()} en el tanque · faltan ≈ ${nf(vVol(tq * (100 - nivel) / 100), 1)} ${vU()} para llenar`) : 'Agrega la capacidad del tanque en el vehículo para calcular litros.'; }
   };
   f.addEventListener('click', e => {
+    if (e.target.id === 'vfGDescAuto') { const gd = $('#vfGDesc'); gd.dataset.man = ''; calc(); gd.dataset.man = '1'; gd.focus(); return; }
     if (e.target.id === 'vgAgregar') { $('#vgLineas').insertAdjacentHTML('beforeend', lineaCostoHTML({concepto: '', tx_id: null, costo: null})); calc(); }
     if (e.target.classList.contains('vgQuitar')) { const ls = f.querySelectorAll('.vgl'); if (ls.length > 1) e.target.closest('.vgl').remove(); else { const l = ls[0]; l.querySelector('.vgTx').value = ''; l.querySelector('.vgCosto').value = ''; l.querySelector('.vgConc').value = ''; } calc(); }
   });
-  f.addEventListener('input', calc); f.addEventListener('change', e => {
+  f.addEventListener('input', e => { if (e.target.id === 'vfGDesc') e.target.dataset.man = '1'; calc(); }); f.addEventListener('change', e => {
+    if (e.target.id === 'vfGasto') { const gd = $('#vfGDesc'); const t = e.target.value && D.byId.get(e.target.value); if (gd) { gd.value = t ? t.det || '' : ''; gd.dataset.man = t ? '1' : ''; } }
     if (e.target.classList.contains('vgTx') && e.target.value) { const t = D.byId.get(e.target.value); const pd = parseDet(t.det); if (!$('#vfOdo').value && pd.odo) $('#vfOdo').value = pd.odo; if (!$('#vfProv').value && pd.prov) $('#vfProv').value = pd.prov; if (!$('#vfDesc').value) $('#vfDesc').value = t.det; const cc = e.target.closest('.vgl').querySelector('.vgConc'); if (!cc.value) cc.value = /REPUEST|PIEZA|FILTRO|ACEITE|LLANTA|BATER/.test(NORM(t.det + ' ' + t.nota)) ? 'Repuestos' : /MANO DE OBRA|TALLER|SERVICIO/.test(NORM(t.det + ' ' + t.nota)) ? 'Mano de obra' : ''; if (f.querySelectorAll('.vgl').length === 1 && (!$('#vfFecha').value || $('#vfFecha').value === hoy())) $('#vfFecha').value = t.fecha; }
     if (e.target.id === 'vfGasto' && e.target.value) { const t = D.byId.get(e.target.value); const pd = parseDet(t.det); $('#vfFecha').value = t.fecha; if (pd.odo && !$('#vfOdo').value) $('#vfOdo').value = pd.odo; if (pd.prov && !$('#vfProv').value) $('#vfProv').value = pd.prov; if (!comb && !$('#vfDesc').value) $('#vfDesc').value = t.det; }
     calc();
@@ -2576,6 +2586,7 @@ async function guardarReg() {
   else { Object.assign(row, {mant_tipo: $('#vfMtipo').value.trim(), descripcion: $('#vfDesc').value.trim()}); if (!row.mant_tipo) return toast('Escribe el tipo de mantenimiento.'); }
   try {
     if (!id && !(await vehNatGuardar(v, row, comb))) return;   // gasto registrado aquí mismo (fase 4B)
+    if (comb && gid && $('#vfGDesc')) await vehGastoDesc(gid, $('#vfGDesc').value.trim());   // descripción del gasto vinculado editada aquí
     const d = id ? await q(sb.from('veh_registros').update(row).eq('id', id).select(), 'Registro actualizado') : await q(sb.from('veh_registros').insert(row).select(), comb ? 'Recarga registrada' : 'Mantenimiento registrado');
     if (d && d[0]) { S.vreg = S.vreg.filter(x => x.id !== d[0].id); S.vreg.push(d[0]); if (!comb && !id) { S.vehDraft = null; S.vehTab = 'mant'; render(); toast('Ahora puedes adjuntar fotos y facturas'); return abrirRegModal('mantenimiento', d[0].id); } }
   } catch (e) { return; }
@@ -5702,13 +5713,19 @@ function vehNatHtml(v, tipo, ed) {
 }
 function vehNatDet(v, comb, odo, prov, extra) { const prevR = recargas(v).filter(x => x.odometro != null && x.odometro < odo).pop(); const km = prevR && isFinite(odo) ? Math.round(odo - prevR.odometro) : null;
   return `${(v.nombre || '').toUpperCase()} | ${isFinite(odo) ? Math.round(odo) + ' km' : ''}${comb && km ? ' ' + km + ' km' : ''}${prov ? ' - ' + prov.toUpperCase() : ''}${extra ? ' | ' + extra : ''}`.replace(/\s+/g, ' ').trim(); }
+// vehGastoDesc: cambia la descripción del gasto vinculado (registro web: con su historial; registro de la app: como edición web).
+async function vehGastoDesc(tid, desc) { const t = D.byId.get(tid); if (!t || (t.det || '') === desc) return;
+  if (t.web) { const r = regDe(t.web); if (!r) return; const antes = Object.assign({}, r); const {data, error} = await sb.from('registros').update({descripcion: desc || null}).eq('id', r.id).select(); if (error) { toast('No se pudo cambiar la descripción del gasto.'); return; }
+    Object.assign(r, data && data[0] ? data[0] : {descripcion: desc || null}); await regHist(r.id, 'editado', antes, r); }
+  else await appGuardarEds(appParche(Object.assign({}, appEds()), t, {det: desc}));
+  derive(); }
 // vehNatGuardar: crea el o los gastos antes de guardar el registro del vehículo y los deja vinculados.
 async function vehNatGuardar(v, row, comb) {
   const on = $('#vnOn'); if (!on || !on.checked) return true; const cta = $('#vnCta').value; const [g, s2, dt] = ($('#vnCat').value || '||').split('|');
   if (!cta) { toast('Elige la cuenta del gasto.'); $('#vnCta').focus(); return false; } if (!g) { toast('Elige la categoría del gasto.'); return false; }
   const base = {tipo: 'gasto', fecha: row.fecha, cuenta: cta, grupal: g, subgrupal: s2 || null, detalle: dt || null};
   if (comb) { const m = +row.costo || 0; if (!(m > 0)) { toast('Escribe el costo de la carga.'); return false; }
-    const n = await regCrearDirecto(Object.assign({}, base, {monto: crR2(m), descripcion: vehNatDet(v, true, row.odometro, row.proveedor)})); row.tx_id = 'W' + n.id; row.costo = null; return true; }
+    const dz = (($('#vfGDesc') || {}).value || '').trim(); const n = await regCrearDirecto(Object.assign({}, base, {monto: crR2(m), descripcion: dz || vehNatDet(v, true, row.odometro, row.proveedor)})); row.tx_id = 'W' + n.id; row.costo = null; return true; }
   const ls = row.gastos || []; const sin = ls.filter(x => !x.tx_id && +x.costo > 0); if (!sin.length) return true;
   for (const x of sin) { const n = await regCrearDirecto(Object.assign({}, base, {monto: crR2(+x.costo), descripcion: vehNatDet(v, false, row.odometro, row.proveedor, x.concepto || row.mant_tipo)})); x.tx_id = 'W' + n.id; x.costo = null; }
   row.tx_id = (ls.find(x => x.tx_id) || {}).tx_id || null; return true;
