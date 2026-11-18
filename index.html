@@ -794,7 +794,10 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .rc-dv{display:grid;justify-items:end;gap:1px}.rc-dv .rc-sl{font-size:11.5px!important;min-width:0!important}
 .cta-fab{position:fixed;right:max(20px,env(safe-area-inset-right,0px) + 16px);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60}
 /* detalle de cuenta como página: ocupa toda la pantalla, debajo de las ventanas */
-.cta-page{position:fixed;inset:0;z-index:39;background:var(--bg);display:flex;justify-content:center}
+.cta-page{position:fixed;inset:0;z-index:39;background:var(--bg);display:flex;justify-content:center}.tj-page{z-index:38}
+.cta-page>.modal.tj-fmodal{width:100%;max-width:1280px;height:100%;max-height:none!important;border-radius:0;border-width:0 1px;padding-top:env(safe-area-inset-top,0px)}
+.tj-page .rc-dia-n{cursor:pointer;grid-template-columns:auto auto 1fr auto auto}.tj-page .rc-dia-n:hover{background:var(--sunk)}
+@media (max-width:760px){.cta-page>.modal.tj-fmodal{border:0}}
 .cta-page>.modal.cta-modal{width:100%;max-width:1280px;height:100%;max-height:none;border-radius:0;border-width:0 1px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px)}
 .cta-page>.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}
 body.cta-abierta{overflow:hidden}
@@ -4244,7 +4247,7 @@ document.addEventListener('click', async e => {
   if (act === 'appEdElimNo') { S.appElimQ = null; return abrirDetalleTx(b.dataset.id); }
   if (act === 'appEdElim') { const id = b.dataset.id; const t = D.byId.get(id); if (!t) return; S.appElimQ = null;
     try { await appGuardarEds(appMarcarElim(Object.assign({}, appEds()), [t], true)); toast('Registro eliminado (queda en Registros web → Eliminados)'); } catch (er) { return; }
-    cerrarCapa(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); return; }
+    cerrarCapa(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); if (tjAbierta()) pintarTjFicha(true); return; }
   if (act === 'appEdAbrir') { S.appEd = b.dataset.id; S.appEdQ = null; abrirDetalleTx(b.dataset.id); const f = document.querySelector('.app-ed'); if (f) f.scrollIntoView({block: 'start', behavior: 'smooth'}); return; }
   if (act === 'appEdCerrar') { const id = S.appEd; S.appEd = null; return abrirDetalleTx(id); }
   if (act === 'appEdGuardar') return appEdGuardar(b.dataset.id);
@@ -4745,23 +4748,40 @@ const tjU = v => (v < 0 ? '−' : '') + '$ ' + Math.abs(v).toLocaleString('en-US
 document.addEventListener('scroll', e => { const p = e.target; if (!p || !p.matches || !p.matches('.tj-fmodal, .tj-fmodal>.panel')) return; const m = p.closest('.tj-fmodal'); const min = m.classList.contains('tj-min');
   const v = min ? p.scrollTop > 24 : p.scrollTop > 72; if (v === min) return; m.classList.toggle('tj-min', v);
   const hd = m.querySelector('.tj-fhd'); if (hd) m.style.setProperty('--mhd', hd.offsetHeight + 'px'); }, {passive: true, capture: true});
-function pintarTjFicha() {
-  const t = tjById(S.tjFicha); if (!t) { S.tjFicha = null; $('#modalRoot').innerHTML = ''; return; }
-  const w0 = document.querySelector('.tj-fmodal .cr-plan-wrap'); const top = w0 && w0.dataset.c === 'tj-' + t.id ? w0.scrollTop : 0;
-  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal tj-fmodal" role="dialog" aria-modal="true" aria-label="Detalle de la tarjeta">${vTjFicha(t)}</div></div>`;
-  const w = document.querySelector('.tj-fmodal .cr-plan-wrap'); if (w) w.scrollTop = top;
+/* El detalle de una tarjeta también es una página (#tjRoot, debajo de las ventanas): el formulario de un registro nuevo, el detalle de un
+   movimiento, etc. se abren encima y la tarjeta sigue de fondo. pintarTjFicha(true) la actualiza de fondo sin tocar la ventana de arriba. */
+function tjRootEl() { let r = document.getElementById('tjRoot'); if (!r) { r = document.createElement('div'); r.id = 'tjRoot'; document.getElementById('modalRoot').before(r); } return r; }
+const tjAbierta = () => !!document.querySelector('#tjRoot .tj-page');
+function tjCerrarPag() { const r = document.getElementById('tjRoot'); if (r) r.innerHTML = ''; if (!ctaAbierta()) document.body.classList.remove('cta-abierta'); S.tjFicha = null; if (S.selCtx === 'tj') { ctaSel().clear(); S.ctaSelMenu = null; S.selCtx = 'cta'; } }
+function pintarTjFicha(fondo) {
+  const t = tjById(S.tjFicha); if (!t) { tjCerrarPag(); return; }
+  if (!fondo && document.querySelector('#modalRoot .modal')) $('#modalRoot').innerHTML = '';   // como antes: abrir o volver a la ficha cierra la ventana de arriba
+  if (S.selCtx === 'tj' && S.ctaSelCta !== 'tj:' + t.id) { ctaSel().clear(); S.ctaSelMenu = null; S.selCtx = 'cta'; }
+  const root = tjRootEl(); const p0 = root.querySelector('.tj-fmodal'); const mismo = p0 && p0.dataset.t === t.id; const pn0 = p0 && p0.querySelector(':scope>.panel');
+  const sc = mismo && pn0 ? pn0.scrollTop : null; const min = mismo && p0.classList.contains('tj-min');
+  const w0 = root.querySelector('.tj-fmodal .cr-plan-wrap'); const top = w0 && w0.dataset.c === 'tj-' + t.id ? w0.scrollTop : 0;
+  const enSel = S.selCtx === 'tj' && ctaSel().size > 0; const mov = ['mov', 'cortes'].includes(S.tjVista || 'mov');
+  const fab = enSel || !mov ? '' : `<button class="rg-fab cta-fab" data-act="tjNuevoReg" data-f="" aria-label="Registro nuevo con esta tarjeta" title="Registro nuevo con esta tarjeta"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>`;
+  root.innerHTML = `<div class="cta-page tj-page"><div class="modal cr-modal tj-fmodal ${min ? 'tj-min' : ''}" data-t="${esc(t.id)}" role="region" aria-label="Detalle de la tarjeta">${vTjFicha(t)}${enSel ? ctaSelHoja() : ''}${fab}</div></div>`;
+  document.body.classList.add('cta-abierta');
+  const m = root.querySelector('.tj-fmodal'); const pn = m.querySelector(':scope>.panel');
+  if (enSel) { const h0 = m.querySelector('.tj-fhd'); if (h0) h0.outerHTML = ctaSelBarra().replace('class="hd sel-hd"', 'class="hd tj-fhd sel-hd"'); }
+  if (pn && sc != null) pn.scrollTop = sc;
+  const hd = m.querySelector('.tj-fhd'); if (hd) m.style.setProperty('--mhd', hd.offsetHeight + 'px');
+  const w = root.querySelector('.tj-fmodal .cr-plan-wrap'); if (w) w.scrollTop = top;
 }
 // cerrarCapa: cierra la ventana de arriba. Si era un corte o el formulario de una tarjeta abierta, vuelve al detalle de esa tarjeta.
 // regTjCampos: datos de tarjeta del formulario según sus cuentas (plástico y moneda).
 function regTjCampos(F) { F.tj = F.tjD = F.tjMon = F.tjMonD = undefined; const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); } }
 // regVolverCta: si el formulario se abrió desde el detalle de una cuenta, al guardar o cancelar vuelve a ese detalle (al mes del último registro guardado).
-function regVolverCta() { const n = S.regVolverCta; if (!n) return false; S.regVolverCta = null; S.regF = null; S.ctaFicha = n; if (S.regUlt && S.regUlt.fecha && (S.ctaVista || 'd') === 'd') S.ctaMes = S.regUlt.fecha.slice(0, 7);
+function regVolverCta() { if (S.regVolverTj) { S.regVolverTj = null; S.regF = null; if (tjAbierta()) pintarTjFicha(true); return true; }
+  const n = S.regVolverCta; if (!n) return false; S.regVolverCta = null; S.regF = null; S.ctaFicha = n; if (S.regUlt && S.regUlt.fecha && (S.ctaVista || 'd') === 'd') S.ctaMes = S.regUlt.fecha.slice(0, 7);
   pintarCtaFicha(); const m = document.querySelector('.cta-modal'); if (m) m.scrollTop = S.ctaScroll || 0; return true; }
 function cerrarCapa() {
-  if (S.regVolverCta && document.querySelector('.rg-modal')) { $('#modalRoot').innerHTML = ''; regVolverCta(); return; }
+  if ((S.regVolverCta || S.regVolverTj) && document.querySelector('.rg-modal')) { $('#modalRoot').innerHTML = ''; regVolverCta(); return; }
   const volverCta = !!document.querySelector('.dtx-modal') && S.ctaVolver;   // movimiento abierto desde el detalle de una cuenta
-  const enFicha = !!document.querySelector('.tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
-  if (enFicha || !enTj()) S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
+  const enFicha = !!document.querySelector('#modalRoot .tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
+  if (tjAbierta()) pintarTjFicha(true); else if (enFicha || !enTj()) S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
   if (!ctaAbierta()) { S.ctaFicha = null; S.ctaEdit = false; }   // detalle de una cuenta (si está abierta como página, sigue de fondo)
   if (volverCta) { S.ctaFicha = volverCta; S.ctaVolver = null; S.detAbierto = null; pintarCtaFicha(); const m = document.querySelector('.cta-modal'); if (m) m.scrollTop = S.ctaScroll || 0; return; }
   S.ctaVolver = null;
@@ -4806,7 +4826,7 @@ function vTjFicha(t) {
     ['ext', 'Extensiones', '<rect x="2" y="7" width="15" height="11" rx="2"/><path d="M2 11h15M7 4h13a2 2 0 0 1 2 2v9"/>']];
   if (!['mov', 'cortes', 'fin', 'ext'].includes(S.tjVista)) S.tjVista = 'mov'; const vAct = S.tjVista;
   return `<div class="panel"><div class="hd tj-fhd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><h2 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2></div>
-      ${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar" title="Cerrar">✕</button>
+      ${['mov', 'cortes'].includes(S.tjVista || 'mov') ? `<button class="btn sm ghost ico" data-act="tjBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.tjBus}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>` : ''}${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost ico" data-act="tjCerrar" aria-label="Cerrar" title="Cerrar (Esc)">✕</button>
       <div class="tj-vico" role="tablist" aria-label="Secciones de la tarjeta">${TJV.map(([k, l, d]) => `<button type="button" role="tab" class="tjv-${k} ${vAct === k ? 'on' : ''}" aria-selected="${vAct === k}" data-act="tjVista" data-v="${k}" aria-label="${l}" title="${l}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>${vAct === k ? `<span>${({mov: 'Por corte', cortes: 'Cortes', fin: 'Créditos'})[k] || l}</span>` : ''}</button>`).join('')}</div></div>
     <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Corte · pago</div><div class="v">día ${t.dia_corte} · ${t.dia_pago}</div><div class="note">${act ? 'período actual ' + fFecha(act.desde).slice(0, 5) + ' – ' + fFecha(act.corte).slice(0, 5) : ''}</div></div>
@@ -5258,7 +5278,7 @@ async function regGuardar(seguir) {
     if (a) derive();
     if (seguir) { const res = regResumen(row);
       Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null, id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
-      pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); return; }
+      pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); if (tjAbierta()) pintarTjFicha(true); return; }
     $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; render(); if (regVolverCta()) return;
   } catch (e) {} finally { S._regGuardando = false; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = false); }
 }
@@ -5662,7 +5682,7 @@ function vTjMov(t, modo) {
   const plDe = n => { const p = tjDeCuenta(n); return p && p.titular ? p : null; };
   const num = v => (U ? '$ ' : '') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); const sNum = v => (v < -0.004 ? '-' : '') + num(v);
   const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; const hoyD = hoy(); const set = tjSet(t);
-  const ps = tjPerC(t); const vista = modo === 'l' ? 'l' : 'c';   // 'l': pestaña "Todos los cortes" de la barra de arriba
+  const ps = tjPerC(t); const vista = modo === 'l' && !(S.tjBus && (S.tjQ || '').trim()) ? 'l' : 'c';   // 'l': pestaña "Todos los cortes" de la barra de arriba
   const pagoDe = new Map(); ps.forEach(p => p.pg.forEach(x => { if (x.tx_id) pagoDe.set(x.tx_id, p.corte); }));
   // Cada registro se ve en el período en que se hizo (por su fecha), también los pagos; el corte al que se aplica un pago se indica en la fila.
   const corteDe = f => tjCorteDe(t, f.t.fecha).corte;
@@ -5689,25 +5709,32 @@ function vTjMov(t, modo) {
   const avisoMan = man.length ? `<div class="bd note tjm-man">${man.length} ${man.length === 1 ? 'pago está vinculado' : 'pagos están vinculados'} a mano a otro corte distinto al de su fecha. ${S.tjManQ ? `¿Pasarlos a la regla automática? <button class="btn sm ghost" data-act="tjManQ">No</button><button class="btn sm pri" data-act="tjManBorrar">Sí, aplicar la regla</button>` : '<button class="btn sm" data-act="tjManQ">Aplicar la regla a todos</button>'}</div>` : '';
   if (!ps.length) return `<div class="tjm-f">${filtros}</div><div class="note" style="padding:14px">Sin cortes todavía.</div>${pie}`;
   const {d, vis, extraT, vals, glob} = mk(mon);
+  const qq = S.tjBus ? (S.tjQ || '').trim().toUpperCase() : ''; const nq = parseFloat(qq.replace(/[^0-9.]/g, ''));
+  const coincide = f => [f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta].join(' ').toUpperCase().includes(qq) || (isFinite(nq) && nq > 0 && String(Math.abs(f.v)).includes(String(nq)));
+  const busca = S.tjBus ? `<input class="in" id="tjQ" type="search" placeholder="Buscar en todos los registros de la tarjeta (texto o monto)" value="${esc(S.tjQ || '')}" style="max-width:none;margin:6px 12px;width:calc(100% - 24px)">` : '';
   let nav, sum, cuerpo, info = '';
   if (vista === 'c') {
     const i = ps.findIndex(p => p.corte === cor); const p = ps[i]; const prev = ps[i - 1], next = ps[i + 1]; const R = vals(p);
     nav = `<div class="rc-nav"><button class="btn sm ghost" data-act="tjMovCorte" data-v="${prev ? prev.corte : ''}" ${prev ? '' : 'disabled'} aria-label="Corte anterior">‹</button><b>Corte ${tjNom(p.corte)}</b><button class="btn sm ghost" data-act="tjMovCorte" data-v="${next ? next.corte : ''}" ${next ? '' : 'disabled'} aria-label="Corte siguiente">›</button></div>`;
     info = `<div class="tjm-per"><span class="chip ${p.est[1]}">${p.est[0]}</span><span>Cargos del <b>${fFecha(p.desde).slice(0, 5)}</b> al <b>${fFecha(p.corte).slice(0, 5)}</b>${p.abierto ? ` · se paga hasta el <b>${fFecha(p.vHasta).slice(0, 5)}</b>` : ` · pagar el saldo al corte a más tardar el <b class="${p.venc ? 'neg' : ''}">${fFecha(p.vHasta).slice(0, 5)}</b>${R.ap != null ? ` · abonado después del corte <b>${num(R.ap)}</b>` : ''}`}</span></div>`;
     sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(R.cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(R.pa)}</b></div><div><span>${p.abierto ? 'Saldo global hoy' : 'Saldo global al corte'}</span><b class="num ${glob.get(p.corte) > 0.004 ? 'neg' : ''}">${num(glob.get(p.corte))}</b></div><div><span>${p.abierto ? 'A pagar al corte' : 'Falta pagar'}</span><b class="num ${R.fa > 0.004 ? 'neg' : ''}" ${p.abierto ? `title="Saldo global proyectado al ${fFecha(p.corte)}: incluye los cargos de este corte, también los programados"` : ''}>${R.fa == null ? '—' : num(R.fa)}</b></div></div>`;
-    const l = vis.filter(f => corteDe(f) === p.corte); const ids = new Set(d.filas.map(f => f.t.id));
+    const l = qq ? vis.filter(coincide) : vis.filter(f => corteDe(f) === p.corte); const ids = new Set(d.filas.map(f => f.t.id));
+    if (qq) { const cg = crR2(-l.filter(f => f.lado === 'r').reduce((s2, f) => s2 + f.v, 0)), pa = crR2(l.filter(f => f.lado === 'd').reduce((s2, f) => s2 + f.v, 0));
+      nav = `<div class="rc-nav"><span></span><b>${l.length} ${l.length === 1 ? 'coincide' : 'coinciden'}</b><span></span></div>`; info = '';
+      sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(pa)}</b></div><div><span>Registros</span><b class="num">${l.length}</b></div><div><span>Saldo hoy</span><b class="num">${sNum(d.saldo)}</b></div></div>`; }
     const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); }); const rev = ctaTrasRev();
     const fila = f => { const x = f.t; const tras = tjEsTras(x); const pp = plDe(f.cta);
       const izq = (tras ? (f.lado === 'd' ? 'Pago / abono' : 'Transferencia') : `${esc(catG(x.cat))}${x.sub ? '<br>' + esc(subG(x.cat, x.sub)) : ''}`) + `<br><span class="tjm-pl ${pp ? 'ext' : ''}">${pp ? esc(tjNomPl(pp)) : 'Titular'}</span>`;
       const tit = (x.nota ? notaG(x.cat, x.sub, x.nota) : '') || (tras ? (f.lado === 'd' ? 'Pago a la tarjeta' : 'Traslado') : subG(x.cat, x.sub) || catG(x.cat) || 'Registro');
       let lin2 = esc(tjCta(x.cuenta)); if (tras) { const o = (rev.get(x.id) || {}).otra || tjDestino(x) || '¿?'; lin2 = ctaSigno(x) < 0 ? `${esc(tjCta(x.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(x.cuenta))}`; }
-      return `<div class="rc-it" data-act="ctaMov" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${x.det ? ' <span>' + esc(x.det) + '</span>' : ''}</div><div class="rc-s">${hora12(x.hora || (trasX(x) || [])[2] || '')} ${lin2}${x.fecha > hoyD ? ' · <span class="chip warn">programado</span>' : ''}${f.lado === 'd' && pagoDe.get(x.id) ? ` · <span class="tjm-ap">paga corte ${tjNom(pagoDe.get(x.id))}</span>` : ''}</div></div>
+      return `<div class="rc-it ${S.selCtx === 'tj' && ctaSel().has(x.id) ? 'rc-sel' : ''}" data-act="ctaMov" data-id="${esc(x.id)}" role="button" tabindex="0"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${x.det ? ' <span>' + esc(x.det) + '</span>' : ''}</div><div class="rc-s">${hora12(x.hora || (trasX(x) || [])[2] || '')} ${lin2}${x.fecha > hoyD ? ' · <span class="chip warn">programado</span>' : ''}${f.lado === 'd' && pagoDe.get(x.id) ? ` · <span class="tjm-ap">paga corte ${tjNom(pagoDe.get(x.id))}</span>` : ''}</div></div>
         <div class="rc-v"><span class="num ${f.lado === 'r' ? 'rc-r' : 'rc-d'}">${f.est ? '≈ ' : ''}${sNum(f.lado === 'r' ? -f.v : f.v)}</span><span class="num rc-sl" title="Saldo de la tarjeta después de este registro">${sNum(f.saldo)}</span></div></div>`; };
     // Pagos vinculados a mano cuyo registro no está en las cuentas de la tarjeta (sale de otra cuenta): se muestran con su monto como pago.
     const extra = extraT.filter(z => z.en === p.corte);
     cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const wd = dt.getDay();
       const dep = crR2(ls.filter(f => f.lado === 'd').reduce((s, f) => s + f.v, 0)), ret = crR2(-ls.filter(f => f.lado === 'r').reduce((s, f) => s + f.v, 0));
-      return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}</span><span class="num rc-d">${dep ? num(dep) : ''}</span><span class="num rc-r">${ret ? num(ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
+      const sd = (() => { let x = d.base; for (const r of d.filas) { if (r.t.fecha > fe) break; x = r.saldo; } return x; })();
+      return `<div class="rc-dia rc-dia-n" data-act="tjNuevoReg" data-f="${fe}" role="button" tabindex="0" title="Registro nuevo con fecha ${fFecha(fe)}"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)} <span class="rc-mas" aria-hidden="true">+</span></span><span class="num rc-d">${dep ? num(dep) : ''}</span><span class="rc-dv"><span class="num rc-r">${ret ? num(ret) : ''}</span><span class="num rc-sl" title="Saldo de la tarjeta al final del día">${sNum(sd)}</span></span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
       + (extra.length ? `<div class="rc-dia"><b>+</b><span class="rc-wd"></span><span class="rc-my">pagos desde otras cuentas</span><span class="num rc-d">${num(extra.reduce((s, z) => s + z.v, 0))}</span><span></span></div>` + extra.map(z => `<div class="rc-it" ${z.tx ? `data-act="ctaMov" data-id="${esc(z.tx.id)}" role="button" tabindex="0"` : ''}><div class="rc-c">Pago / abono<br><span class="tjm-pl">vinculado</span></div><div class="rc-m"><div class="rc-t"><b>Pago a la tarjeta</b></div><div class="rc-s">${z.tx ? fFecha(z.tx.fecha).slice(0, 5) + ' ' + esc(tjCta(z.tx.cuenta)) : 'monto escrito a mano'} · <span class="tjm-ap">paga corte ${tjNom(z.aplica)}</span></div></div><div class="rc-v"><span class="num rc-d">${num(z.v)}</span></div></div>`).join('') : '')
       || '<div class="note" style="padding:14px">Sin cargos ni pagos en este corte.</div>';
   } else {
@@ -5726,7 +5753,7 @@ function vTjMov(t, modo) {
       return `<div class="rc-pr tjm-pr" data-act="tjMovIr" data-vista="c" data-v="${p.corte}" role="button" tabindex="0"><b>${tjNom(p.corte)}<span class="cat">${fFecha(p.desde).slice(0, 5)} – ${fFecha(p.corte).slice(0, 5)}</span><span class="cat">pago ${fFecha(p.vHasta).slice(0, 5)}</span><span class="chip ${p.est[1]}">${p.est[0]}</span></b>
         ${celda('rc-r', M => M.vals(p).cg)}${celda('rc-d', M => M.vals(p).pa)}${celda('rc-sl2', M => M.glob.get(p.corte), v => v > 0.004)}${celda('', M => M.vals(p).fa, v => v > 0.004)}</div>`; }).join('');
   }
-  return `<div class="tjm-f">${filtros}${nav}${info}${sum}</div>${avisoMan}<div class="rc-lst">${cuerpo}</div>${pie}`;
+  return `<div class="tjm-f">${filtros}${busca}${nav}${info}${sum}</div>${avisoMan}<div class="rc-lst">${cuerpo}</div>${pie}`;
 }
 function vTjFin(t) {
   const cs = credsTj(t); const ts = tasaUSD();
@@ -5846,6 +5873,11 @@ document.addEventListener('click', async e => {
   if (act === 'tjMovAnio') { if (!b.dataset.v) return; S.tjMovAnio = b.dataset.v; return pintarTjFicha(); }
   if (act === 'tjMovVista') { S.tjMovVista = b.dataset.v; return pintarTjFicha(); }
   if (act === 'tjMovIr') { S.tjMovVista = b.dataset.vista; S.tjVista = 'mov'; if (b.dataset.vista === 'c') S.tjMovCorte = b.dataset.v; else S.tjMovAnio = b.dataset.v; pintarTjFicha(); const m = document.querySelector('.tj-fmodal>.panel'); if (m) m.scrollTop = 0; return; }
+  if (act === 'tjCerrar') { tjCerrarPag(); return render(); }
+  if (act === 'tjBus') { S.tjBus = !S.tjBus; if (!S.tjBus) S.tjQ = ''; pintarTjFicha(true); const q0 = $('#tjQ'); if (q0) q0.focus(); return; }
+  if (act === 'tjNuevoReg') { const t = tjById(S.tjFicha); if (!t) return; S.regVolverTj = t.id; abrirRegForm(); regTjElegir(S.regF, 'cta', t.id); const F = S.regF; F.tipo = 'gasto';
+    const mon = S.tjMovMon === 'USD' ? 'USD' : 'L'; const cm = [...tjSet(t)].find(n => ctaNombres().includes(n) && ctaInfo(n).mon === mon && !(tjDeCuenta(n) || {}).titular); if (cm) { F.cuenta = cm; regTjCampos(F); }
+    const fe = b.dataset.f; if (fe) { F.fecha = fe; if (fe !== hoy()) F.hora = ''; } return pintarRegForm(); }
   if (act === 'tjMovCorte') { if (!b.dataset.v) return; S.tjMovCorte = b.dataset.v; return pintarTjFicha(); }
   if (act === 'tjCortePag') { const t = tjById(S.tjFicha); const p = t && tjPeriodos(t).find(x => x.corte === b.dataset.c); if (!p) return;
     try { const reg = await tjRegPeriodo(t, p); const v = !reg.pagado; const ch = {pagado: v, pagado_el: v ? hoy() : null};
@@ -5853,7 +5885,7 @@ document.addEventListener('click', async e => {
   if (act === 'tjManQ') { S.tjManQ = !S.tjManQ; return pintarTjFicha(); }
   if (act === 'tjManBorrar') { const t = tjById(S.tjFicha); if (!t) return; const ids = tjManDistintos(t).map(x => x.id); S.tjManQ = false;
     try { if (ids.length) await q(sb.from('tarjeta_pagos').delete().in('id', ids), ids.length + (ids.length === 1 ? ' pago pasa' : ' pagos pasan') + ' a la regla automática'); S.tjpg = S.tjpg.filter(x => !ids.includes(x.id)); } catch (er) {} render(); return pintarTjFicha(); }
-  if (act === 'tjRegistrar') { const t = tjById(b.dataset.id); abrirRegForm(); regTjElegir(S.regF, 'cta', t.id); S.regF.tipo = 'gasto'; return pintarRegForm(); }
+  if (act === 'tjRegistrar') { const t = tjById(b.dataset.id); if (tjAbierta()) S.regVolverTj = t.id; abrirRegForm(); regTjElegir(S.regF, 'cta', t.id); S.regF.tipo = 'gasto'; return pintarRegForm(); }
   if (act === 'tjNuevaExt') { S.tjExtDe = b.dataset.id; return abrirTjForm(null); }
   if (act === 'crPagarCuota') return crPagarCuota(b.dataset.id);
   if (!S.regF) return; const F = S.regF;
@@ -6271,9 +6303,12 @@ document.addEventListener('click', e => {
    sincronización los traería de vuelta como estaban), así que se avisan y se dejan igual. */
 const ctaSel = () => S.ctaSel || (S.ctaSel = new Set());
 function ctaSelInfo() {
-  const d = S.ctaFicha ? ctaDatos(S.ctaFicha) : null; const ids = ctaSel(); const filas = d ? d.filas.filter(f => ids.has(f.t.id)) : [];
+  const ids = ctaSel(); let filas, mon;
+  if (S.selCtx === 'tj' && S.tjFicha && tjById(S.tjFicha)) { const t = tjById(S.tjFicha); mon = S.tjMovMon === 'USD' ? 'USD' : 'L'; const vistos = new Set();
+    filas = [...tjDatos(t, mon).filas, ...tjDatos(t, mon === 'USD' ? 'L' : 'USD').filas].filter(f => ids.has(f.t.id) && !vistos.has(f.t.id) && vistos.add(f.t.id)); }
+  else { const d = S.ctaFicha ? ctaDatos(S.ctaFicha) : null; filas = d ? d.filas.filter(f => ids.has(f.t.id)) : []; mon = d ? d.i.mon : 'L'; }
   const web = filas.filter(f => f.t.web && regDe(f.t.web)); const appF = filas.filter(f => !(f.t.web && regDe(f.t.web))); const app = appF.length;
-  return {filas, web, app, appF, total: crR2(filas.reduce((s, f) => s + f.v, 0)), mon: d ? d.i.mon : 'L'};
+  return {filas, web, app, appF, total: crR2(filas.filter(f => !f.cta || ctaInfo(f.cta).mon === mon).reduce((s, f) => s + f.v, 0)), mon};
 }
 function ctaSelBarra() {
   const I = ctaSelInfo(); const TR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
@@ -6308,7 +6343,7 @@ async function ctaSelAplicar(k) {
   else if (k === 'det') { const v = ((($('#selDet') || {}).value) || '').trim() || null; campos = () => ({detalle: v}); appC = () => ({nota: v || ''}); }
   else if (k === 'cat') { const g = ($('#selG') || {}).value; if (!g) return toast('Elige el grupal.'); const sg = ($('#selS') || {}).value || null; const limp = ($('#selLimpDet') || {}).checked; campos = () => Object.assign({grupal: g, subgrupal: sg}, limp ? {detalle: null} : {}); appC = t => /gasto|ingreso/.test(appTipo(t)) ? Object.assign({cat: g, sub: sg || ''}, limp ? {nota: ''} : {}) : null; }
   else if (k === 'borrar') campos = () => ({estado: 'eliminado'});
-  const vistos = new Set(); let ok = 0, salt = 0; S.ctaSelMenu = null; pintarCtaFicha();
+  const vistos = new Set(); let ok = 0, salt = 0; S.ctaSelMenu = null; selRepintar();
   for (const f of I.web) { const r = regDe(f.t.web); if (vistos.has(r.id)) continue; vistos.add(r.id); const c = campos(r, f.t); if (!c) { salt++; continue; }
     const antes = Object.assign({}, r); c.actualizado_el = new Date().toISOString();
     if (r.tipo === 'ajuste' && k === 'cta') delete c.cuenta_destino;
@@ -6319,28 +6354,30 @@ async function ctaSelAplicar(k) {
     if (okA) try { await appGuardarEds(m); } catch (e) { okA = 0; } }
   ctaSel().clear(); derive(); S._ctaVer = (S._ctaVer || 0) + 1;
   toast(`${k === 'borrar' ? 'Eliminados' : 'Cambiados'}: ${ok + okA}${salt ? ` · ${salt} sin cambio (la cuenta sería la misma de los dos lados)` : ''}${I.app && okA < I.app ? ` · ${I.app - okA} de la app sin tocar` : ''}`);
-  pintarCtaFicha(); render();
+  selRepintar(); render();
 }
 // Mantener presionado (dedo o mouse): medio segundo sin moverse.
 let _lp = null, _lpHecho = false;   // _lpHecho: el toque que sigue a mantener presionado no debe contar como otro toque
-document.addEventListener('pointerdown', e => { const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov]'); if (!it || (e.pointerType === 'mouse' && e.button !== 0)) return;
+// selRepintar: vuelve a pintar la vista donde se está seleccionando (detalle de cuenta o de tarjeta).
+function selRepintar() { if (S.selCtx === 'tj' && tjAbierta()) pintarTjFicha(true); else pintarCtaFicha(); }
+document.addEventListener('pointerdown', e => { const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov], .tj-page .rc-it[data-act=ctaMov]'); if (!it || (e.pointerType === 'mouse' && e.button !== 0)) return;
   const x = e.clientX, y = e.clientY; clearTimeout(_lp && _lp.t); _lpHecho = false;
-  _lp = {x, y, t: setTimeout(() => { _lp = null; ctaSel().add(it.dataset.id); S.ctaSelCta = S.ctaFicha; _lpHecho = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; const lst = document.querySelector('.rc-bd'); const sc = lst ? lst.scrollTop : 0; pintarCtaFicha(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; }, 500)}; });
+  _lp = {x, y, t: setTimeout(() => { _lp = null; const enTj = !!it.closest('.tj-page'); if (enTj !== (S.selCtx === 'tj')) ctaSel().clear(); S.selCtx = enTj ? 'tj' : 'cta'; ctaSel().add(it.dataset.id); S.ctaSelCta = enTj ? 'tj:' + S.tjFicha : S.ctaFicha; _lpHecho = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; const lst = document.querySelector('.rc-bd'); const sc = lst ? lst.scrollTop : 0; selRepintar(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; }, 500)}; });
 ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { if (_lp) { clearTimeout(_lp.t); _lp = null; } }));
 document.addEventListener('pointermove', e => { if (_lp && Math.hypot(e.clientX - _lp.x, e.clientY - _lp.y) > 10) { clearTimeout(_lp.t); _lp = null; } });
-document.addEventListener('contextmenu', e => { if (e.target.closest('.cta-modal .rc-it')) e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (e.target.closest('.cta-modal .rc-it, .tj-page .rc-it')) e.preventDefault(); });
 // En modo selección un toque suma o quita el registro (no abre su detalle).
 document.addEventListener('click', e => {
-  const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov]');
-  if (it && (ctaSel().size || _lpHecho)) { e.stopImmediatePropagation(); e.preventDefault(); if (_lpHecho) { _lpHecho = false; return; }
-    const id = it.dataset.id; ctaSel().has(id) ? ctaSel().delete(id) : ctaSel().add(id); const sc = (document.querySelector('.rc-bd') || {}).scrollTop || 0; pintarCtaFicha(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; return; }
+  const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov], .tj-page .rc-it[data-act=ctaMov]');
+  if (it && (ctaSel().size || _lpHecho) && (!!it.closest('.tj-page') === (S.selCtx === 'tj'))) { e.stopImmediatePropagation(); e.preventDefault(); if (_lpHecho) { _lpHecho = false; return; }
+    const id = it.dataset.id; ctaSel().has(id) ? ctaSel().delete(id) : ctaSel().add(id); const sc = (document.querySelector('.rc-bd') || {}).scrollTop || 0; selRepintar(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; return; }
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
-  if (act === 'selSalir') { ctaSel().clear(); S.ctaSelMenu = null; return pintarCtaFicha(); }
-  if (act === 'selMenu') { S.ctaSelMenu = b.dataset.v; S.selG = ''; return pintarCtaFicha(); }
-  if (act === 'selMenuX') { S.ctaSelMenu = null; return pintarCtaFicha(); }
+  if (act === 'selSalir') { ctaSel().clear(); S.ctaSelMenu = null; return selRepintar(); }
+  if (act === 'selMenu') { S.ctaSelMenu = b.dataset.v; S.selG = ''; return selRepintar(); }
+  if (act === 'selMenuX') { S.ctaSelMenu = null; return selRepintar(); }
   if (act === 'selAplicar') return ctaSelAplicar(b.dataset.v);
 }, true);
-document.addEventListener('change', e => { if (e.target.id === 'selG') { S.selG = e.target.value; pintarCtaFicha(); } });
+document.addEventListener('change', e => { if (e.target.id === 'selG') { S.selG = e.target.value; selRepintar(); } });
 
 // pintarCtaFicha: detalle de una cuenta en ventana emergente (pantalla completa en el teléfono): saldo y movimientos por día.
 /* El detalle de una cuenta es una página (no una ventana emergente): vive en #ctaRoot, debajo de las ventanas. Así el formulario de un
@@ -6353,7 +6390,7 @@ function ctaCerrarPag() { const r = document.getElementById('ctaRoot'); if (r) r
 function pintarCtaFicha() {
   /* Detalle de una cuenta como en Registro Contable: pestañas Diario / Mensual / Anual, flechas para cambiar de período,
      franja Depósito · Retiro · Balance · Saldo del período y, en Diario, los registros por día con el saldo que quedó después de cada uno. */
-  const n = S.ctaFicha; if (!n) return; if (S.ctaSelCta !== n) { ctaSel().clear(); S.ctaSelMenu = null; S.ctaSelCta = n; } const d = ctaDatos(n); const i = d.i; const enSel = ctaSel().size > 0; const fmt = v => ctaFmt(v, i.mon); const sinSaldo = !!i.pago;
+  const n = S.ctaFicha; if (!n) return; if (S.selCtx !== 'tj' && S.ctaSelCta !== n) { ctaSel().clear(); S.ctaSelMenu = null; S.ctaSelCta = n; } if (S.selCtx === 'tj' && !tjAbierta()) { S.selCtx = 'cta'; ctaSel().clear(); S.ctaSelMenu = null; S.ctaSelCta = n; } const d = ctaDatos(n); const i = d.i; const enSel = ctaSel().size > 0; const fmt = v => ctaFmt(v, i.mon); const sinSaldo = !!i.pago;
   const num = v => (i.mon === 'USD' ? '$ ' : '') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const sNum = v => (v < -0.004 ? '-' : '') + num(v);
   const vista = S.ctaVista || 'd'; const mHoy = hoy().slice(0, 7);
@@ -6862,6 +6899,7 @@ document.addEventListener('change', async e => {
 });
 document.addEventListener('input', e => {
   const el = e.target;
+  if (el.id === 'tjQ') { S.tjQ = el.value; const pos = el.selectionStart; pintarTjFicha(true); const n = $('#tjQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'ctaQ') { S.ctaQ = el.value; const pos = el.selectionStart; pintarCtaFicha(); const n = $('#ctaQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'catQ') { S.catQ = el.value; const pos = el.selectionStart; render(); const n = $('#catQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'ctaAdmQ') { S.ctaAdmQ = el.value; const pos = el.selectionStart; render(); const n = $('#ctaAdmQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
@@ -7235,6 +7273,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.tjDashFull) { S.tjDashFull = null; return render(); }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) cerrarCapa();
   else if (e.key === 'Escape' && ctaAbierta()) { ctaCerrarPag(); render(); }
+  else if (e.key === 'Escape' && tjAbierta()) { if (S.selCtx === 'tj' && ctaSel().size) { ctaSel().clear(); S.ctaSelMenu = null; return pintarTjFicha(true); } tjCerrarPag(); render(); }
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('.addrow') && e.target.matches('input')) { e.preventDefault(); const bb = e.target.closest('tr').querySelector('[data-act=agregar]'); bb && bb.click(); }
