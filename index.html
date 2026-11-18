@@ -783,6 +783,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .tjm-2{display:grid;justify-items:end;gap:1px;min-width:0}.tjm-pr{column-gap:8px}@media (max-width:760px){.tjm-pr .tjm-2{font-size:10.5px}}.tjm-2 .u{font-size:.86em;opacity:.85}.rc-sum .tjm-2{justify-items:center}.tjm-2 .neg{color:var(--bad)}
 .vgd{display:flex;gap:6px;align-items:center}.vgd input{flex:1;min-width:0}
 .cuo-2{display:inline-flex;flex-wrap:wrap;gap:4px}
+.copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
 /* ===== Fase 4 ===== */
@@ -4113,7 +4114,7 @@ async function iniciarHistorial() {
 }
 // abrirDetalleTx: Ficha completa de un registro de la app con su historial.
 function abrirDetalleTx(id) {
-  const t = D.byId.get(id); if (!t) return; S.detAbierto = {tipo: 'tx', id}; if (S.appEd && S.appEd !== id) S.appEd = null;
+  const t = D.byId.get(id); if (!t) return; S.detAbierto = {tipo: 'tx', id}; if (S.appEd && S.appEd !== id) S.appEd = null; if (S.copiaQ && S.copiaQ !== id) S.copiaQ = null;
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
   const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
   const e = estadoTx(t); const pp = partes(t.id); const h = S.hist && S.hist.get(t.id); const ign = S.ign.get(t.id);
@@ -4181,11 +4182,12 @@ function appParche(m, t, cambios) { const prev = m[t.id] || {}; const app = prev
 async function appGuardarEds(m) { await guardarAjuste('appEdits', m); S.aj.appEdits = m; derive(); S._ctaVer = (S._ctaVer || 0) + 1; }
 // appEdHtml: en el detalle de un registro de la app: quién lo editó en la web, el botón Editar y el formulario.
 function appEdHtml(t) {
+  if (S.copiaQ === t.id) return copiaQHtml(t);
   if (t.web || !esAdmin()) return ''; const o = appEds()[t.id]; const tipo = appTipo(t); const usd = appEsUSD(t); const corte = corteApp();
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
   const antes = o ? [o.fecha && ['fecha', fFecha(o.app.fecha)], o.cuenta && ['cuenta', o.app.cuenta], ('cat' in o || 'sub' in o || 'nota' in o) && ['categoría', [o.app.cat, o.app.sub, o.app.nota].filter(Boolean).join(' › ') || '—'], 'det' in o && ['descripción', o.app.det || '—'], o.monto != null && ['monto', L(o.app.monto)]].filter(Boolean) : [];
   const nota = o ? `<div class="app-ed-n"><b>Editado en la web</b> por ${esc(nombreDe(o.por))} · ${cuando(o.el)}${antes.length ? `<div class="cat">En la app era: ${antes.map(([k, v]) => k + ' ' + esc(v)).join(' · ')}</div>` : ''}</div>` : '';
-  if (S.appEd !== t.id) return `${nota}<div class="row" style="justify-content:flex-end;gap:8px">${o ? (S.appEdQ === t.id ? `<span class="note">¿Volver a como está en la app?</span><button class="btn sm ghost" data-act="appEdQ" data-id="">No</button><button class="btn sm" data-act="appEdRev" data-id="${esc(t.id)}">Sí, volver</button>` : `<button class="btn sm ghost" data-act="appEdQ" data-id="${esc(t.id)}">Volver a lo de la app</button>`) : ''}<button class="btn sm pri" data-act="appEdAbrir" data-id="${esc(t.id)}">Editar</button></div>`;
+  if (S.appEd !== t.id) return `${nota}<div class="row" style="justify-content:flex-end;gap:8px"><button class="btn sm" data-act="regCopiaQ" data-id="${esc(t.id)}">Copiar</button>${o ? (S.appEdQ === t.id ? `<span class="note">¿Volver a como está en la app?</span><button class="btn sm ghost" data-act="appEdQ" data-id="">No</button><button class="btn sm" data-act="appEdRev" data-id="${esc(t.id)}">Sí, volver</button>` : `<button class="btn sm ghost" data-act="appEdQ" data-id="${esc(t.id)}">Volver a lo de la app</button>`) : ''}<button class="btn sm pri" data-act="appEdAbrir" data-id="${esc(t.id)}">Editar</button></div>`;
   const vMon = usd ? tjMonto(t).usd : t.monto; const catV = [t.cat, t.sub, t.nota].join('|'); let ops = '';
   if (tipo === 'gasto' || tipo === 'ingreso') { ops = catOpcs(tipo, catV); if (!ops.includes(`value="${esc(catV)}"`)) ops = `<option value="${esc(catV)}" selected>${esc([t.cat, t.sub, t.nota].filter(Boolean).join(' › ') || 'Sin categoría')} (actual)</option>` + ops; }
   const ctaOps = regCuentasOpts(tjCta(t.cuenta)); const enLista = ctaOps.includes(`value="${esc(tjCta(t.cuenta))}"`);
@@ -5318,6 +5320,27 @@ let _fabT = null; const fabMov = () => { const f = document.querySelector('.rg-f
 document.addEventListener('scroll', fabMov, {passive: true, capture: true}); document.addEventListener('touchmove', fabMov, {passive: true});
 const regFab = () => S.me && S.me.activo ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
 // regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
+// Copiar un registro: abre el formulario de registro nuevo con los mismos datos (cuenta, monto, categoría, descripción…);
+// antes pregunta si la copia lleva la fecha del registro o la de hoy. Se revisa y se guarda como cualquier registro nuevo.
+function copiaQHtml(t) { const r = t.web && regDe(t.web); const f = r ? r.fecha : t.fecha;
+  return `<div class="copia-q"><b>Copiar este registro</b><span class="note">¿Con qué fecha queda la copia?</span><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="regCopia" data-id="${esc(t.id)}" data-hoy="">Fecha del registro · ${fFecha(f)}</button><button class="btn sm pri" data-act="regCopia" data-id="${esc(t.id)}" data-hoy="1">Hoy · ${fFecha(hoy())}</button><button class="btn sm ghost" data-act="regCopiaNo" data-id="${esc(t.id)}">Cancelar</button></div></div>`; }
+function regCopiar(id, usarHoy) { const t = D.byId.get(id); if (!t) return; const r = t.web && regDe(t.web); let c;
+  if (r) c = {tipo: r.tipo, cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, comision: r.comision, signo: r.signo || 1, modoAj: 'monto', grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || '', etq: (r.etiquetas || []).join(', '), hora: r.hora || ''};
+  else { const tipo = appTipo(t); const m = crR2(Math.abs(appEsUSD(t) ? (tjMonto(t).usd || 0) : (+t.montoApp || +t.monto || 0)));
+    c = {tipo, monto: m, grupal: t.cat || '', subgrupal: t.sub || '', detalle: t.nota || '', desc: t.det || '', hora: t.hora || ''};
+    if (tipo === 'traslado') { const o = (ctaTrasRev().get(t.id) || {}).otra || tjDestino(t) || ''; Object.assign(c, ctaSigno(t) < 0 ? {cuenta: tjCta(t.cuenta), destino: o} : {cuenta: o, destino: tjCta(t.cuenta)}, {grupal: '', subgrupal: ''}); }
+    else c.cuenta = tjCta(t.cuenta);
+    if (tipo === 'ajuste') Object.assign(c, {signo: ajusteOrigen(t)[1] || 1, modoAj: 'monto'}); }
+  S.copiaQ = null; S.detAbierto = null; abrirRegForm(); const F = S.regF;
+  Object.assign(F, c, {fecha: usarHoy ? hoy() : (r ? r.fecha : t.fecha), hora: usarHoy ? ahoraHora() : (c.hora || ''), rep: null});
+  if (!esAdmin() && !['gasto', 'ingreso'].includes(F.tipo)) F.tipo = 'gasto';
+  F.tj = F.tjD = F.tjMon = F.tjMonD = undefined; { const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); } }
+  pintarRegForm(); toast('Copia lista: revisa y guarda');
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b || !/^regCopia/.test(b.dataset.act)) return; const act = b.dataset.act;
+  if (act === 'regCopiaQ') { S.copiaQ = b.dataset.id; S.appEd = null; abrirDetalleTx(b.dataset.id); const q = document.querySelector('.copia-q'); if (q) q.scrollIntoView({block: 'center', behavior: 'smooth'}); return; }
+  if (act === 'regCopiaNo') { S.copiaQ = null; return abrirDetalleTx(b.dataset.id); }
+  if (act === 'regCopia') return regCopiar(b.dataset.id, !!b.dataset.hoy); });
 function regDetalleHtml(t) {
   const r = regWebDeTx(t); if (!r) return '';
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
@@ -5330,7 +5353,7 @@ function regDetalleHtml(t) {
       <div><span>Registrado por ${esc(nombreDe(r.creado_por))}</span><span>${cuando(r.creado_el)}</span></div>
       ${r.aprobado_por && r.aprobado_por !== r.creado_por ? `<div><span>Aprobado por ${esc(nombreDe(r.aprobado_por))}</span><span>${cuando(r.aprobado_el)}</span></div>` : ''}
       ${h.filter(x => x.accion !== 'creado').map(x => `<div><span>${ACC[x.accion] || esc(x.accion)} por ${esc(nombreDe(x.por))}</span><span>${cuando(x.el)}</span></div>`).join('')}</div>
-    <div class="row" style="justify-content:flex-end">${S.regConfElimDet === r.id ? `<span class="note">¿Eliminarlo? Queda en Registros web → Eliminados.</span><button class="btn sm ghost" data-act="regElimDetNo">No</button><button class="btn sm danger" data-act="regElimDet" data-id="${esc(r.id)}">Sí, eliminar</button>` : `<button class="btn sm ghost danger" data-act="regElimDet" data-id="${esc(r.id)}">Eliminar registro</button><button class="btn sm pri" data-act="regEditar" data-id="${esc(r.id)}">Editar registro</button>`}</div>`;
+    <div class="row" style="justify-content:flex-end">${S.regConfElimDet === r.id ? `<span class="note">¿Eliminarlo? Queda en Registros web → Eliminados.</span><button class="btn sm ghost" data-act="regElimDetNo">No</button><button class="btn sm danger" data-act="regElimDet" data-id="${esc(r.id)}">Sí, eliminar</button>` : `<button class="btn sm ghost danger" data-act="regElimDet" data-id="${esc(r.id)}">Eliminar registro</button><button class="btn sm" data-act="regCopiaQ" data-id="${esc(t.id)}">Copiar</button><button class="btn sm pri" data-act="regEditar" data-id="${esc(r.id)}">Editar registro</button>`}</div>`;
 }
 // regPublicarCatalogo: los demás usuarios no leen los registros de la app, así que el catálogo vigente (el que sale de los datos y aún no validas)
 // se guarda en la tabla categorias como "sin validar" para que lo vean en su formulario. No cambia nombres ni orden; solo agrega lo que falta.
