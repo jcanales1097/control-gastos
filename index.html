@@ -786,7 +786,12 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .cta-modal .rc-dia-n{cursor:pointer;grid-template-columns:auto auto 1fr auto auto}.cta-modal .rc-dia-n:hover{background:var(--sunk)}.rc-mas{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--line);font-size:13px;line-height:1;color:var(--muted);margin-left:4px}
 .rc-dv{display:grid;justify-items:end;gap:1px}.rc-dv .rc-sl{font-size:11.5px!important;min-width:0!important}
 .cta-fab{position:fixed;right:max(20px,env(safe-area-inset-right,0px) + 16px);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60}
-@media (min-width:761px){.modal-bg:has(.cta-modal){padding:14px!important;align-items:stretch}.modal.cta-modal{width:100%!important;max-width:1280px!important;height:calc(100vh - 28px);max-height:none!important;margin:0 auto;overflow-y:auto;overscroll-behavior:contain}.modal-bg:has(.cta-modal){overflow:hidden}.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}}
+/* detalle de cuenta como página: ocupa toda la pantalla, debajo de las ventanas */
+.cta-page{position:fixed;inset:0;z-index:39;background:var(--bg);display:flex;justify-content:center}
+.cta-page>.modal.cta-modal{width:100%;max-width:1280px;height:100%;max-height:none;border-radius:0;border-width:0 1px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px)}
+.cta-page>.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}
+body.cta-abierta{overflow:hidden}
+@media (max-width:760px){.cta-page>.modal.cta-modal{border:0}}
 .copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
@@ -4721,7 +4726,7 @@ function cerrarCapa() {
   const volverCta = !!document.querySelector('.dtx-modal') && S.ctaVolver;   // movimiento abierto desde el detalle de una cuenta
   const enFicha = !!document.querySelector('.tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
   if (enFicha || !enTj()) S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
-  S.ctaFicha = null; S.ctaEdit = false;   // detalle de una cuenta
+  if (!ctaAbierta()) { S.ctaFicha = null; S.ctaEdit = false; }   // detalle de una cuenta (si está abierta como página, sigue de fondo)
   if (volverCta) { S.ctaFicha = volverCta; S.ctaVolver = null; S.detAbierto = null; pintarCtaFicha(); const m = document.querySelector('.cta-modal'); if (m) m.scrollTop = S.ctaScroll || 0; return; }
   S.ctaVolver = null;
   if (enFicha || !enCred()) S.credFicha = null; else if (S.credFicha) pintarCredFicha();   // créditos: vuelve al detalle del crédito
@@ -5217,7 +5222,7 @@ async function regGuardar(seguir) {
     if (a) derive();
     if (seguir) { const res = regResumen(row);
       Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null, id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
-      pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); return; }
+      pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); return; }
     $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; render(); if (regVolverCta()) return;
   } catch (e) {} finally { S._regGuardando = false; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = false); }
 }
@@ -6296,6 +6301,13 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => { if (e.target.id === 'selG') { S.selG = e.target.value; pintarCtaFicha(); } });
 
 // pintarCtaFicha: detalle de una cuenta en ventana emergente (pantalla completa en el teléfono): saldo y movimientos por día.
+/* El detalle de una cuenta es una página (no una ventana emergente): vive en #ctaRoot, debajo de las ventanas. Así el formulario de un
+   registro nuevo, el detalle de un movimiento, etc. se abren encima y la cuenta sigue de fondo; al cerrarlos se actualiza. */
+function ctaRootEl() { let r = document.getElementById('ctaRoot'); if (!r) { r = document.createElement('div'); r.id = 'ctaRoot'; document.getElementById('modalRoot').before(r); } return r; }
+const ctaAbierta = () => !!document.querySelector('#ctaRoot .cta-page');
+function ctaPagina(root, keep) { document.body.classList.add('cta-abierta'); const m = root.querySelector('.cta-modal'); if (!m) return; if (keep != null) m.scrollTop = keep;
+  const hd = m.querySelector('.hd'); m.style.setProperty('--mhd', (hd ? hd.offsetHeight : 0) + 'px'); }
+function ctaCerrarPag() { const r = document.getElementById('ctaRoot'); if (r) r.innerHTML = ''; document.body.classList.remove('cta-abierta'); S.ctaFicha = null; S.ctaEdit = false; S.ctaVolver = null; ctaSel().clear(); S.ctaSelMenu = null; }
 function pintarCtaFicha() {
   /* Detalle de una cuenta como en Registro Contable: pestañas Diario / Mensual / Anual, flechas para cambiar de período,
      franja Depósito · Retiro · Balance · Saldo del período y, en Diario, los registros por día con el saldo que quedó después de cada uno. */
@@ -6346,9 +6358,10 @@ function pintarCtaFicha() {
     : nProb ? `<div class="tj-aviso">${nProb} ${nProb === 1 ? 'traslado de esta cuenta no tiene' : 'traslados de esta cuenta no tienen'} su otra cuenta clara. <button class="btn sm" data-act="ctaIrTras">Revisar traslados</button></div>` : '';
   const LUPA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
   const fab = enSel ? '' : `<button class="rg-fab cta-fab" data-act="ctaNuevoReg" data-f="" aria-label="Registro nuevo en ${esc(i.nom)}" title="Registro nuevo en esta cuenta"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>`;
-  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal cta-modal rc-modal" role="dialog" aria-modal="true" aria-labelledby="ctaT">
+  const root = ctaRootEl(); const old = root.querySelector('.cta-modal'); const keep = old && old.dataset.n === n ? old.scrollTop : null;
+  root.innerHTML = `<div class="cta-page"><div class="modal cr-modal cta-modal rc-modal" data-n="${esc(n)}" role="region" aria-labelledby="ctaT">
     ${enSel ? ctaSelBarra() : `<div class="hd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0">${ctaClsIco(i.clase)}<div style="min-width:0"><h2 id="ctaT">${esc(i.nom)}</h2><div class="note">${i.tipo ? esc(i.tipo.nombre) : 'Sin tipo'}${i.cfg.alias ? ' · ' + esc(i.n) : ''} · ${i.mon === 'USD' ? 'dólares' : 'lempiras'}${sinSaldo ? '' : ' · saldo hoy <b class="num ' + (d.saldo < -0.004 ? 'neg' : '') + '">' + fmt(d.saldo) + '</b>'}</div></div></div>
-      <button class="btn sm ghost ico" data-act="ctaBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.ctaBus}">${LUPA}</button>${icoBtn('editar', 'Editar cuenta', 'ctaEditar')}<button class="btn sm ghost ico" data-act="cerrarModal" title="Cerrar (Esc)" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}
+      <button class="btn sm ghost ico" data-act="ctaBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.ctaBus}">${LUPA}</button>${icoBtn('editar', 'Editar cuenta', 'ctaEditar')}<button class="btn sm ghost ico" data-act="ctaCerrar" title="Cerrar (Esc)" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}
     <div class="bd rc-bd">
       ${S.ctaEdit ? ctaForm(i) : ''}${aviso}
       ${S.ctaBus ? `<input class="in" id="ctaQ" type="search" placeholder="Buscar en todos los registros (texto o monto)" value="${esc(S.ctaQ || '')}" style="max-width:none">` : ''}
@@ -6357,6 +6370,7 @@ function pintarCtaFicha() {
       <div class="rc-sum"><div><span>Depósito</span><b class="num rc-d">${num(R.dep)}</b></div><div><span>Retiro</span><b class="num rc-r">${num(R.ret)}</b></div><div><span>Balance</span><b class="num">${sNum(R.bal)}</b></div><div><span>Saldo</span><b class="num rc-sl2">${sinSaldo ? '—' : sNum(R.saldo)}</b></div></div>
       <div class="rc-lst">${cuerpo}</div>
     </div>${ctaSelHoja()}${fab}</div></div>`;
+  ctaPagina(root, keep);
 }
 // ctaForm: editar la configuración de una cuenta (tipo, moneda, nombre corto, cuenta de pago, total, oculta).
 function ctaForm(i) {
@@ -6734,9 +6748,10 @@ document.addEventListener('click', async e => {
   if (act === 'ctaTab') { S.ctaTab = b.dataset.v; const h = S.ctaTab === 'tc' ? '#tarjetas' : S.ctaTab === 'pre' ? '#creditos' : '#cuentas'; if (location.hash !== h) history.replaceState(null, '', h); render(); return window.scrollTo(0, 0); }
   if (act === 'ctaVerOc') { S.ctaVerOc = !S.ctaVerOc; return render(); }
   if (act === 'ctaOrdenar') { S.ctaOrdenar = !S.ctaOrdenar; return render(); }
-  if (act === 'ctaNuevoReg') { const n = S.ctaFicha; if (!n) return; const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.regVolverCta = n; S.ctaFicha = null;
+  if (act === 'ctaNuevoReg') { const n = S.ctaFicha; if (!n) return; const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.regVolverCta = n;
     abrirRegForm(); const F = S.regF; const fe = b.dataset.f; F.cuenta = n; if (fe) { F.fecha = fe; if (fe !== hoy()) F.hora = ''; }
     if (F.tipo === 'traslado' && F.destino === n) F.destino = ''; regTjCampos(F); return pintarRegForm(); }
+  if (act === 'ctaCerrar') { ctaCerrarPag(); return render(); }
   if (act === 'ctaMov') { const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.ctaVolver = S.ctaFicha; return abrirDetalleTx(b.dataset.id); }
   if (act === 'ctaSel') { S.ctaVolver = null; S.ctaFicha = b.dataset.n; S.ctaMes = null; S.ctaAnio = null; S.ctaVista = 'd'; S.ctaQ = ''; S.ctaBus = false; S.ctaEdit = false; return pintarCtaFicha(); }
   if (act === 'ctaVista') { S.ctaVista = b.dataset.v; S.ctaQ = ''; return pintarCtaFicha(); }
@@ -6745,7 +6760,7 @@ document.addEventListener('click', async e => {
   if (act === 'ctaBus') { S.ctaBus = !S.ctaBus; if (!S.ctaBus) S.ctaQ = ''; pintarCtaFicha(); const q0 = $('#ctaQ'); if (q0) q0.focus(); return; }
   if (act === 'ctaMes') { if (!b.dataset.v) return; S.ctaMes = b.dataset.v; S.ctaAnio = null; return pintarCtaFicha(); }
   if (act === 'ctaEditar') { S.ctaEdit = !S.ctaEdit; return pintarCtaFicha(); }
-  if (act === 'ctaIrTras') { $('#modalRoot').innerHTML = ''; S.ctaFicha = null; S.ctaTab = 'adm'; S.ctaAdm = 'tras'; history.replaceState(null, '', '#cuentas'); render(); return window.scrollTo(0, 0); }
+  if (act === 'ctaIrTras') { $('#modalRoot').innerHTML = ''; ctaCerrarPag(); S.ctaTab = 'adm'; S.ctaAdm = 'tras'; history.replaceState(null, '', '#cuentas'); render(); return window.scrollTo(0, 0); }
   if (act === 'trasVer') { S.trasVer = b.dataset.v; return render(); }
   if (act === 'ajVer') { S.ajVer = b.dataset.v; return render(); }
   if (act === 'ajSigno') return guardarAjusteSigno(b.dataset.id, b.dataset.v);
@@ -6757,7 +6772,7 @@ document.addEventListener('click', async e => {
         dia_corte: vis('#ctaFC') ? (parseInt($('#ctaFC').value) || null) : null, dia_pago: vis('#ctaFD') ? (parseInt($('#ctaFD').value) || null) : null,
         incluir_total: inc === '' ? null : inc === '1', estado: $('#ctaFE').value, nota: $('#ctaFN').value.trim(), validada: true}, 'Cuenta guardada'); S.ctaEdit = false; render(); pintarCtaFicha(); } catch (er) {} return; }
   if (act === 'ctaEliminar') { const n = b.dataset.n; if (S.ctaConfElim !== n) { S.ctaConfElim = n; return S.ctaFicha ? pintarCtaFicha() : render(); } S.ctaConfElim = null;
-    try { await ctaGuardar(n, {estado: 'eliminada', eliminada_el: new Date().toISOString()}, 'Cuenta eliminada; sus registros se conservan'); $('#modalRoot').innerHTML = ''; S.ctaFicha = null; S.ctaEdit = false; render(); } catch (er) {} return; }
+    try { await ctaGuardar(n, {estado: 'eliminada', eliminada_el: new Date().toISOString()}, 'Cuenta eliminada; sus registros se conservan'); $('#modalRoot').innerHTML = ''; ctaCerrarPag(); render(); } catch (er) {} return; }
   if (act === 'ctaRestaurar') { try { await ctaGuardar(b.dataset.n, {estado: 'activa', eliminada_el: null}, 'Cuenta restaurada'); if (S.ctaFicha) pintarCtaFicha(); render(); } catch (er) {} return; }
   if (act === 'ctaBorrarDef') { const n = b.dataset.n; if (S.ctaConfBorrar !== n) { S.ctaConfBorrar = n; return render(); } S.ctaConfBorrar = null;
     try { await q(sb.from('cuentas').delete().eq('nombre', n), 'Cuenta borrada'); S.cta.delete(n); S._ctaVer++; } catch (er) {} return render(); }
@@ -7177,6 +7192,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.grafFull) { S.grafFull = null; return render(); }
   if (e.key === 'Escape' && !$('#modalRoot').innerHTML && S.tjDashFull) { S.tjDashFull = null; return render(); }
   if (e.key === 'Escape' && $('#modalRoot').innerHTML) cerrarCapa();
+  else if (e.key === 'Escape' && ctaAbierta()) { ctaCerrarPag(); render(); }
   if (e.key === 'Enter' && e.target.id === 'portalIn' && HELPER !== null) { e.preventDefault(); e.target.dispatchEvent(new Event('change', {bubbles: true})); syncDirecto(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('#regForm') && e.target.matches('input:not([type=radio])')) { e.preventDefault(); return guardarRegistro(); }
   if (e.key === 'Enter' && e.target.closest && e.target.closest('.addrow') && e.target.matches('input')) { e.preventDefault(); const bb = e.target.closest('tr').querySelector('[data-act=agregar]'); bb && bb.click(); }
