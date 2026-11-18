@@ -783,6 +783,10 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .tjm-2{display:grid;justify-items:end;gap:1px;min-width:0}.tjm-pr{column-gap:8px}@media (max-width:760px){.tjm-pr .tjm-2{font-size:10.5px}}.tjm-2 .u{font-size:.86em;opacity:.85}.rc-sum .tjm-2{justify-items:center}.tjm-2 .neg{color:var(--bad)}
 .vgd{display:flex;gap:6px;align-items:center}.vgd input{flex:1;min-width:0}
 .cuo-2{display:inline-flex;flex-wrap:wrap;gap:4px}
+.cta-modal .rc-dia-n{cursor:pointer;grid-template-columns:auto auto 1fr auto auto}.cta-modal .rc-dia-n:hover{background:var(--sunk)}.rc-mas{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--line);font-size:13px;line-height:1;color:var(--muted);margin-left:4px}
+.rc-dv{display:grid;justify-items:end;gap:1px}.rc-dv .rc-sl{font-size:11.5px!important;min-width:0!important}
+.cta-fab{position:fixed;right:max(20px,env(safe-area-inset-right,0px) + 16px);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60}
+@media (min-width:761px){.modal-bg:has(.cta-modal){padding:14px!important;align-items:stretch}.modal.cta-modal{width:100%!important;max-width:1280px!important;height:calc(100vh - 28px);max-height:none!important;margin:0 auto}}
 .copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
@@ -4707,7 +4711,13 @@ function pintarTjFicha() {
   const w = document.querySelector('.tj-fmodal .cr-plan-wrap'); if (w) w.scrollTop = top;
 }
 // cerrarCapa: cierra la ventana de arriba. Si era un corte o el formulario de una tarjeta abierta, vuelve al detalle de esa tarjeta.
+// regTjCampos: datos de tarjeta del formulario según sus cuentas (plástico y moneda).
+function regTjCampos(F) { F.tj = F.tjD = F.tjMon = F.tjMonD = undefined; const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); } }
+// regVolverCta: si el formulario se abrió desde el detalle de una cuenta, al guardar o cancelar vuelve a ese detalle (al mes del último registro guardado).
+function regVolverCta() { const n = S.regVolverCta; if (!n) return false; S.regVolverCta = null; S.regF = null; S.ctaFicha = n; if (S.regUlt && S.regUlt.fecha && (S.ctaVista || 'd') === 'd') S.ctaMes = S.regUlt.fecha.slice(0, 7);
+  pintarCtaFicha(); const m = document.querySelector('.cta-modal'); if (m) m.scrollTop = S.ctaScroll || 0; return true; }
 function cerrarCapa() {
+  if (S.regVolverCta && document.querySelector('.rg-modal')) { $('#modalRoot').innerHTML = ''; regVolverCta(); return; }
   const volverCta = !!document.querySelector('.dtx-modal') && S.ctaVolver;   // movimiento abierto desde el detalle de una cuenta
   const enFicha = !!document.querySelector('.tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
   if (enFicha || !enTj()) S.tjFicha = null; else if (S.tjFicha) pintarTjFicha();
@@ -5200,15 +5210,15 @@ async function regGuardar(seguir) {
         monto_destino: row.monto_destino != null && F.rep.cuotas ? crR2(row.monto_destino / plan.length) : row.monto_destino, estado: 'oficial', creado_por: S.me.id, creado_el: ahora, aprobado_por: S.me.id, aprobado_el: ahora}));
       const d = await q(sb.from('registros').insert(filas).select(), seguir ? '' : `${filas.length} registros creados (${repTxt(F)})`); const nuevos = d && d.length ? d : filas; S.reg.push(...nuevos);
       for (const n of nuevos) await regHist(n.id, 'creado', null, n);
-      S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino}; S._regDupOk = null; S._regN = (S._regN || 0) + nuevos.length; }
+      S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino, fecha: F.fecha}; S._regDupOk = null; S._regN = (S._regN || 0) + nuevos.length; }
     else { row.id = crUid(); row.estado = a ? 'oficial' : 'pendiente'; row.creado_por = S.me.id; row.creado_el = new Date().toISOString(); if (a) { row.aprobado_por = S.me.id; row.aprobado_el = row.creado_el; }
       const d = await q(sb.from('registros').insert(row).select(), seguir ? '' : a ? 'Registro guardado' : 'Enviado para aprobación'); const nuevo = d && d[0] ? d[0] : row; S.reg.push(nuevo); await regHist(nuevo.id, 'creado', null, nuevo); if (a) { derive(); await tjPagoAuto(F, nuevo); }
-      S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino}; S._regDupOk = null; S._regN = (S._regN || 0) + 1; }
+      S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino, fecha: F.fecha}; S._regDupOk = null; S._regN = (S._regN || 0) + 1; }
     if (a) derive();
     if (seguir) { const res = regResumen(row);
       Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null, id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
       pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); return; }
-    $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; render();
+    $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; render(); if (regVolverCta()) return;
   } catch (e) {} finally { S._regGuardando = false; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = false); }
 }
 const regResumen = r => { const mon = r.cuenta && ctaInfo(r.cuenta).mon === 'USD' ? 'USD' : 'L';
@@ -5316,7 +5326,7 @@ document.addEventListener('input', e => {
 const regPendientes = () => esAdmin() && S.reg ? S.reg.filter(r => r.estado === 'pendiente') : [];
 // regFab: botón + para registrar (iPhone: abajo a la derecha, fuera de la barra de inicio).
 // Mientras se desplaza la página el botón + se transparenta; vuelve a verse al detenerse.
-let _fabT = null; const fabMov = () => { const f = document.querySelector('.rg-fab'); if (!f) return; f.classList.add('moviendo'); clearTimeout(_fabT); _fabT = setTimeout(() => { const g = document.querySelector('.rg-fab'); if (g) g.classList.remove('moviendo'); }, 650); };
+let _fabT = null; const fabMov = () => { const fs = document.querySelectorAll('.rg-fab'); if (!fs.length) return; fs.forEach(f => f.classList.add('moviendo')); clearTimeout(_fabT); _fabT = setTimeout(() => { document.querySelectorAll('.rg-fab').forEach(g => g.classList.remove('moviendo')); }, 650); };
 document.addEventListener('scroll', fabMov, {passive: true, capture: true}); document.addEventListener('touchmove', fabMov, {passive: true});
 const regFab = () => S.me && S.me.activo ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
 // regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
@@ -6318,7 +6328,7 @@ function pintarCtaFicha() {
       return `<div class="rc-it ${enSel && ctaSel().has(t.id) ? 'rc-sel' : ''}" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="${enSel ? 'Tocar para seleccionar' : 'Ver todo el detalle · mantener presionado para seleccionar'}"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora}${lin2}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${ctaTrasChip(t)}</div></div>
         <div class="rc-v"><span class="num ${f.lado === 'r' ? 'rc-r' : 'rc-d'}" ${f.est ? 'title="Aproximado: sube el Excel de monedas para el monto exacto"' : ''}>${f.est ? '≈ ' : ''}${sNum(f.lado === 'r' ? -f.v : f.v)}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo de la cuenta después de este registro">${sNum(f.saldo)}</span>`}</div></div>`; };
     cuerpo = [...porDia.keys()].sort().reverse().map(fe => { const ls = porDia.get(fe); const dt = new Date(fe + 'T12:00'); const r = resumen(ls, fe); const wd = dt.getDay();
-      return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}</span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
+      return `<div class="rc-dia rc-dia-n" data-act="ctaNuevoReg" data-f="${fe}" role="button" tabindex="0" title="Registro nuevo con fecha ${fFecha(fe)}"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)} <span class="rc-mas" aria-hidden="true">+</span></span><span class="num rc-d">${r.dep ? num(r.dep) : ''}</span><span class="rc-dv"><span class="num rc-r">${r.ret ? num(r.ret) : ''}</span>${sinSaldo ? '' : `<span class="num rc-sl" title="Saldo al final del día">${sNum(r.saldo)}</span>`}</span></div>` + [...ls].reverse().map(fila).join(''); }).join('')
       || `<div class="note" style="padding:14px">${qq ? 'Ningún registro coincide con la búsqueda.' : 'Sin movimientos en este mes.'}</div>`;
   } else if (vista === 'm') {
     actNav = 'ctaAnio'; lab = anio; if (anio > mIni.slice(0, 4)) prev = String(+anio - 1); if (anio < mFin.slice(0, 4)) next = String(+anio + 1);
@@ -6335,6 +6345,7 @@ function pintarCtaFicha() {
   const aviso = i.pago ? `<div class="tj-aviso">Tarjeta de débito: sus movimientos se descuentan de <b>${esc(ctaInfo(i.pago).nom)}</b> y su saldo va en esa cuenta. <button class="btn sm" data-act="ctaSel" data-n="${esc(i.pago)}">Abrir ${esc(ctaInfo(i.pago).nom)}</button></div>`
     : nProb ? `<div class="tj-aviso">${nProb} ${nProb === 1 ? 'traslado de esta cuenta no tiene' : 'traslados de esta cuenta no tienen'} su otra cuenta clara. <button class="btn sm" data-act="ctaIrTras">Revisar traslados</button></div>` : '';
   const LUPA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+  const fab = enSel ? '' : `<button class="rg-fab cta-fab" data-act="ctaNuevoReg" data-f="" aria-label="Registro nuevo en ${esc(i.nom)}" title="Registro nuevo en esta cuenta"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>`;
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal cta-modal rc-modal" role="dialog" aria-modal="true" aria-labelledby="ctaT">
     ${enSel ? ctaSelBarra() : `<div class="hd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0">${ctaClsIco(i.clase)}<div style="min-width:0"><h2 id="ctaT">${esc(i.nom)}</h2><div class="note">${i.tipo ? esc(i.tipo.nombre) : 'Sin tipo'}${i.cfg.alias ? ' · ' + esc(i.n) : ''} · ${i.mon === 'USD' ? 'dólares' : 'lempiras'}${sinSaldo ? '' : ' · saldo hoy <b class="num ' + (d.saldo < -0.004 ? 'neg' : '') + '">' + fmt(d.saldo) + '</b>'}</div></div></div>
       <button class="btn sm ghost ico" data-act="ctaBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.ctaBus}">${LUPA}</button>${icoBtn('editar', 'Editar cuenta', 'ctaEditar')}<button class="btn sm ghost ico" data-act="cerrarModal" title="Cerrar (Esc)" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}
@@ -6345,7 +6356,7 @@ function pintarCtaFicha() {
       <div class="rc-tabs" role="tablist">${[['d', 'Diario'], ['m', 'Mensual'], ['a', 'Anual']].map(([k, t]) => `<button class="${vista === k && !qq ? 'on' : ''}" role="tab" aria-selected="${vista === k}" data-act="ctaVista" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="rc-sum"><div><span>Depósito</span><b class="num rc-d">${num(R.dep)}</b></div><div><span>Retiro</span><b class="num rc-r">${num(R.ret)}</b></div><div><span>Balance</span><b class="num">${sNum(R.bal)}</b></div><div><span>Saldo</span><b class="num rc-sl2">${sinSaldo ? '—' : sNum(R.saldo)}</b></div></div>
       <div class="rc-lst">${cuerpo}</div>
-    </div>${ctaSelHoja()}</div></div>`;
+    </div>${ctaSelHoja()}${fab}</div></div>`;
 }
 // ctaForm: editar la configuración de una cuenta (tipo, moneda, nombre corto, cuenta de pago, total, oculta).
 function ctaForm(i) {
@@ -6723,6 +6734,9 @@ document.addEventListener('click', async e => {
   if (act === 'ctaTab') { S.ctaTab = b.dataset.v; const h = S.ctaTab === 'tc' ? '#tarjetas' : S.ctaTab === 'pre' ? '#creditos' : '#cuentas'; if (location.hash !== h) history.replaceState(null, '', h); render(); return window.scrollTo(0, 0); }
   if (act === 'ctaVerOc') { S.ctaVerOc = !S.ctaVerOc; return render(); }
   if (act === 'ctaOrdenar') { S.ctaOrdenar = !S.ctaOrdenar; return render(); }
+  if (act === 'ctaNuevoReg') { const n = S.ctaFicha; if (!n) return; const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.regVolverCta = n; S.ctaFicha = null;
+    abrirRegForm(); const F = S.regF; const fe = b.dataset.f; F.cuenta = n; if (fe) { F.fecha = fe; if (fe !== hoy()) F.hora = ''; }
+    if (F.tipo === 'traslado' && F.destino === n) F.destino = ''; regTjCampos(F); return pintarRegForm(); }
   if (act === 'ctaMov') { const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; S.ctaVolver = S.ctaFicha; return abrirDetalleTx(b.dataset.id); }
   if (act === 'ctaSel') { S.ctaVolver = null; S.ctaFicha = b.dataset.n; S.ctaMes = null; S.ctaAnio = null; S.ctaVista = 'd'; S.ctaQ = ''; S.ctaBus = false; S.ctaEdit = false; return pintarCtaFicha(); }
   if (act === 'ctaVista') { S.ctaVista = b.dataset.v; S.ctaQ = ''; return pintarCtaFicha(); }
