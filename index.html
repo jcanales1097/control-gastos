@@ -4337,6 +4337,7 @@ async function unifAplicar() {
       const ch = t === tit ? {cuentas: [x.libro.L, x.libro.USD].filter(Boolean), cta_l: x.libro.L || null, cta_usd: x.libro.USD || null} : {cuentas: [], cta_l: null, cta_usd: null};
       await q(sb.from('tarjetas').update(ch).eq('id', t.id)); Object.assign(t, ch); } }
   ok = true; } finally {   // aunque falle a medias, lo hecho queda anotado para poder deshacerlo
+  rec.mapa = {}; plan.forEach(x => x.movs.forEach(mv => { if (mv.acct !== mv.dest) rec.mapa[mv.acct] = mv.dest; }));
   rec.el = new Date().toISOString(); if (!ok) rec.parcial = true; await guardarAjuste('unifTj', rec); S.aj.unifTj = rec;
   derive(); S._ctaVer = (S._ctaVer || 0) + 1; }
   toast('Listo: cada tarjeta es una sola cuenta'); }
@@ -4487,7 +4488,17 @@ let _tjCu = null, _tjCuD = null;
 function tjCuentas() { if (_tjCuD !== D.txs) { const c = new Set(), a = new Map(); D.txs.forEach(t => { c.add(tjCta(t.cuenta)); const x = t.x; if (x) for (const k of ['assetId', 'payTypeId', 'assetUid']) if (x[k]) a.set(x[k], tjCta(t.cuenta)); }); _tjCu = {c, a}; _tjCuD = D.txs; } return _tjCu; }
 // tjDestino: la otra cuenta de un traslado. Se toma de la categoría si es el nombre de una cuenta; si no, de los datos extra del portal
 // (un campo con el nombre de una cuenta, o un id de cuenta destino). '' si no se sabe.
-function tjDestino(t) {
+// Tras unificar las tarjetas, una cuenta juntada (de una extensión o vieja) se lee como la cuenta de su tarjeta: así un traslado de
+// una sola fila que iba hacia ella (por ejemplo un pago a la cuenta de la extensión) cae en la cuenta de la tarjeta y no en la inhabilitada.
+let _unifM = null, _unifK = null;
+function unifMapa() { const h = S.aj && S.aj.unifTj && S.aj.unifTj.el ? S.aj.unifTj : null; if (!h) return null; if (_unifK === h) return _unifM; const m = {};
+  if (h.mapa) Object.assign(m, h.mapa);
+  else Object.entries(h.tjs || {}).forEach(([id, prev]) => { const t = tjById(id); if (!t) return; const tit = tjTit(t);
+    (prev.cuentas || []).concat([prev.cta_l, prev.cta_usd]).filter(Boolean).map(tjCta).forEach(c => { const d = tjMonDe(c) === 'USD' ? tit.cta_usd : tit.cta_l; if (d && tjCta(d) !== c) m[c] = tjCta(d); }); });
+  _unifK = h; _unifM = m; return m; }
+const unifRen = n => { const m = unifMapa(); return m && n && m[n] ? m[n] : n; };
+function tjDestino(t) { return unifRen(tjDestino0(t)); }
+function tjDestino0(t) {
   { const mm = S.aj && S.aj.trasManual && S.aj.trasManual[t.id]; if (mm && tjCta(mm) !== tjCta(t.cuenta)) return tjCta(mm); }   // elegida a mano en Cuentas → Traslados
   { const xx = trasX(t); if (xx && xx[0] && tjCta(xx[0]) !== tjCta(t.cuenta)) return tjCta(xx[0]); }   // dato exacto del Excel de la app
   const {c, a} = tjCuentas(); const cat = tjCta(t.cat); if (cat && c.has(cat)) return cat; const x = t.x; if (!x) return '';
@@ -6187,7 +6198,7 @@ const enTj = () => S.view === 'cuentas' && S.ctaTab === 'tc';
 const enCred = () => S.view === 'cuentas' && S.ctaTab === 'pre';   // la pestaña Préstamos muestra el módulo de Créditos
 // ctaAlertas: cortes de tarjeta vencidos y cuotas de créditos atrasadas sin pago (para los contadores del menú y de las pestañas).
 function ctaAlertas() {
-  const tc = S.tj ? tjs().filter(t => t.estado !== 'cerrada').reduce((n, t) => n + tjPeriodos(t).filter(p => p.venc).length, 0) : 0;
+  const tc = S.tj ? tjs().filter(t => t.estado !== 'cerrada' && !t.titular).filter(t => { const u = tjPeriodos(t).filter(p => !p.abierto).pop(); return u && u.venc; }).length : 0;   // tarjetas con su último corte vencido
   const pre = S.cred ? creditos().filter(c => c.estado !== 'cancelado').reduce((t, c) => t + cuotasDe(c.id).filter(x => !x.conciliada && x.fecha < hoy() && !enlCuota(x.id).length).length, 0) : 0;
   return {tc, pre};
 }
@@ -6370,7 +6381,7 @@ function vCtaLista(tab) {
   const todas = ctaNombres().map(ctaInfo); const enTab = todas.filter(i => !clases || clases.includes(i.clase) || (tab === 'ban' && !i.clase));
   const lista = enTab.filter(i => !i.elim && (!i.oculta || S.ctaVerOc)).sort(ctaOrdCmp); const nOc = enTab.filter(i => i.estado === 'inhabilitada').length; const ord = !!S.ctaOrdenar;
   const asa = (tipo, v) => ord ? `<span class="ct-asa" data-drag="${tipo}" data-v="${esc(v)}" role="button" aria-label="Arrastrar para mover" title="Arrastrar para mover">≡</span>` : '';
-  const T = ctaTotales(enTab); const sinTipo = todas.filter(i => !i.clase && !i.elim).length;
+  const T = ctaTotales(enTab); const sinTipo = todas.filter(i => !i.clase && !i.elim && i.estado === 'activa').length;   // las inhabilitadas (p. ej. las juntadas en su tarjeta) no piden tipo
   const mixto = (l, u) => `${L(l)}${u ? ' · ' + tjU(u) : ''}`;
   const kpis = `<div class="kpis cta-kpis">
     <div class="kpi"><div class="eyebrow">Capital</div><div class="v ${T.cap < -0.004 ? 'neg' : ''}">${L(T.cap)}</div><div class="note">${mixto(T.capL, T.capU)}</div></div>
