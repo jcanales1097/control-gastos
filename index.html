@@ -522,10 +522,10 @@ body:has(.graf-full){overflow:hidden}
   .kpis.k4 .kpi .v{font-size:10.5px;white-space:nowrap;letter-spacing:-.02em}
   .ctl-part{flex-wrap:nowrap!important;gap:5px!important;overflow-x:auto;scrollbar-width:none;white-space:nowrap}.ctl-part::-webkit-scrollbar{display:none}
   .ctl-part .eyebrow{flex:none}.ctl-part .chip{font-size:9.5px;padding:1px 7px;flex:none}.ctl-part .btn{margin-left:auto;flex:none;padding:3px 8px;font-size:11px}
-  .ctl-tabs{display:grid}.ctl-tabs.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ctl-tabs{display:grid}.ctl-tabs.c3{grid-template-columns:repeat(3,minmax(0,1fr))}.ctl-tabs.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
   .ctl-tabs .tj-tab{font-size:11.5px;padding:5px 4px;gap:3px 5px}.ctl-tabs .tj-tab b{font-size:10.5px;width:100%}
   .ctl-secs{display:block}.ctl-secs>div{display:none}
-  .ctl-eg>.ctl-s-eg,.ctl-in>.ctl-s-in,.ctl-mp>.ctl-s-mp,.ctl-gr>.ctl-s-gr{display:block}
+  .ctl-eg>.ctl-s-eg,.ctl-in>.ctl-s-in,.ctl-mp>.ctl-s-mp,.ctl-gr>.ctl-s-gr,.ctl-pr>.ctl-s-pr{display:block}
   .ctl-s-eg>.panel>.hd,.ctl-s-in>.panel>.hd{display:none}
   .filters.f-una{display:grid!important;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px;padding:6px 8px}
   .filters.f-una>*{grid-column:auto!important;min-width:0;width:100%;font-size:12px!important;padding:5px 6px!important}
@@ -806,6 +806,10 @@ body.cta-abierta{overflow:hidden}
 .unif-p .unif-l{display:grid;gap:8px}.unif-l>div{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.unif-m{font-size:12.5px}.unif-n{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cr-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}.cr-filtros .in{width:auto;min-width:0;flex:0 1 auto}.cr-filtros #crQ{flex:1 1 220px}
 @media (max-width:760px){.cr-filtros select.in{flex:1 1 45%}.cr-filtros #crQ{flex-basis:100%}}
+.pr-k{margin:0;border-radius:0;border-width:0 0 1px}.pr-bar{display:inline-block;width:90px;max-width:100%}.pr-t tfoot td{border-top:2px solid var(--ink)}.pr-sin td{background:var(--sunk)}
+.pr-form{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:12px 14px;border-top:1px solid var(--line)}.pr-form>b{flex-basis:100%;font-size:13px}.pr-form #prDesc{flex:2 1 200px}.pr-form #prCat{flex:2 1 200px;width:auto}
+.pr-form label{display:grid;gap:3px;font-size:11px;color:var(--muted);flex:1 1 90px}.pr-form label .in{width:100%}
+@media (max-width:760px){.pr-k{grid-template-columns:repeat(2,minmax(0,1fr))!important}.pr-t th:nth-child(2),.pr-t td:nth-child(2),.pr-t th:nth-child(3),.pr-t td:nth-child(3),.pr-t th:nth-child(4),.pr-t td:nth-child(4),.pr-t th:nth-child(8),.pr-t td:nth-child(8){display:none}}
 .copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
@@ -1898,11 +1902,12 @@ function vControl(c) {
     </div>
     ${c.porMes ? vDistribucion(c, R) : ''}
     ${(() => { /* Teléfono: Egresos / Ingresos / Proyectos como pestañas (una sección a la vez); en computadora se ven todas. */
-      const mp = c.porMes ? vMicros(c, mes) : ''; const k = (S.ctlSec === 'mp' && !mp) || (S.ctlSec === 'gr' && c.porMes) ? 'eg' : (S.ctlSec || 'eg');
+      const mp = c.porMes ? vMicros(c, mes) : ''; const pr = !c.porMes && esProy(c) ? vPresup(c, h) : '';
+      const k = (S.ctlSec === 'mp' && !mp) || (S.ctlSec === 'gr' && c.porMes) || (S.ctlSec === 'pr' && !pr) ? 'eg' : (S.ctlSec || 'eg');
       const bt = (v, txt, n, tot) => `<button class="tj-tab ${k === v ? 'on' : ''}" data-act="ctlSec" data-v="${v}">${txt} <span class="tj-tc">${n}</span>${tot != null ? ` <b class="num">${L(tot)}</b>` : ''}</button>`;
       const gr = c.porMes ? '' : vResumenProy(c, R, h);   // proyectos: el gráfico de evolución es otra pestaña en el teléfono
-      return `<div class="tj-tabs ctl-tabs ${mp || gr ? 'c3' : ''}">${bt('eg', 'Egresos', h.egresos.length, R.egreso)}${bt('in', 'Ingresos', h.ingresos.length, R.ingreso)}${mp ? bt('mp', 'Proyectos', microsDe(c.id).length) : ''}${gr ? `<button class="tj-tab ${k === 'gr' ? 'on' : ''}" data-act="ctlSec" data-v="gr">Gráfico<b class="num" style="font-weight:400;color:var(--muted)">evolución</b></button>` : ''}</div>
-      <div class="ctl-secs ctl-${k}">${gr ? `<div class="ctl-s-gr">${gr}</div>` : ''}<div class="ctl-s-eg">${tablaFilas(c, h, 'egreso')}</div><div class="ctl-s-in">${tablaFilas(c, h, 'ingreso')}</div>${mp ? `<div class="ctl-s-mp">${mp}</div>` : ''}</div>`; })()}
+      return `<div class="tj-tabs ctl-tabs ${pr ? 'c4' : mp || gr ? 'c3' : ''}">${bt('eg', 'Egresos', h.egresos.length, R.egreso)}${bt('in', 'Ingresos', h.ingresos.length, R.ingreso)}${pr ? bt('pr', 'Presupuesto', presItems(c).length, crR2(presItems(c).reduce((s2, it) => s2 + presTot(it), 0))) : ''}${mp ? bt('mp', 'Proyectos', microsDe(c.id).length) : ''}${gr ? `<button class="tj-tab ${k === 'gr' ? 'on' : ''}" data-act="ctlSec" data-v="gr">Gráfico<b class="num" style="font-weight:400;color:var(--muted)">evolución</b></button>` : ''}</div>
+      <div class="ctl-secs ctl-${k}">${pr ? `<div class="ctl-s-pr">${pr}</div>` : ''}${gr ? `<div class="ctl-s-gr">${gr}</div>` : ''}<div class="ctl-s-eg">${tablaFilas(c, h, 'egreso')}</div><div class="ctl-s-in">${tablaFilas(c, h, 'ingreso')}</div>${mp ? `<div class="ctl-s-mp">${mp}</div>` : ''}</div>`; })()}
     </div>`;
 }
 // porMesProy: Totales por mes de un proyecto.
@@ -4383,6 +4388,63 @@ document.addEventListener('click', async e => { const b = e.target.closest('[dat
   if (act === 'unifDeshQ') { S.unifDeshQ = true; return render(); }
   if (act === 'unifDeshNo') { S.unifDeshQ = false; return render(); }
   if (act === 'unifDesh') { S.unifDeshQ = false; try { await unifDeshacer(); } catch (er) { toast('No se pudo deshacer: ' + (er && er.message || er)); } return render(); } });
+
+/* ===================== Presupuesto de un proyecto =====================
+   Lista de ítems que se presupuestan (descripción, categoría, cantidad y precio) para estimar el proyecto y compararlo con lo
+   ejecutado: cada egreso validado del proyecto cuenta en el ítem de su categoría (el más específico: subgrupal antes que grupal).
+   Lo que no cae en ningún ítem se ve como "Sin presupuestar". Se guarda en el ajuste "presup" ({id del proyecto: [ítems]}). */
+const presItems = c => ((S.aj && S.aj.presup) || {})[c.id] || [];
+const presTot = it => crR2((+it.cant || 0) * (+it.precio || 0));
+async function presGuardar(c, items) { const m = Object.assign({}, (S.aj && S.aj.presup) || {}, {[c.id]: items}); await guardarAjuste('presup', m); S.aj.presup = m; }
+// presCats: categorías para elegir (grupal y grupal › subgrupal) de los gastos registrados y del catálogo.
+function presCats() { const g = new Map(); const add = (a, b) => { if (!a) return; if (!g.has(a)) g.set(a, new Set()); if (b) g.get(a).add(b); };
+  D.txs.forEach(t => { if (t.code === 1 && !tjEsTras(t)) add(t.cat, t.sub); }); (S.reg || []).forEach(r => { if (r.tipo === 'gasto') add(r.grupal, r.subgrupal); });
+  return [...g.keys()].sort((a, b) => a.localeCompare(b, 'es', {numeric: true})).map(a => [a, [...g.get(a)].sort((x, y) => x.localeCompare(y, 'es', {numeric: true}))]); }
+// presCruce: ejecutado de cada ítem y lo que quedó sin presupuestar.
+function presCruce(c, h) { const items = presItems(c); const ej = new Map(items.map(it => [it.id, {v: 0, n: 0}])); let sinV = 0, sinN = 0;
+  h.egresos.filter(r => r.estado === 'valido').forEach(r => { const v = +r.valor || 0;
+    const it = items.find(x => x.cat && x.sub && x.cat === r.cat && x.sub === r.sub) || items.find(x => x.cat && !x.sub && x.cat === r.cat);
+    if (it) { const e = ej.get(it.id); e.v += v; e.n++; } else { sinV += v; sinN++; } });
+  return {items, ej, sinV: crR2(sinV), sinN}; }
+function vPresup(c, h) {
+  const {items, ej, sinV, sinN} = presCruce(c, h); const a = esAdmin(); const ed = items.find(x => x.id === S.prEd) || null;
+  const pres = crR2(items.reduce((s, it) => s + presTot(it), 0)); const ejT = crR2([...ej.values()].reduce((s, e) => s + e.v, 0) + sinV); const dif = crR2(pres - ejT);
+  const pct = v => pres ? Math.min(100, v / pres * 100) : 0; const catTxt = it => it.cat ? esc(it.cat) + (it.sub ? '<br><span class="cat">' + esc(it.sub) + '</span>' : '') : '<span class="muted">sin categoría</span>';
+  const barra = (e, p) => `<span class="cr-bar pr-bar"><i style="width:${p ? Math.min(100, e / p * 100).toFixed(1) : (e ? 100 : 0)}%;${p && e > p + 0.004 ? 'background:var(--bad)' : ''}"></i></span>`;
+  const filas = items.map(it => { const p = presTot(it), e = crR2(ej.get(it.id).v), d = crR2(p - e);
+    return `<tr><td><b>${esc(it.desc || '—')}</b>${ej.get(it.id).n ? `<div class="cat">${ej.get(it.id).n} ${ej.get(it.id).n === 1 ? 'registro' : 'registros'}</div>` : ''}</td><td class="small">${catTxt(it)}</td>
+      <td class="num">${(+it.cant || 0).toLocaleString('en-US', {maximumFractionDigits: 2})}</td><td class="num">${L(+it.precio || 0)}</td><td class="num"><b>${L(p)}</b></td><td class="num">${e ? L(e) : '<span class="muted">—</span>'}</td>
+      <td class="num ${d < -0.004 ? 'neg' : 'pos'}">${L(d)}</td><td>${barra(e, p)}</td>
+      <td class="acc">${a ? `<div class="acc-row">${icoBtn('editar', 'Editar ítem', 'prEdit').replace('data-act=', `data-id="${it.id}" data-act=`)}${S.prBorrarQ === it.id ? `<button class="btn sm danger" data-act="prBorrar" data-id="${it.id}">¿Quitar? Sí</button><button class="btn sm ghost" data-act="prBorrarNo">No</button>` : icoBtn('borrar', 'Quitar ítem', 'prBorrarQ', '', 'danger').replace('data-act=', `data-id="${it.id}" data-act=`)}</div>` : ''}</td></tr>`; }).join('');
+  const sinFila = sinN ? `<tr class="pr-sin"><td><b>Sin presupuestar</b><div class="cat">${sinN} ${sinN === 1 ? 'registro' : 'registros'} cuya categoría no está en ningún ítem</div></td><td></td><td></td><td></td><td class="num muted">—</td><td class="num">${L(sinV)}</td><td class="num neg">${L(-sinV)}</td><td></td><td></td></tr>` : '';
+  const cats = presCats(); const cv = ed ? (ed.cat ? ed.cat + (ed.sub ? '|' + ed.sub : '') : '') : (S.prCat || '');
+  const catOpts = `<option value="">Sin categoría</option>` + cats.map(([g, subs]) => `<optgroup label="${esc(g)}"><option value="${esc(g)}" ${cv === g ? 'selected' : ''}>${esc(g)} (todo)</option>${subs.map(s2 => `<option value="${esc(g + '|' + s2)}" ${cv === g + '|' + s2 ? 'selected' : ''}>${esc(s2)}</option>`).join('')}</optgroup>`).join('');
+  const form = a ? `<div class="pr-form"><b>${ed ? 'Editar ítem' : 'Agregar ítem'}</b>
+    <input class="in" id="prDesc" placeholder="Descripción (ej. Pintura, Mano de obra)" value="${esc(ed ? ed.desc || '' : '')}" autocomplete="off">
+    <select class="in" id="prCat" title="Los egresos de esta categoría cuentan como ejecutado de este ítem">${catOpts}</select>
+    <label>Cant.<input class="in num" id="prCant" inputmode="decimal" value="${ed ? ed.cant : '1'}"></label>
+    <label>Precio unitario (L)<input class="in num" id="prPrecio" inputmode="decimal" value="${ed ? ed.precio : ''}" placeholder="0.00"></label>
+    <span class="row" style="gap:6px">${ed ? '<button class="btn sm ghost" data-act="prCancelar">Cancelar</button>' : ''}<button class="btn sm pri" data-act="prGuardar">${ed ? 'Guardar' : 'Agregar'}</button></span></div>` : '';
+  return `<div class="panel pr-p"><div class="hd"><h2 style="margin-right:auto">Presupuesto</h2><span class="note">${items.length} ${items.length === 1 ? 'ítem' : 'ítems'}</span></div>
+    <div class="kpis k4 pr-k"><div class="kpi"><div class="eyebrow">Presupuesto</div><div class="v">${L(pres)}</div><div class="note">estimado del proyecto</div></div>
+      <div class="kpi"><div class="eyebrow">Ejecutado</div><div class="v">${L(ejT)}</div><div class="note">egresos validados</div></div>
+      <div class="kpi"><div class="eyebrow">${dif < -0.004 ? 'Excedido' : 'Disponible'}</div><div class="v ${dif < -0.004 ? 'neg' : 'pos'}">${L(Math.abs(dif))}</div><div class="note">presupuesto − ejecutado</div></div>
+      <div class="kpi"><div class="eyebrow">Avance</div><div class="v">${pres ? Math.round(ejT / pres * 100) + ' %' : '—'}</div><div class="note">${barra(ejT, pres)}</div></div></div>
+    ${items.length || sinN ? `<div class="tbl-wrap"><table class="pr-t"><thead><tr><th>Ítem</th><th>Categoría</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Presupuesto</th><th class="num">Ejecutado</th><th class="num">Diferencia</th><th>Avance</th><th></th></tr></thead>
+      <tbody>${filas}${sinFila}</tbody><tfoot><tr><td><b>Total</b></td><td></td><td></td><td></td><td class="num"><b>${L(pres)}</b></td><td class="num"><b>${L(ejT)}</b></td><td class="num ${dif < -0.004 ? 'neg' : 'pos'}"><b>${L(dif)}</b></td><td>${barra(ejT, pres)}</td><td></td></tr></tfoot></table></div>`
+      : `<div class="bd note">Todavía no hay ítems. Agrega lo que vas a comprar o pagar (material, mano de obra…) con su categoría: los egresos del proyecto de esa categoría se comparan solos contra lo presupuestado.</div>`}
+    ${form}</div>`; }
+document.addEventListener('click', async e => { const b = e.target.closest('[data-act]'); if (!b || !/^pr[A-Z]/.test(b.dataset.act)) return; const act = b.dataset.act;
+  const c = /^[cp]-/.test(String(S.view || '')) ? ctrlById(S.view.slice(2)) : null; if (!c) return;
+  if (act === 'prEdit') { S.prEd = b.dataset.id; render(); const f = $('#prDesc'); if (f) { f.scrollIntoView({block: 'center'}); f.focus(); } return; }
+  if (act === 'prCancelar') { S.prEd = null; return render(); }
+  if (act === 'prBorrarQ') { S.prBorrarQ = b.dataset.id; return render(); }
+  if (act === 'prBorrarNo') { S.prBorrarQ = null; return render(); }
+  if (act === 'prBorrar') { S.prBorrarQ = null; try { await presGuardar(c, presItems(c).filter(x => x.id !== b.dataset.id)); toast('Ítem quitado'); } catch (er) {} return render(); }
+  if (act === 'prGuardar') { const desc = ($('#prDesc').value || '').trim(); const [cat, sub] = ($('#prCat').value || '').split('|'); const num = id => parseFloat((($(id) || {}).value || '').replace(/[^0-9.]/g, '')) || 0;
+    const cant = num('#prCant'), precio = num('#prPrecio'); if (!desc) return toast('Escribe la descripción del ítem.'); if (!(cant > 0)) return toast('Escribe la cantidad.');
+    const it = {id: S.prEd || crUid(), desc, cat: cat || '', sub: sub || '', cant, precio}; const l = presItems(c).slice(); const i = l.findIndex(x => x.id === it.id); if (i >= 0) l[i] = it; else l.push(it);
+    S.prCat = $('#prCat').value; try { await presGuardar(c, l); toast(i >= 0 ? 'Ítem guardado' : 'Ítem agregado'); S.prEd = null; } catch (er) {} render(); const f = $('#prDesc'); if (f && i < 0) f.focus(); } });
 
 /* ================= acciones ================= */
 // asignar: Asigna registros de la app a un control (crea movimientos válidos).
