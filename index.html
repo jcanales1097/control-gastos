@@ -770,6 +770,17 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .modal.tj-fmodal{display:flex;flex-direction:column;max-height:calc(100vh - 40px)}
 .tj-fmodal>.panel{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .tj-fmodal .tj-fhd{position:sticky;top:0;z-index:3;background:var(--panel)}
+.tj-fmodal>.panel>*{flex-shrink:0}
+.tjf-g{display:flex;flex-direction:column}.tjf-side{display:contents}.tjf-side .tjm-pie{order:9}.tjf-main{order:5}
+@media (min-width:1000px){
+  .tj-page .tjf-g{display:grid;grid-template-columns:minmax(330px,380px) minmax(0,1fr);align-items:start}
+  .tj-page .tjf-side{display:block;position:sticky;top:var(--mhd,0px);max-height:calc(100vh - var(--mhd,0px));overflow-y:auto;border-right:1px solid var(--line);background:var(--panel)}
+  .tj-page .tjf-side .kpis.cr-sum{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-flow:row!important}.tj-page .tjf-side .kpis.cr-sum .kpi{border-bottom:1px solid var(--line)}.tj-page .tjf-side .kpi .v{font-size:17px;white-space:nowrap}
+  .tj-page .tjf-side .rc-sum{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 6px;border-bottom:1px solid var(--line)}.tj-page .tjf-side .rc-sum>div{display:grid;gap:2px}
+  .tj-page .tjf-side .tjm-per{padding-inline:14px}.tj-page .tjf-side .tjm-pie .bd{padding:12px 14px}
+  .tj-page .tjf-main{min-width:0}.tj-page .tjf-main .rc-dia{top:var(--mhd,0px)}
+  .tj-page .tjf-main .rc-it,.tj-page .tjf-main .rc-dia{padding-inline:18px}
+}
 .tj-min .tj-fhd{padding-top:6px!important;padding-bottom:6px!important;row-gap:5px}.tj-min .tj-fhd h2{font-size:14px}.tj-min .tj-plastic.lg{transform:scale(.7);transform-origin:left center;margin-right:-8px}
 .tj-min .tj-vico{padding:2px}.tj-min .tj-vico button{min-height:28px}.tj-min .tj-vico button.on{flex:1.6 1 0}.tj-min .tj-vico svg{width:16px;height:16px}
 .tj-min .tj-fhd .btn.ico{min-height:28px;padding-block:2px}
@@ -5017,6 +5028,10 @@ function vTjEstado(t, ps, usd) { const E = tjEcCtas(t, ps); ps = ps.map(p => Obj
       <td class="num tj-bal">${tjD(crR2(p.dL - p.gL), crR2(p.dU - p.gU), usd)}</td><td class="num tj-glob">${tjD(p.ecL, p.ecU, usd, {negL: p.ecL < -0.004, negU: p.ecU < -0.004, b: true})}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
+// tjfGrid: arma el cuerpo de la ficha de la tarjeta. En Movimientos y Todos los cortes: columna lateral (datos de la tarjeta, corte y resumen)
+// y columna principal (registros); el teléfono las apila en el orden de siempre (resumen, registros y el botón de registrar al final).
+function tjfGrid(kp, cuerpo) { const i = cuerpo.indexOf('<!--MAIN-->'); if (i < 0) return kp + cuerpo;
+  return `<div class="tjf-g"><aside class="tjf-side">${kp}${cuerpo.slice(0, i)}</aside><div class="tjf-main">${cuerpo.slice(i + 11)}</div></div>`; }
 function vTjFicha(t) {
   const ps = tjPeriodos(t).reverse(); const act = ps.find(p => p.abierto); const usd = (t.cuentas || []).some(tjEsUSD); const tasa = tasaUSD();
   const pend = ps.filter(p => !p.abierto && !p.pagado && p.est[0] !== 'Sin cargos');
@@ -5029,13 +5044,13 @@ function vTjFicha(t) {
   return `<div class="panel"><div class="hd tj-fhd"><div class="row" style="gap:10px;margin-right:auto;flex-wrap:nowrap;min-width:0"><span class="tj-plastic lg" aria-hidden="true"></span><h2 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.banco || '')} · ${esc(t.nombre || '')} •••• ${esc(t.ultimos4 || '')}</h2></div>
       ${['mov', 'cortes'].includes(S.tjVista || 'mov') ? `<button class="btn sm ghost ico" data-act="tjBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.tjBus}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>` : ''}${icoBtn('editar', 'Editar tarjeta', 'tjForm')}<button class="btn sm ghost ico" data-act="tjCerrar" aria-label="Cerrar" title="Cerrar (Esc)">✕</button>
       <div class="tj-vico" role="tablist" aria-label="Secciones de la tarjeta">${TJV.map(([k, l, d]) => `<button type="button" role="tab" class="tjv-${k} ${vAct === k ? 'on' : ''}" aria-selected="${vAct === k}" data-act="tjVista" data-v="${k}" aria-label="${l}" title="${l}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>${vAct === k ? `<span>${({mov: 'Por corte', cortes: 'Cortes', fin: 'Créditos'})[k] || l}</span>` : ''}</button>`).join('')}</div></div>
-    <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
+    ${tjfGrid(`    <div class="kpis cr-sum" style="border:0;border-radius:0;border-bottom:1px solid var(--line)">
       <div class="kpi"><div class="eyebrow">Corte · pago</div><div class="v">día ${t.dia_corte} · ${t.dia_pago}</div><div class="note">${act ? 'período actual ' + fFecha(act.desde).slice(0, 5) + ' – ' + fFecha(act.corte).slice(0, 5) : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Límite</div><div class="v">${lim ? tjU(lim) : '—'}</div><div class="note">${lim && tasa ? '≈ ' + L(lim * tasa) + ' a tasa del día' : ''}</div></div>
       <div class="kpi"><div class="eyebrow">Usado</div><div class="v">${usadoU != null ? tjU(usadoU) : '—'}</div><div class="note">${L(deudaL)}${deudaU ? ' + ' + tjU(deudaU) : ''} sin pagar</div></div>
       <div class="kpi"><div class="eyebrow">Disponible aprox.</div><div class="v ${lim && usadoU != null && usadoU > lim * .8 ? 'neg' : ''}">${lim && usadoU != null ? (tasa ? '≈ ' + L(crR2((lim - usadoU - intraU) * tasa)) : tjU(crR2(lim - usadoU - intraU))) : '—'}</div><div class="note">${lim && usadoU != null ? (tasa ? tjU(crR2(lim - usadoU - intraU)) + ' a tasa del día · ' : '') + Math.round(usadoU / lim * 100) + ' % del límite usado' : 'agrega el límite y la tasa'}</div></div></div>
     ${intraU ? `<div class="bd note">Los financiamientos de esta tarjeta ocupan ${tjU(intraU)} del disponible (capital de cuotas que todavía no llegan a un corte).</div>` : ''}
-    ${S.tjVista === 'mov' ? vTjMov(t) : S.tjVista === 'cortes' ? vTjMov(t, 'l') : S.tjVista === 'fin' ? vTjFin(t) : vTjExt(t)}
+`, S.tjVista === 'mov' ? vTjMov(t) : S.tjVista === 'cortes' ? vTjMov(t, 'l') : S.tjVista === 'fin' ? vTjFin(t) : vTjExt(t))}
     </div>`;
 }
 /* --- ventana del período --- */
@@ -5959,7 +5974,7 @@ function vTjMov(t, modo) {
       return `<div class="rc-pr tjm-pr" data-act="tjMovIr" data-vista="c" data-v="${p.corte}" role="button" tabindex="0"><b>${tjNom(p.corte)}<span class="cat">${fFecha(p.desde).slice(0, 5)} – ${fFecha(p.corte).slice(0, 5)}</span><span class="cat">pago ${fFecha(p.vHasta).slice(0, 5)}</span><span class="chip ${p.est[1]}">${p.est[0]}</span></b>
         ${celda('rc-r', M => M.vals(p).cg)}${celda('rc-d', M => M.vals(p).pa)}${celda('rc-sl2', M => M.glob.get(p.corte), v => v > 0.004)}${celda('', M => M.vals(p).fa, v => v > 0.004)}</div>`; }).join('');
   }
-  return `<div class="tjm-f">${filtros}${busca}${nav}${info}${sum}</div>${avisoMan}<div class="rc-lst">${cuerpo}</div>${pie}`;
+  return `<div class="tjm-f">${filtros}${busca}${nav}${info}${sum}</div>${avisoMan}<div class="tjm-pie">${pie}</div><!--MAIN--><div class="rc-lst">${cuerpo}</div>`;
 }
 function vTjFin(t) {
   const cs = credsTj(t); const ts = tasaUSD();
