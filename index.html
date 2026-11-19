@@ -803,6 +803,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 body.cta-abierta{overflow:hidden}
 @media (max-width:760px){.cta-page>.modal.cta-modal{border:0}}
 .rg-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk);font-size:13px}.rg-ctl select{width:auto;min-width:160px}
+.unif-p .unif-l{display:grid;gap:8px}.unif-l>div{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.unif-m{font-size:12.5px}.unif-n{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
@@ -1302,6 +1303,7 @@ function derive() {
   const txs = []; const corte = corteApp(); const post = []; const elim = [];
   for (const [, doc] of S.tx) for (const r of (doc.rows || [])) {
     const t = reclasificar(rowToTx(appAplicarEd(r))); const dc = decisionDe(t.id); if (appEds()[t.id]) t.edWeb = appEds()[t.id];
+    if (t.edWeb && t.edWeb.plastico) t.plastico = t.edWeb.plastico;   // plástico (extensión) de un registro de la app que pasó a la cuenta de la tarjeta
     if (t.edWeb && t.edWeb.elim) { elim.push(t); continue; }   // registro de la app eliminado en la web: no cuenta (se restaura desde Registros web → Eliminados)
     if (dc.borrado) t.borradoApp = dc.borrado.at; if (dc.web) t.versionWeb = dc.web;
     if (corte && t.fecha > corte) { if (!t.borradoApp) post.push(t); continue; }   // después del corte con la app solo cuenta lo registrado en la web
@@ -1457,6 +1459,7 @@ async function cargarTodo() {
   // Fase 4 (fase4.sql): marcadores, series de repetición y notas del día. Sin la tabla, cada función se esconde.
   try { S.marc = await todo('marcadores', 'orden'); } catch (e) { S.marc = null; }
   if (esAdmin()) { try { const {error} = await sb.from('tarjetas').select('titular').limit(1); S.f4b = !error; } catch (e) { S.f4b = false; } }
+  if (esAdmin()) { try { const {error} = await sb.from('registros').select('plastico').limit(1); S.fPl = !error; } catch (e) { S.fPl = false; } }   // tarjeta = cuenta: plástico de cada registro
   if (esAdmin()) { try { S.notasDia = new Map((await todo('notas_dia', 'fecha')).map(r => [r.fecha, r])); } catch (e) { S.notasDia = null; } try { S.series = await todo('registro_series', 'creado_el'); } catch (e) { S.series = null; } }
   if (esAdmin()) setTimeout(regPublicarCatalogo, 1500);
   offAplicar();   // lo hecho sin conexión que todavía no se envió
@@ -4215,6 +4218,7 @@ function appParche(m, t, cambios) { const prev = m[t.id] || {}; const app = prev
   const o = Object.assign({}, prev, cambios); const n = {app, por: S.me.id, el: new Date().toISOString()}; let hay = false;
   ['fecha', 'cuenta', 'cat', 'sub', 'nota', 'det'].forEach(k => { if (k in o && (o[k] || '') !== (app[k] || '')) { n[k] = o[k] || ''; hay = true; } });
   if (o.monto != null && cents(o.monto) !== cents(app.monto)) { n.monto = +o.monto; hay = true; }
+  ['plastico', 'elim', 'elim_por', 'elim_el'].forEach(k => { if (o[k] != null) { n[k] = o[k]; hay = true; } });   // marcas que no son de los campos editables
   if (hay) m[t.id] = n; else delete m[t.id]; return m; }
 // appMarcarElim: marca (o quita la marca de) eliminado en la web a registros de la app, sin perder sus otras ediciones.
 function appMarcarElim(m, ts, on) { ts.forEach(t => { const prev = m[t.id] || {}; const o = Object.assign({}, prev);
@@ -4267,6 +4271,92 @@ document.addEventListener('click', async e => {
   if (act === 'appEdRev') { const id = b.dataset.id; const m = Object.assign({}, appEds()); delete m[id]; S.appEdQ = null;
     try { await appGuardarEds(m); toast('Volvió a como está en la app'); } catch (er) {} render(); if (D.byId.get(id)) abrirDetalleTx(id); return; }
 });
+
+/* ===================== Una tarjeta = una cuenta =====================
+   Desde que todo se registra en la web, cada tarjeta es UNA cuenta bimoneda: su saldo en lempiras y en dólares. Por dentro conserva
+   una cuenta de lempiras y otra de dólares (sus dos libros); las demás cuentas que tenía (las de las extensiones o cuentas viejas
+   de la app) se juntan en ese libro y cada registro guarda qué plástico lo hizo (campo "plastico": titular o extensión).
+   Lo que se mueve: registros web (cuenta / cuenta destino en Supabase) y de la app (edición web). Las cuentas juntadas quedan
+   inhabilitadas y su saldo inicial pasa al libro. Todo queda anotado en el ajuste "unifTj" para poder deshacerlo. */
+const unifHecho = () => (S.aj && S.aj.unifTj && S.aj.unifTj.el) ? S.aj.unifTj : null;
+// tjLibro: cuenta principal de la tarjeta en esa moneda (la que queda).
+function tjLibro(tit, mon) { const k = mon === 'USD' ? 'cta_usd' : 'cta_l'; if (tit[k]) return tjCta(tit[k]);
+  const extsCtas = new Set(tjExts(tit).flatMap(e => [e.cta_l, e.cta_usd, ...(e.cuentas || [])]).filter(Boolean).map(tjCta));
+  const l = (tit.cuentas || []).map(tjCta).filter(c => !extsCtas.has(c) && tjMonDe(c) === mon && !(ctaNombres().includes(c) && ctaInfo(c).elim));
+  return l.find(c => !(ctaNombres().includes(c) && ctaInfo(c).oculta)) || l[0] || ''; }
+// unifPlan: por tarjeta, qué cuentas se juntan en qué libro y con qué plástico, y cuántos registros se mueven.
+function unifPlan() {
+  const appTodos = [...D.txs.filter(t => !t.web), ...(S._postCorte || []), ...(S._appElim || [])];
+  return (S.tj || []).filter(t => !t.titular).map(tit => {
+    const exts = tjExts(tit); const libro = {L: tjLibro(tit, 'L'), USD: tjLibro(tit, 'USD')}; const movs = [];
+    [...tjSet(tit)].forEach(acct => { const mon = tjMonDe(acct); let dest = libro[mon]; if (!dest) { libro[mon] = dest = acct; }   // sin libro en esa moneda: esta cuenta pasa a serlo
+      const pl = exts.find(e => [e.cta_l, e.cta_usd, ...(e.cuentas || [])].filter(Boolean).map(tjCta).includes(acct)) || null;
+      if (acct === dest && !pl) return;
+      const web = (S.reg || []).filter(r => r.estado !== 'eliminado' || true).filter(r => tjCta(r.cuenta || '') === acct || tjCta(r.cuenta_destino || '') === acct);
+      const app = appTodos.filter(t => tjCta(t.cuenta) === acct);
+      movs.push({acct, dest, mon, pl: pl ? pl.id : null, web: web.map(r => r.id), app: app.map(t => t.id), base: acct !== dest && ctaNombres().includes(acct) ? +ctaInfo(acct).cfg.saldo_inicial || 0 : 0}); });
+    return {tit, libro, movs}; }).filter(x => x.movs.length || (x.tit.cuentas || []).length > 2); }
+function vUnifPanel() {
+  if (!esAdmin()) return ''; const h = unifHecho();
+  if (h && !S.unifVer) return `<div class="note unif-n">Cada tarjeta es una sola cuenta (unificadas el ${fFecha(h.el.slice(0, 10))}${h.parcial ? ', <b class="neg">quedó a medias</b>' : ''}). <button class="btn sm ghost" data-act="unifVer">Ver</button></div>`;
+  if (h) return S.unifVer ? `<div class="panel unif-p"><div class="bd stack"><div><b>Tarjetas unificadas</b> el ${new Date(h.el).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}: cada tarjeta es una sola cuenta (L y $) y cada registro guarda su plástico.</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${S.unifDeshQ ? `<span class="note">¿Deshacer? Los registros vuelven a sus cuentas de antes.</span><button class="btn sm ghost" data-act="unifDeshNo">No</button><button class="btn sm danger" data-act="unifDesh">Sí, deshacer</button>` : `<button class="btn sm ghost danger" data-act="unifDeshQ">Deshacer la unificación</button>`}<button class="btn sm ghost" data-act="unifVer">Cerrar</button></div></div></div>` : '';
+  const plan = unifPlan(); const tot = plan.reduce((a, x) => { x.movs.forEach(m => { a.web += m.web.length; a.app += m.app.length; a.ctas += m.acct !== m.dest ? 1 : 0; }); return a; }, {web: 0, app: 0, ctas: 0});
+  if (!tot.ctas && !tot.web && !tot.app) return '';
+  if (!S.fPl) return `<div class="panel unif-p"><div class="bd"><b>Una tarjeta = una cuenta.</b> Para unificar las cuentas de las tarjetas corre primero en Supabase el SQL <code>tarjeta_cuenta.sql</code> (agrega el plástico a cada registro) y recarga.</div></div>`;
+  return `<div class="panel unif-p"><div class="hd"><h2 style="margin-right:auto">Una tarjeta = una cuenta</h2></div><div class="bd stack">
+    <div>Cada tarjeta queda como una sola cuenta con saldo en lempiras y en dólares. Las cuentas de sus extensiones y las cuentas viejas se juntan en ella; cada registro guarda qué plástico lo hizo.</div>
+    <div class="unif-l">${plan.map(x => `<div><b>${esc(tjNomC(x.tit))}</b><span class="note">queda: ${[x.libro.L, x.libro.USD].filter(Boolean).map(esc).join(' · ')}</span>${x.movs.filter(m => m.acct !== m.dest || m.pl).map(m => `<span class="unif-m">${esc(m.acct)} → ${esc(m.dest)}${m.pl ? ' · ' + esc(tjNomPl(tjById(m.pl))) : ''} <span class="note">${m.web.length} web · ${m.app.length} app</span></span>`).join('')}</div>`).join('')}</div>
+    <div class="note">${tot.ctas} ${tot.ctas === 1 ? 'cuenta se junta' : 'cuentas se juntan'} · ${tot.web} registros web y ${tot.app} de la app cambian de cuenta. Los saldos de cada tarjeta no cambian. Se puede deshacer.</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="corteRespaldo">Descargar respaldo</button>${S.unifQ ? `<span class="note">¿Unificar ahora?</span><button class="btn sm ghost" data-act="unifNo">No</button><button class="btn sm pri" data-act="unifSi">Sí, unificar</button>` : `<button class="btn sm pri" data-act="unifQ">Unificar las cuentas de las tarjetas</button>`}</div></div></div>`; }
+async function unifAplicar() {
+  const plan = unifPlan(); const rec = {el: null, por: S.me.id, web: [], app: {}, ctas: {}, tjs: {}}; const m = Object.assign({}, appEds());
+  const byId = new Map([...D.txs, ...(S._postCorte || []), ...(S._appElim || [])].map(t => [t.id, t]));
+  toast('Unificando…'); let ok = false;
+  try {
+  for (const x of plan) for (const mv of x.movs) {
+    // registros web: cuenta (con su plástico) y cuenta destino
+    const ws = mv.web.map(id => regDe(id)).filter(Boolean); const deC = ws.filter(r => tjCta(r.cuenta || '') === mv.acct), deD = ws.filter(r => tjCta(r.cuenta_destino || '') === mv.acct);
+    if (deC.length) { const ids = deC.map(r => r.id); rec.web.push({ids, campo: 'cuenta', de: mv.acct, prev: Object.fromEntries(deC.map(r => [r.id, r.plastico || null]))});
+      await q(sb.from('registros').update({cuenta: mv.dest, plastico: mv.pl}).in('id', ids)); deC.forEach(r => { r.cuenta = mv.dest; r.plastico = mv.pl; }); }
+    if (deD.length && mv.acct !== mv.dest) { const ids = deD.map(r => r.id); rec.web.push({ids, campo: 'cuenta_destino', de: mv.acct});
+      await q(sb.from('registros').update({cuenta_destino: mv.dest}).in('id', ids)); deD.forEach(r => { r.cuenta_destino = mv.dest; }); }
+    // registros de la app: edición web con la cuenta nueva y el plástico
+    mv.app.forEach(id => { const t = byId.get(id); if (!t) return; rec.app[id] = m[id] ? JSON.parse(JSON.stringify(m[id])) : null;
+      if (mv.acct !== mv.dest) appParche(m, t, {cuenta: mv.dest}); const o = m[id] || {app: {fecha: t.fecha, cuenta: t.cuenta, cat: t.cat, sub: t.sub, nota: t.nota, det: t.det, monto: t.monto}, por: S.me.id, el: new Date().toISOString()};
+      if (mv.pl) o.plastico = mv.pl; m[id] = o; });
+    // la cuenta juntada: su saldo inicial pasa al libro y queda inhabilitada
+    if (mv.acct !== mv.dest) { if (ctaNombres().includes(mv.acct)) { rec.ctas[mv.acct] = {saldo_inicial: ctaInfo(mv.acct).cfg.saldo_inicial ?? null, estado: ctaInfo(mv.acct).estado}; await ctaGuardar(mv.acct, {saldo_inicial: 0, estado: 'inhabilitada'}); }
+      if (mv.base) { const ant = ctaNombres().includes(mv.dest) ? +ctaInfo(mv.dest).cfg.saldo_inicial || 0 : 0; if (!(mv.dest in rec.ctas)) rec.ctas[mv.dest] = {saldo_inicial: ctaNombres().includes(mv.dest) ? ctaInfo(mv.dest).cfg.saldo_inicial ?? null : null};
+        await ctaGuardar(mv.dest, {saldo_inicial: crR2(ant + mv.base)}); } }
+  }
+  await guardarAjuste('appEdits', m); S.aj.appEdits = m;
+  // tarjetas: la titular queda con sus dos libros; las extensiones, sin cuentas propias
+  for (const x of plan) { const tit = x.tit; const ts = [tit, ...tjExts(tit)];
+    for (const t of ts) { rec.tjs[t.id] = {cuentas: t.cuentas || null, cta_l: t.cta_l || null, cta_usd: t.cta_usd || null};
+      const ch = t === tit ? {cuentas: [x.libro.L, x.libro.USD].filter(Boolean), cta_l: x.libro.L || null, cta_usd: x.libro.USD || null} : {cuentas: [], cta_l: null, cta_usd: null};
+      await q(sb.from('tarjetas').update(ch).eq('id', t.id)); Object.assign(t, ch); } }
+  ok = true; } finally {   // aunque falle a medias, lo hecho queda anotado para poder deshacerlo
+  rec.el = new Date().toISOString(); if (!ok) rec.parcial = true; await guardarAjuste('unifTj', rec); S.aj.unifTj = rec;
+  derive(); S._ctaVer = (S._ctaVer || 0) + 1; }
+  toast('Listo: cada tarjeta es una sola cuenta'); }
+async function unifDeshacer() {
+  const rec = unifHecho(); if (!rec) return; toast('Deshaciendo…');
+  for (const g of rec.web) { if (g.campo === 'cuenta') { const porPl = {}; g.ids.forEach(id => { const k = g.prev && g.prev[id] || ''; (porPl[k] = porPl[k] || []).push(id); });
+      for (const [pl, ids] of Object.entries(porPl)) { await q(sb.from('registros').update({cuenta: g.de, plastico: pl || null}).in('id', ids)); ids.forEach(id => { const r = regDe(id); if (r) { r.cuenta = g.de; r.plastico = pl || null; } }); } }
+    else { await q(sb.from('registros').update({cuenta_destino: g.de}).in('id', g.ids)); g.ids.forEach(id => { const r = regDe(id); if (r) r.cuenta_destino = g.de; }); } }
+  const m = Object.assign({}, appEds()); Object.entries(rec.app).forEach(([id, prev]) => { if (prev) m[id] = prev; else delete m[id]; }); await guardarAjuste('appEdits', m); S.aj.appEdits = m;
+  for (const [n, c] of Object.entries(rec.ctas)) await ctaGuardar(n, Object.assign({saldo_inicial: c.saldo_inicial}, c.estado ? {estado: c.estado} : {}));
+  for (const [id, c] of Object.entries(rec.tjs)) { const t = tjById(id); if (!t) continue; await q(sb.from('tarjetas').update(c).eq('id', id)); Object.assign(t, c); }
+  await guardarAjuste('unifTj', null); S.aj.unifTj = null; derive(); S._ctaVer = (S._ctaVer || 0) + 1; toast('Unificación deshecha'); }
+document.addEventListener('click', async e => { const b = e.target.closest('[data-act]'); if (!b || !/^unif/.test(b.dataset.act)) return; const act = b.dataset.act;
+  if (act === 'unifQ') { S.unifQ = true; return render(); }
+  if (act === 'unifNo') { S.unifQ = false; return render(); }
+  if (act === 'unifSi') { S.unifQ = false; b.disabled = true; try { await unifAplicar(); } catch (er) { toast('No se pudo terminar: ' + (er && er.message || er) + '. Lo hecho queda anotado; puedes deshacerlo.'); } S.unifVer = true; return render(); }
+  if (act === 'unifVer') { S.unifVer = !S.unifVer; return render(); }
+  if (act === 'unifDeshQ') { S.unifDeshQ = true; return render(); }
+  if (act === 'unifDeshNo') { S.unifDeshQ = false; return render(); }
+  if (act === 'unifDesh') { S.unifDeshQ = false; try { await unifDeshacer(); } catch (er) { toast('No se pudo deshacer: ' + (er && er.message || er)); } return render(); } });
 
 /* ================= acciones ================= */
 // asignar: Asigna registros de la app a un control (crea movimientos válidos).
@@ -4731,7 +4821,7 @@ function vTarjetas() {
       <td style="white-space:nowrap">${ult ? `<span class="chip ${ult.est[1]}">${ult.est[0]}</span> <span class="num small">${fFecha(ult.corte)}</span>` : '—'}</td>
       <td style="white-space:nowrap">${pp ? `<span class="num small ${pp.fpago < hoy() ? 'neg' : ''}">${fFecha(pp.fpago)}</span>` : '<span class="muted small">al día</span>'}</td>
       <td class="acc"><div class="acc-row">${S.confirmTj === t.id ? `<button class="btn sm danger" data-act="tjBorrar">¿Eliminar? Sí</button><button class="btn sm ghost" data-act="tjBorrarNo">No</button>` : icoBtn('editar', 'Editar tarjeta', 'tjForm') + icoBtn('borrar', 'Eliminar tarjeta', 'tjBorrar', '', 'danger')}</div></td></tr>`; }).join('');
-  const cab = `<div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>${lista.length ? tjTabs() : ''}`;
+  const cab = `<div class="row" style="justify-content:space-between;align-items:flex-end;gap:12px">${head}<button class="btn pri" data-act="tjNueva">+ Nueva tarjeta</button></div>${vUnifPanel()}${lista.length ? tjTabs() : ''}`;
   if (S.tjTab === 'analisis' && lista.length) return `<div class="stack">${cab}${vTjDash(lista)}</div>`;
   return `<div class="stack">
     ${cab}
@@ -4749,7 +4839,7 @@ function vTarjetas() {
       <div class="kpi"><div class="eyebrow">Cortes vencidos</div><div class="v ${kV ? 'neg' : ''}">${kV}</div><div class="note">pasó la fecha de pago y no están pagados</div></div>
     </div>
     <div class="panel"><div class="hd"><h2 style="margin-right:auto">Tarjetas</h2></div>
-      ${lista.length ? `<div class="solo-tel-b">${filMT.join('')}</div><div class="tbl-wrap solo-pc"><table><thead><tr><th>Tarjeta</th><th>Cuentas en la app</th><th>Días</th><th class="num">Gasto período actual</th><th class="num">Saldo pendiente</th><th>Uso del límite</th><th>Último corte</th><th>Pago pendiente</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`
+      ${lista.length ? `<div class="solo-tel-b">${filMT.join('')}</div><div class="tbl-wrap solo-pc"><table><thead><tr><th>Tarjeta</th><th>Cuentas (L · $)</th><th>Días</th><th class="num">Gasto período actual</th><th class="num">Saldo pendiente</th><th>Uso del límite</th><th>Último corte</th><th>Pago pendiente</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>`
         : '<div class="bd note">Todavía no hay tarjetas. Agrega la primera con “+ Nueva tarjeta” y elige las cuentas de la app que le pertenecen.</div>'}</div>
   </div>`;
 }
@@ -5047,7 +5137,7 @@ const REG_EST = {oficial: ['Oficial', 'ok'], pendiente: ['Por aprobar', 'warn'],
 const regDe = id => (S.reg || []).find(r => r.id === id);
 // regATx: filas (formato de la app) de un registro oficial.
 function regATx(r) {
-  const base = {fecha: r.fecha, hora: r.hora || '', mes: String(r.fecha).slice(0, 7), web: r.id, det: r.descripcion || '', neg: false, etiquetas: r.etiquetas || [], serie: r.serie || null, cuota: r.cuota || null};
+  const base = {fecha: r.fecha, hora: r.hora || '', mes: String(r.fecha).slice(0, 7), web: r.id, plastico: r.plastico || null, det: r.descripcion || '', neg: false, etiquetas: r.etiquetas || [], serie: r.serie || null, cuota: r.cuota || null};
   const enUSD = c => { try { return ctaInfo(c).mon === 'USD'; } catch (e) { return tjEsUSD(c); } };
   const amt = (c, m) => { m = Math.abs(+m || 0); if (!enUSD(c)) return {monto: m, montoApp: m}; const ts = +r.tasa || tasaUSD() || 0; const h = crR2(m * ts); return {monto: h, montoApp: h, moneda: 'USD', original: m, tasa: ts}; };
   const fila = (suf, o) => Object.assign({id: 'W' + r.id + suf}, base, o);
@@ -5093,7 +5183,8 @@ function abrirRegForm(id) {
       grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || '', etq: (r.etiquetas || []).join(', ')}
     : {tipo: prev.tipo || 'gasto', fecha: hoy(), hora: ahoraHora(), cuenta: prev.cuenta || '', destino: prev.destino || '', monto: '', montoD: '', comision: '', signo: 1, modoAj: 'saldo', grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null};
   if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
-  { const F = S.regF; const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); } }
+  { const F = S.regF; const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); }
+    if (r && r.plastico && F.tj && tjById(r.plastico)) F.tj = r.plastico; }
   S.regVista = 'form'; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
@@ -5247,6 +5338,7 @@ function regArmar() {
   regLeerForm(); const F = S.regF; const a = esAdmin(); const monto = numDe(F.monto);
   if (!F.fecha) return 'Falta la fecha.';
   const etqs = etqLista(F.etq); const row = {etiquetas: etqs.length ? etqs : null, tipo: F.tipo, fecha: F.fecha, hora: F.hora || null, descripcion: (F.desc || '').trim() || null, grupal: null, subgrupal: null, detalle: (F.detalle || '').trim() || null, cuenta: null, cuenta_destino: null, monto_destino: null, comision: null, signo: null, tasa: null};
+  if (S.fPl) { const pl = F.tj && tjById(F.tj); row.plastico = pl && pl.titular && F.cuenta && tjDeCuenta(F.cuenta) ? pl.id : null; }   // qué extensión hizo el cargo
   if (F.tipo === 'traslado') { if (!F.cuenta || !F.destino) return 'Elige las dos cuentas.'; if (F.cuenta === F.destino) return 'Las dos cuentas deben ser distintas.'; if (!(monto > 0)) return 'Escribe el importe.';
     row.cuenta = F.cuenta; row.cuenta_destino = F.destino; row.monto = crR2(monto); const mo = ctaInfo(F.cuenta).mon, md = ctaInfo(F.destino).mon, ts = tasaUSD();
     if (mo !== md) { let md2 = numDe(F.montoD); if (!(md2 > 0)) { if (!ts) return 'Escribe el importe que llega (no hay tasa del día).'; md2 = mo === 'USD' ? monto * ts : monto / ts; } row.monto_destino = crR2(md2); }
@@ -5694,6 +5786,7 @@ function vTjMov(t, modo) {
   const monsT = ['L', 'USD'].filter(m => [...tjSet(t)].some(n => ctaNombres().includes(n) && ctaInfo(n).mon === m)); if (!monsT.length) return '<div class="bd note">Esta tarjeta no tiene cuentas.</div>';
   const mon = monsT.includes(S.tjMovMon) ? S.tjMovMon : monsT[0]; const U = mon === 'USD'; const exts = tjExts(t); const pl = S.tjMovPl || '';
   const plDe = n => { const p = tjDeCuenta(n); return p && p.titular ? p : null; };
+  const plF = f => (f.t.plastico && tjById(f.t.plastico)) || plDe(f.cta);   // plástico del registro (o, en lo viejo, el de su cuenta)
   const num = v => (U ? '$ ' : '') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); const sNum = v => (v < -0.004 ? '-' : '') + num(v);
   const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; const hoyD = hoy(); const set = tjSet(t);
   const ps = tjPerC(t); const vista = modo === 'l' && !(S.tjBus && (S.tjQ || '').trim()) ? 'l' : 'c';   // 'l': pestaña "Todos los cortes" de la barra de arriba
@@ -5701,7 +5794,7 @@ function vTjMov(t, modo) {
   // Cada registro se ve en el período en que se hizo (por su fecha), también los pagos; el corte al que se aplica un pago se indica en la fila.
   const corteDe = f => tjCorteDe(t, f.t.fecha).corte;
   // mk: datos de una moneda (filas de la tarjeta, pagos desde otras cuentas, totales por corte y saldo global).
-  const mk = mo => { const Um = mo === 'USD'; const d = tjDatos(t, mo); const vis = pl ? d.filas.filter(f => { const p = plDe(f.cta); return pl === 'tit' ? !p : p && p.id === pl; }) : d.filas;
+  const mk = mo => { const Um = mo === 'USD'; const d = tjDatos(t, mo); const vis = pl ? d.filas.filter(f => { const p = plF(f); return pl === 'tit' ? !p : p && p.id === pl; }) : d.filas;
   const idsF = new Set(d.filas.map(f => f.t.id)); const extraT = pl ? [] : ps.flatMap(p => p.pg.filter(x => !x.auto && !(x.tx_id && idsF.has(x.tx_id))).map(x => { const tx = x.tx_id && D.byId.get(x.tx_id);
     const m = x.monto_manual != null ? (x.usd ? {usd: +x.monto_manual, l: 0} : {l: +x.monto_manual, usd: 0}) : tx ? tjPagoMonto(tx, set) : (x.usd ? {usd: +x.monto || 0, l: 0} : {l: +x.monto || 0, usd: 0});
     return {x, tx, v: crR2(Um ? m.usd : m.l), aplica: p.corte, en: tx ? tjCorteDe(t, tx.fecha).corte : p.corte}; })).filter(z => z.v);
@@ -5737,7 +5830,7 @@ function vTjMov(t, modo) {
       nav = `<div class="rc-nav"><span></span><b>${l.length} ${l.length === 1 ? 'coincide' : 'coinciden'}</b><span></span></div>`; info = '';
       sum = `<div class="rc-sum"><div><span>Cargos</span><b class="num rc-r">${num(cg)}</b></div><div><span>Pagos</span><b class="num rc-d">${num(pa)}</b></div><div><span>Registros</span><b class="num">${l.length}</b></div><div><span>Saldo hoy</span><b class="num">${sNum(d.saldo)}</b></div></div>`; }
     const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); }); const rev = ctaTrasRev();
-    const fila = f => { const x = f.t; const tras = tjEsTras(x); const pp = plDe(f.cta);
+    const fila = f => { const x = f.t; const tras = tjEsTras(x); const pp = plF(f);
       const izq = (tras ? (f.lado === 'd' ? 'Pago / abono' : 'Transferencia') : `${esc(catG(x.cat))}${x.sub ? '<br>' + esc(subG(x.cat, x.sub)) : ''}`) + `<br><span class="tjm-pl ${pp ? 'ext' : ''}">${pp ? esc(tjNomPl(pp)) : 'Titular'}</span>`;
       const tit = (x.nota ? notaG(x.cat, x.sub, x.nota) : '') || (tras ? (f.lado === 'd' ? 'Pago a la tarjeta' : 'Traslado') : subG(x.cat, x.sub) || catG(x.cat) || 'Registro');
       let lin2 = esc(tjCta(x.cuenta)); if (tras) { const o = (rev.get(x.id) || {}).otra || tjDestino(x) || '¿?'; lin2 = ctaSigno(x) < 0 ? `${esc(tjCta(x.cuenta))} → ${esc(o)}` : `${esc(o)} → ${esc(tjCta(x.cuenta))}`; }
@@ -5780,7 +5873,8 @@ function vTjFin(t) {
 }
 function vTjExt(t) {
   const exts = tjExts(t);
-  return `<div class="bd stack">${exts.map(x => { const s = tjSaldos(Object.assign({}, x, {id: '__' + x.id})); return `<div class="tjf-it"><div class="row" style="justify-content:space-between;gap:8px"><b>${esc(tjNomPl(x))}</b><span class="row" style="gap:6px"><span class="num">${L(s.l)}${s.u ? ' · ' + tjU(s.u) : ''}</span><button class="btn sm ghost" data-act="tjForm" data-id="${esc(x.id)}">Editar</button></span></div><div class="cat">${(x.cuentas || []).map(c => esc(c)).join(' · ') || 'sin cuentas de la app'}</div></div>`; }).join('')
+  const act = tjPerC(t).find(p => p.abierto); const delPl = (x, mon) => { if (!act) return 0; return crR2(-tjDatos(t, mon).filas.filter(f => f.lado === 'r' && f.t.plastico === x.id && f.t.fecha >= act.desde && f.t.fecha <= act.corte).reduce((a, f) => a + f.v, 0)); };
+  return `<div class="bd stack">${exts.map(x => { const s0 = (x.cuentas || []).length || x.cta_l || x.cta_usd ? tjSaldos(Object.assign({}, x, {id: '__' + x.id})) : null; const s = s0 || {l: -delPl(x, 'L'), u: -delPl(x, 'USD')}; return `<div class="tjf-it"><div class="row" style="justify-content:space-between;gap:8px"><b>${esc(tjNomPl(x))}</b><span class="row" style="gap:6px"><span class="num">${L(s.l)}${s.u ? ' · ' + tjU(s.u) : ''}</span><button class="btn sm ghost" data-act="tjForm" data-id="${esc(x.id)}">Editar</button></span></div><div class="cat">${(x.cuentas || []).map(c => esc(c)).join(' · ') || 'sin cuentas de la app'}</div></div>`; }).join('')
     || '<div class="note">Sin extensiones. Una extensión registra sus gastos aparte, pero todo cae en el estado de cuenta, el saldo y el disponible de la titular, y los pagos se hacen a la titular.</div>'}
     ${S.f4b ? `<button class="btn sm" data-act="tjNuevaExt" data-id="${esc(t.id)}" style="justify-self:start">+ Agregar extensión</button>` : '<div class="note">Para agregar extensiones corre primero en Supabase el SQL de la fase 4B (fase4b.sql).</div>'}</div>`;
 }
@@ -5809,7 +5903,9 @@ function regTjCeldas(cel, sel) { if (!S.tj) return ''; const l = (S.tj || []).fi
   return l.length ? `<div class="rg-gt">Tarjetas de crédito</div><div class="rg-grid">${l.map(t => cel('regPickC', 'tj:' + t.id, `<span>${esc(t.titular ? tjNomPl(t) : tjNomC(t))}</span><span class="rg-chev">${t.titular ? '↳ ' + esc(tjNomC(tjTit(t))) : 'L y $'}</span>`, sel === t.id)).join('')}</div>` : ''; }
 function regTjElegir(F, k, id) {   // k: 'cta' o 'dest'
   const t = tjById(id); if (!t) return; const kk = k === 'dest' ? 'tjD' : 'tj', km = k === 'dest' ? 'tjMonD' : 'tjMon'; F[kk] = id;
-  let mon = F[km] || 'L'; if (!tjLedger(t, mon)) mon = mon === 'L' ? 'USD' : 'L'; F[km] = mon; const led = tjLedger(t, mon);
+  // una extensión ya no tiene cuenta propia: registra en la cuenta de la tarjeta (la titular) y el registro guarda su plástico
+  const led0 = m => tjLedger(t, m) || (t.titular ? tjLedger(tjTit(t), m) : '');
+  let mon = F[km] || 'L'; if (!led0(mon)) mon = mon === 'L' ? 'USD' : 'L'; F[km] = mon; const led = led0(mon);
   if (k === 'dest') F.destino = led; else F.cuenta = led;
   if (!led) toast('Esta tarjeta no tiene cuenta para registrar. Revisa sus cuentas en Editar tarjeta.');
 }
