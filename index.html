@@ -802,6 +802,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .cta-page>.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}
 body.cta-abierta{overflow:hidden}
 @media (max-width:760px){.cta-page>.modal.cta-modal{border:0}}
+.rg-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk);font-size:13px}.rg-ctl select{width:auto;min-width:160px}
 .copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
 .tjm-pl{font-size:10.5px;color:var(--muted)}.tjm-pl.ext{color:var(--cb);font-weight:600}
 .tjm-f .rc-nav,.tjm-f .rc-tabs,.tjm-f .rc-sum{margin-inline:0}
@@ -1712,7 +1713,7 @@ const ICTL = {
   cerrar: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
   abrir: '<svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>'};
 function accionesCtl(c, mes, R, a) {
-  return `${cerrado(c) ? '' : `<button class="btn pri" data-act="nuevoReg" data-c="${c.id}" data-m="${esc(mes)}" title="Nuevo registro" aria-label="Nuevo registro">${ICTL.nuevo}<span class="htx">+ Nuevo registro</span></button>`}<details class="menu"><summary class="btn" title="Reporte PDF" aria-label="Reporte PDF">${ICTL.pdf}<span class="htx">Reporte PDF ▾</span></summary><div class="menu-pop">
+ return `${cerrado(c) || !esAdmin() ? '' : `<button class="btn pri" data-act="nuevoReg" data-c="${c.id}" data-m="${esc(mes)}" title="Nuevo registro" aria-label="Nuevo registro">${ICTL.nuevo}<span class="htx">+ Nuevo registro</span></button>`}<details class="menu"><summary class="btn" title="Reporte PDF" aria-label="Reporte PDF">${ICTL.pdf}<span class="htx">Reporte PDF ▾</span></summary><div class="menu-pop">
         <button data-act="pdf" data-c="${c.id}" data-m="${mes}">Reporte completo</button>
         ${(() => { const ps = [...new Set([...personasDe(c, mes), ...R.per.map(x => x.p)])].filter(Boolean); return ps.length ? `<div class="sep"></div><div class="eyebrow">Solo para una persona</div>${ps.map(p => `<button data-act="pdf" data-c="${c.id}" data-m="${mes}" data-p="${esc(p)}">${esc(p)} <span class="muted small">· sus gastos y los compartidos</span></button>`).join('')}` : ''; })()}
       </div></details><button class="btn" data-act="export" data-c="${c.id}" title="Exportar a Excel" aria-label="Exportar a Excel">${ICTL.xls}<span class="htx">Exportar a Excel</span></button>
@@ -2101,7 +2102,7 @@ function tablaFilas(c, h, lado) {
     <td class="desc small td-desc"><button class="linkish" data-act="detalle" title="Ver todos los datos">${esc(r.descripcion || r.detalle || '(sin descripción)')}</button>${clipN(adjDeFila(r))}${r.estado !== 'valido' && r.creado_por ? `<div class="cat">Registró ${esc(nombreDe(r.creado_por))}${r.estado === 'rechazado' && r.nota ? ` · Motivo: ${esc(r.nota)}` : ''}</div>` : ''}</td>
     <td class="num td-val" style="white-space:nowrap">${L(+r.valor || 0)}${a && r.tx_id ? fxTxt(D.byId.get(r.tx_id)) : ''}</td>
     <td class="td-est" style="white-space:nowrap">${origenChip(r)}</td>
-    <td class="acc"><div class="acc-row"><span class="solo-tel-il">${icoBtn('ver', 'Ver todos los datos', 'detalle')}</span>${a && r.estado === 'pendiente' ? icoBtn('validar', 'Validar', '', '#validar') : ''}${puedeEditar(r) ? icoBtn('editar', 'Editar', 'editarMov') : ''}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? icoBtn('dividir', 'Dividir en partes', 'dividirMov') : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? icoBtn('asociar', 'Asociar a un registro de la app', 'asociar') : ''}${puedeBorrar(r) ? (S.confirmK === r.id ? `<button class="btn sm danger" data-act="quitar">${r.tx_id ? '¿Quitar?' : '¿Borrar?'} Sí</button>` : icoBtn(r.tx_id ? 'quitar' : 'borrar', r.tx_id ? 'Quitar (vuelve a la bandeja)' : 'Borrar', 'quitar', '', 'danger')) : ''}</div></td></tr>`;
+    <td class="acc"><div class="acc-row"><span class="solo-tel-il">${icoBtn('ver', 'Ver todos los datos', 'detalle')}</span>${a && r.estado === 'pendiente' ? icoBtn('validar', 'Validar', '', '#validar') : ''}${puedeEditar(r) ? icoBtn('editar', 'Editar', 'editarMov') : ''}${a && r.tx_id && !ro && D.byId.get(r.tx_id) ? icoBtn('dividir', 'Dividir en partes', 'dividirMov') : ''}${a && !r.tx_id && r.estado === 'valido' && !ro ? icoBtn('asociar', 'Asociar a un registro de la app', 'asociar') : ''}${a && r.tx_id && D.byId.get(r.tx_id) ? icoBtn('borrar', 'Eliminar el registro (de la cuenta y de aquí)', 'ctlElimFila', '', 'danger') : ''}${puedeBorrar(r) ? (S.confirmK === r.id ? `<button class="btn sm danger" data-act="quitar">${r.tx_id ? '¿Quitar?' : '¿Borrar?'} Sí</button>` : icoBtn(r.tx_id ? 'quitar' : 'borrar', r.tx_id ? 'Quitar (vuelve a la bandeja)' : 'Borrar', 'quitar', '', 'danger')) : ''}</div></td></tr>`;
     const hechos = new Set(); const nc = cols; const ivalor = 3 + (eg && fam ? 1 : 0);
     const sueltas = rowsO.filter(r => !(r.grupo && microById(r.grupo)));
     const grupos = [...new Set(rowsO.filter(r => r.grupo && microById(r.grupo)).map(r => r.grupo))].sort((x, y) => microById(x).nombre.localeCompare(microById(y).nombre, 'es'));
@@ -2122,7 +2123,7 @@ function tablaFilas(c, h, lado) {
     }).join(''); })()}
   </tbody></table></div>
   ${filtrado && !rows.length ? '<div class="bd note">Ninguna fila coincide con la búsqueda o los filtros.</div>' : ''}
-  ${todas.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno con “+ Nuevo registro”.' : `Registra un ${eg ? 'gasto' : 'ingreso'} con “+ Nuevo registro”; quedará por validar.`}</div>`}</div>`;
+  ${todas.length ? '' : `<div class="bd note">${a ? 'Asigna movimientos desde la bandeja o agrega uno con “+ Nuevo registro”.' : `Todavía no hay ${eg ? 'gastos' : 'ingresos'} en este mes.`}</div>`}</div>`;
 }
 
 /* ================= participantes por mes ================= */
@@ -3537,10 +3538,19 @@ async function guardarAsoc() {
   try { await actualizarMov(m.id, ch, 'Fila asociada al registro de la app'); await ligarAdjuntos(m.id, t.id).catch(() => {}); S.asoc = null; $('#modalRoot').innerHTML = ''; render(); } catch (e) {}
 }
 
+// regCtrlHtml: en el formulario abierto desde un gestor de gastos: a qué gestor y con qué TIPO (o persona) queda asignado el registro.
+function regCtrlHtml(F) { const R = S.regCtrl; const c = ctrlById(R.cid); if (!c) return ''; const eg = F.tipo === 'gasto';
+  const donde = `<b>${esc(c.nombre)}</b>${c.porMes && R.mes && R.mes !== 'general' ? ' · ' + esc(mesLargo(R.mes)) : ''}`;
+  if (!['gasto', 'ingreso'].includes(F.tipo)) return `<div class="rg-ctl note">Los traslados y ajustes no se asignan a ${donde}.</div>`;
+  return `<div class="rg-ctl"><span>Se asigna a ${donde} como</span><select class="in" id="rgCtlTipo">${tipoOptions(c, eg ? R.tipoE : R.tipoI, eg ? 'egreso' : 'ingreso', R.mes)}</select>${c.porMes ? '<span class="note">en el mes de la fecha del registro</span>' : ''}</div>`; }
+document.addEventListener('change', e => { if (e.target.id === 'rgCtlTipo' && S.regCtrl) { if (S.regF && S.regF.tipo === 'ingreso') S.regCtrl.tipoI = e.target.value; else S.regCtrl.tipoE = e.target.value; } });
+// regAsignarCtrl: asigna al gestor los registros recién creados (gastos e ingresos) con el TIPO elegido.
+async function regAsignarCtrl(ids, tipo) { const R = S.regCtrl; if (!R || !['gasto', 'ingreso'].includes(tipo)) return; const sel = $('#rgCtlTipo'); const tp = sel ? sel.value : tipo === 'ingreso' ? R.tipoI : R.tipoE;
+  const txs = ids.map(id => 'W' + id).filter(x => D.byId.get(x)); if (txs.length) await asignar(txs, R.cid, tp); }
 /* ================= detalle de una fila ================= */
 // abrirDetalle: Ficha completa de una fila: datos, datos de la app, historial y comprobantes.
 function abrirDetalle(id) {
-  const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin(); S.detAbierto = {tipo: 'fila', id};
+  const m = S.movs.get(id); if (!m) return; const c = ctrlById(m.control); const a = esAdmin(); S.detAbierto = {tipo: 'fila', id}; if (S.ctlElimQ && S.ctlElimQ !== id) S.ctlElimQ = null;
   const t = m.tx_id ? D.byId.get(m.tx_id) : null; const cb = cambioDe(m);
   const fila = (k, v) => v === undefined || v === null || v === '' ? '' : `<tr><th>${k}</th><td>${v}</td></tr>`;
   const cuando = d => d ? new Date(d).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'}) : '';
@@ -3571,6 +3581,8 @@ function abrirDetalle(id) {
       </tbody></table>
       ${a && !m.tx_id && m.estado === 'valido' && !cerrado(c) ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-act="asociar" data-mov-id="${esc(m.id)}">Asociar a un registro de la app</button></div>` : ''}
       ${a && m.tx_id && t && !cerrado(c) ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-act="dividirMov" data-mov-id="${esc(m.id)}">${ps.length > 1 ? 'Cambiar reparto' : 'Dividir'}</button></div>` : ''}
+      ${a && m.tx_id && t ? (S.ctlElimQ === m.id ? `<div class="copia-q"><b>¿Eliminar este registro?</b><span class="note">Se quita de ${ps.length > 1 ? 'todos los gestores donde está repartido' : 'este gestor'} y deja de contar en la cuenta ${esc(tjCta(t.cuenta))}. Queda en Cuentas → Registros web → Eliminados, donde se puede restaurar.</span><div class="row" style="gap:8px"><button class="btn sm ghost" data-act="ctlElimNo" data-mov-id="${esc(m.id)}">No</button><button class="btn sm danger" data-act="ctlElim" data-mov-id="${esc(m.id)}">Sí, eliminar</button></div></div>`
+        : `<div class="eyebrow">El registro</div><div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn sm ghost danger" data-act="ctlElimQ" data-mov-id="${esc(m.id)}">Eliminar registro</button><button class="btn sm" data-act="ctlRegCopiar" data-mov-id="${esc(m.id)}">Copiar</button><button class="btn sm pri" data-act="ctlRegEditar" data-mov-id="${esc(m.id)}">Editar registro</button></div>`) : ''}
     </div></div></div>`;
 }
 
@@ -4778,6 +4790,7 @@ function regVolverCta() { if (S.regVolverTj) { S.regVolverTj = null; S.regF = nu
   const n = S.regVolverCta; if (!n) return false; S.regVolverCta = null; S.regF = null; S.ctaFicha = n; if (S.regUlt && S.regUlt.fecha && (S.ctaVista || 'd') === 'd') S.ctaMes = S.regUlt.fecha.slice(0, 7);
   pintarCtaFicha(); const m = document.querySelector('.cta-modal'); if (m) m.scrollTop = S.ctaScroll || 0; return true; }
 function cerrarCapa() {
+  if (document.querySelector('#modalRoot .rg-modal')) S.regCtrl = null;
   if ((S.regVolverCta || S.regVolverTj) && document.querySelector('.rg-modal')) { $('#modalRoot').innerHTML = ''; regVolverCta(); return; }
   const volverCta = !!document.querySelector('.dtx-modal') && S.ctaVolver;   // movimiento abierto desde el detalle de una cuenta
   const enFicha = !!document.querySelector('#modalRoot .tj-fmodal'); $('#modalRoot').innerHTML = ''; S.concQ = null; S.tjPer = null;
@@ -5174,7 +5187,7 @@ function pintarRegForm() {
         ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', `<div class="rg-etqw"><input class="rg-in" id="rgEtq" value="${esc(F.etq || '')}" placeholder="ej. Viaje Roatán, Navidad" autocomplete="off">${(() => { const ya = etqLista(F.etq); const sug = etqUsadas().filter(x => !ya.includes(x)).slice(0, 6); return ya.length || sug.length ? `<div class="rg-etqs">${ya.map(x => `<button type="button" class="chip on" data-act="etqTog" data-v="${esc(x)}">#${esc(x)} ✕</button>`).join('')}${sug.map(x => `<button type="button" class="chip" data-act="etqTog" data-v="${esc(x)}">+ ${esc(x)}</button>`).join('')}</div>` : ''; })()}</div>`)}
         ${a && !ed && F.tipo !== 'ajuste' && S.series !== null ? fila('Repetir', `<button type="button" class="rg-sel ${F.rep && F.rep.frec ? '' : 'vacio'}" data-act="regPick" data-v="rep">↻ ${repTxt(F)}</button>`, pk === 'rep' ? 'activo' : '') : ''}
         ${fila('Descripción', `<textarea class="rg-in" id="rgDesc" rows="1" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
-      </div>
+      </div>${S.regCtrl && !F.id ? regCtrlHtml(F) : ''}
       <div id="rgMsg" class="note"></div>
       ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
     </div>
@@ -5269,17 +5282,18 @@ async function regGuardar(seguir) {
       await q(sb.from('registro_series').insert(sr)); (S.series || (S.series = [])).push(sr);
       const filas = plan.map(p => Object.assign({}, row, {id: crUid(), fecha: p.fecha, monto: p.monto, serie: sr.id, cuota: p.k, detalle: F.rep.cuotas ? `${row.detalle || 'Cuota'} (${p.k}/${p.n})` : row.detalle,
         monto_destino: row.monto_destino != null && F.rep.cuotas ? crR2(row.monto_destino / plan.length) : row.monto_destino, estado: 'oficial', creado_por: S.me.id, creado_el: ahora, aprobado_por: S.me.id, aprobado_el: ahora}));
-      const d = await q(sb.from('registros').insert(filas).select(), seguir ? '' : `${filas.length} registros creados (${repTxt(F)})`); const nuevos = d && d.length ? d : filas; S.reg.push(...nuevos);
+      const d = await q(sb.from('registros').insert(filas).select(), seguir ? '' : `${filas.length} registros creados (${repTxt(F)})`); const nuevos = d && d.length ? d : filas; S.reg.push(...nuevos); S._regCreados = nuevos.map(n => n.id);
       for (const n of nuevos) await regHist(n.id, 'creado', null, n);
       S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino, fecha: F.fecha}; S._regDupOk = null; S._regN = (S._regN || 0) + nuevos.length; }
     else { row.id = crUid(); row.estado = a ? 'oficial' : 'pendiente'; row.creado_por = S.me.id; row.creado_el = new Date().toISOString(); if (a) { row.aprobado_por = S.me.id; row.aprobado_el = row.creado_el; }
-      const d = await q(sb.from('registros').insert(row).select(), seguir ? '' : a ? 'Registro guardado' : 'Enviado para aprobación'); const nuevo = d && d[0] ? d[0] : row; S.reg.push(nuevo); await regHist(nuevo.id, 'creado', null, nuevo); if (a) { derive(); await tjPagoAuto(F, nuevo); }
+      const d = await q(sb.from('registros').insert(row).select(), seguir ? '' : a ? 'Registro guardado' : 'Enviado para aprobación'); const nuevo = d && d[0] ? d[0] : row; S.reg.push(nuevo); S._regCreados = [nuevo.id]; await regHist(nuevo.id, 'creado', null, nuevo); if (a) { derive(); await tjPagoAuto(F, nuevo); }
       S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino, fecha: F.fecha}; S._regDupOk = null; S._regN = (S._regN || 0) + 1; }
     if (a) derive();
+    if (a && S.regCtrl && !F.id && S._regCreados) { const ids = S._regCreados; S._regCreados = null; await regAsignarCtrl(ids, F.tipo); }
     if (seguir) { const res = regResumen(row);
       Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null, id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
       pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); if (tjAbierta()) pintarTjFicha(true); return; }
-    $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; render(); if (regVolverCta()) return;
+    $('#modalRoot').innerHTML = ''; S.regF = null; S._regN = 0; S.regCtrl = null; render(); if (regVolverCta()) return;
   } catch (e) {} finally { S._regGuardando = false; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = false); }
 }
 const regResumen = r => { const mon = r.cuenta && ctaInfo(r.cuenta).mon === 'USD' ? 'USD' : 'L';
@@ -5295,7 +5309,7 @@ async function regCambiarEstado(id, estado, extra, accion, okMsg) {
 function pintarRegMios() {
   const l = (S.reg || []).filter(r => r.creado_por === S.me.id).sort((x, y) => String(y.creado_el).localeCompare(String(x.creado_el)));
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal cr-modal rg-modal" role="dialog" aria-modal="true" aria-labelledby="rgMT">
-    <div class="hd"><h2 id="rgMT" style="margin-right:auto">Mis registros</h2><button class="btn sm pri" data-act="regNuevo">+ Nuevo</button><button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button></div>
+    <div class="hd"><h2 id="rgMT" style="margin-right:auto">Mis registros</h2>${esAdmin() ? '<button class="btn sm pri" data-act="regNuevo">+ Nuevo</button>' : ''}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button></div>
     <div class="bd rg-bd" style="gap:0">${l.map(r => regFilaHtml(r, true)).join('') || '<div class="note" style="padding:14px">Todavía no has registrado nada.</div>'}</div></div></div>`;
 }
 function regFilaHtml(r, mios) {
@@ -5346,7 +5360,7 @@ function vValidarRegistros() {
 /* --- eventos --- */
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act; if (!act.startsWith('reg')) return;
-  if (act === 'regNuevo') return abrirRegForm();
+  if (act === 'regNuevo') { if (!esAdmin()) return; S.regCtrl = null; return abrirRegForm(); }
   if (act === 'regMios') { S.regF = null; S.regPick = null; return pintarRegMios(); }
   if (act === 'regSerieElim') { const r = regDe(b.dataset.id); if (!r) return; const t = S.detAbierto && D.byId.get(S.detAbierto.id);
     if (S.serieConf !== r.id) { S.serieConf = r.id; if (t) abrirDetalleTx(t.id); return; } S.serieConf = null;
@@ -5395,7 +5409,7 @@ const regPendientes = () => esAdmin() && S.reg ? S.reg.filter(r => r.estado === 
 // Mientras se desplaza la página el botón + se transparenta; vuelve a verse al detenerse.
 let _fabT = null; const fabMov = () => { const fs = document.querySelectorAll('.rg-fab'); if (!fs.length) return; fs.forEach(f => f.classList.add('moviendo')); clearTimeout(_fabT); _fabT = setTimeout(() => { document.querySelectorAll('.rg-fab').forEach(g => g.classList.remove('moviendo')); }, 650); };
 document.addEventListener('scroll', fabMov, {passive: true, capture: true}); document.addEventListener('touchmove', fabMov, {passive: true});
-const regFab = () => S.me && S.me.activo ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
+const regFab = () => S.me && S.me.activo && esAdmin() ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
 // regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
 // Copiar un registro: abre el formulario de registro nuevo con los mismos datos (cuenta, monto, categoría, descripción…);
 // antes pregunta si la copia lleva la fecha del registro o la de hoy. Se revisa y se guarda como cualquier registro nuevo.
@@ -6948,6 +6962,18 @@ document.addEventListener('click', async e => {
     const datos = {exportado: new Date().toISOString(), controles: S.ctrls.map(toC), movimientos: [...S.movs.values()], accesos: S.accesos, perfiles: S.perfiles, ignorados: [...S.ign.values()], ajustes: S.aj, tx_mes: [...S.tx.values()]};
     return descargar('control-gastos-respaldo-' + hoy() + '.json', new Blob([JSON.stringify(datos)], {type: 'application/json'}));
   }
+  // Gestor de gastos (administrador): editar, copiar o eliminar el registro de una fila, como desde Cuentas.
+  if (/^ctl(Elim|Reg)/.test(act)) { const m = S.movs.get(b.dataset.movId) || movDe(b); if (!m) return; const t = m.tx_id && D.byId.get(m.tx_id); if (!t || !esAdmin()) return;
+    if (act === 'ctlElimFila' || act === 'ctlElimQ') { S.ctlElimQ = m.id; abrirDetalle(m.id); const q0 = document.querySelector('.copia-q'); if (q0) q0.scrollIntoView({block: 'center', behavior: 'smooth'}); return; }
+    if (act === 'ctlElimNo') { S.ctlElimQ = null; return abrirDetalle(m.id); }
+    if (act === 'ctlRegEditar') { S.ctaVolver = null; if (t.web && regDe(t.web)) { S.regCtrl = null; return abrirRegForm(regDe(t.web).id); } S.appEd = t.id; S.copiaQ = null; return abrirDetalleTx(t.id); }
+    if (act === 'ctlRegCopiar') { S.ctaVolver = null; S.copiaQ = t.id; S.appEd = null; abrirDetalleTx(t.id); return; }
+    if (act === 'ctlElim') { S.ctlElimQ = null; const movs = [...S.movs.values()].filter(x => x.tx_id === t.id);
+      try { for (const x of movs) await borrarMov(x.id, ''); 
+        if (t.web && regDe(t.web)) await regCambiarEstado(regDe(t.web).id, 'eliminado', null, 'eliminado', 'Registro eliminado (queda en Registros web → Eliminados)');
+        else { await appGuardarEds(appMarcarElim(Object.assign({}, appEds()), [t], true)); toast('Registro eliminado (queda en Registros web → Eliminados)'); }
+      } catch (er) { toast(errMsg(er)); } S._ctaVer = (S._ctaVer || 0) + 1; derive(); $('#modalRoot').innerHTML = ''; return render(); }
+    return; }
   if (act === 'quitar') {
     const m = movDe(b); if (!m) return;
     if (S.confirmK !== m.id) { S.confirmK = m.id; clearTimeout(S.confirmT); S.confirmT = setTimeout(() => { S.confirmK = null; render(); }, 4000); return render(); }
@@ -7020,7 +7046,9 @@ document.addEventListener('click', async e => {
   if (act === 'cuoConc') { const x = S.ccuo.find(y => y.id === b.dataset.id); if (!x) return; try { const d = await q(sb.from('credito_cuotas').update({conciliada: !x.conciliada}).eq('id', x.id).select(), x.conciliada ? 'Conciliación quitada' : 'Cuota conciliada'); Object.assign(x, d && d[0] ? d[0] : {conciliada: !x.conciliada}); } catch (e) {} render(); return pintarConc(); }
   if (act === 'cenlProy') return crSetPartes(b.dataset.q, b.dataset.ref, crDesgloseProy(b.dataset.q, b.dataset.ref, false));
   if (act === 'cenlQuitar') { const pp = b.closest('.cr-rec').querySelector('.cr-parts'); return crSetPartes(pp.dataset.q, pp.dataset.ref, {}); }
-  if (act === 'nuevoReg') return abrirRegistro(b.dataset.c, b.dataset.m);
+  if (act === 'nuevoReg') { const c = ctrlById(b.dataset.c); if (!c || !esAdmin()) return; const mes = b.dataset.m;
+    S.regCtrl = {cid: c.id, mes, tipoE: c.tipoDefecto || 'COMPARTIDO', tipoI: S.me.persona || personasDe(c, mes)[0] || 'COMPARTIDO'}; abrirRegForm(); const F = S.regF;
+    F.tipo = S.regLado === 'ingreso' ? 'ingreso' : 'gasto'; if (c.porMes && mes && mes !== 'general' && hoy().slice(0, 7) !== mes) { F.fecha = mes + '-01'; F.hora = ''; } return pintarRegForm(); }
   if (act === 'editarMov') { const m = movDe(b); if (!m) return; return abrirRegistro(m.control, m.mes, m.id); }
   if (act === 'guardarReg') return guardarRegistro();
   if (act === 'agregar') {
