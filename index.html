@@ -803,6 +803,8 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .tjc-uso{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}.tjc-uso .cr-bar{flex:1;max-width:none}
 .cta-modal .rc-dia-n{cursor:pointer;grid-template-columns:auto auto 1fr auto auto}.cta-modal .rc-dia-n:hover{background:var(--sunk)}.rc-mas{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--line);font-size:13px;line-height:1;color:var(--muted);margin-left:4px}
 .rc-dv{display:grid;justify-items:end;gap:1px}.rc-dv .rc-sl{font-size:11.5px!important;min-width:0!important}
+.gen-p .rc-dia-n{cursor:pointer}.gen-p .rc-dia-n:hover{background:var(--sunk)}.gen-p #genQ{margin:10px 12px 0;width:calc(100% - 24px);max-width:none}
+.gen-selbar{position:fixed;top:0;left:0;right:0;z-index:50;padding-top:env(safe-area-inset-top,0px);background:color-mix(in srgb,var(--azul) 22%,var(--panel));box-shadow:0 4px 14px rgba(0,0,0,.15)}.gen-selbar .hd{display:flex;align-items:center;gap:8px;padding:10px max(12px,env(safe-area-inset-right,0px))}.gen-selbar .hd h2{margin:0;font-size:17px}.gen-selbar .sel-sub{position:static}
 .cta-fab{position:fixed;right:max(20px,env(safe-area-inset-right,0px) + 16px);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:60}
 /* detalle de cuenta como página: ocupa toda la pantalla, debajo de las ventanas */
 .cta-page{position:fixed;inset:0;z-index:39;background:var(--bg);display:flex;justify-content:center}.tj-page{z-index:38}
@@ -5777,20 +5779,24 @@ function vCtaGeneral() {
   const etqBar = etqs.length ? `<div class="gen-etq"><span class="note">Etiqueta:</span>${['', ...etqs].map(e => `<button class="chip ${etq === e ? 'on' : ''}" data-act="genEtq" data-v="${esc(e)}">${e ? '#' + esc(e) : 'Todas'}</button>`).join('')}</div>` : '';
   let cuerpo = '', cab = '';
   if (vista === 'd') {
-    const dia = S.genDia && S.genDia.slice(0, 7) === mes ? S.genDia : ''; const l = filas.filter(f => dia ? f.t.fecha === dia : f.t.mes === mes);
-    cab = nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes') + franja(genSum(l)) + (dia ? `<div class="gen-dia-f"><span>Solo el ${fFecha(dia)}</span><button class="btn sm ghost" data-act="genDia" data-v="">Ver todo el mes</button></div>` : '');
+    const qq = (S.genQ || '').trim().toUpperCase(); const nq = parseFloat(qq.replace(/[^0-9.]/g, ''));
+    const coincide = f => [f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, f.otra, ...(f.t.etiquetas || [])].join(' ').toUpperCase().includes(qq) || (isFinite(nq) && nq > 0 && String(f.v).includes(String(nq)));
+    const dia = !qq && S.genDia && S.genDia.slice(0, 7) === mes ? S.genDia : ''; const l = qq ? filas.filter(coincide) : filas.filter(f => dia ? f.t.fecha === dia : f.t.mes === mes);
+    const enSel = S.selCtx === 'gen' && ctaSel().size > 0; const puede = !!(S.me && S.me.activo && esAdmin());
+    cab = (S.genBus ? `<input class="in" id="genQ" type="search" placeholder="Buscar en todos los registros (texto o monto)" value="${esc(S.genQ || '')}" autocomplete="off">` : '')
+      + (qq ? `<div class="rc-nav"><span></span><b>${l.length} ${l.length === 1 ? 'coincide' : 'coinciden'}</b><span></span></div>` : nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes')) + franja(genSum(l)) + (dia ? `<div class="gen-dia-f"><span>Solo el ${fFecha(dia)}</span><button class="btn sm ghost" data-act="genDia" data-v="">Ver todo el mes</button></div>` : '');
     const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); });
-    const dias = [...porDia.keys()]; if (S.notasDia) S.notasDia.forEach((n, fe) => { if (fe.slice(0, 7) === mes && (!dia || fe === dia) && !porDia.has(fe)) dias.push(fe); });
+    const dias = [...porDia.keys()]; if (S.notasDia && !qq) S.notasDia.forEach((n, fe) => { if (fe.slice(0, 7) === mes && (!dia || fe === dia) && !porDia.has(fe)) dias.push(fe); });
     const fila = f => { const t = f.t; const izq = f.tras ? 'Transferencia' : f.aj ? 'Ajuste' : `${esc(catG(t.cat))}${t.sub ? '<br>' + esc(subG(t.cat, t.sub)) : ''}`;
       const tit = (t.nota ? notaG(t.cat, t.sub, t.nota) : '') || (f.tras ? 'Traslado' : subG(t.cat, t.sub) || catG(t.cat) || 'Registro'); const hora = hora12(t.hora || (trasX(t) || [])[2] || '');
       const ct = f.tras ? `${esc(tjCta(t.cuenta))} → ${esc(f.otra || '¿?')}` : esc(tjCta(t.cuenta));
-      return `<div class="rc-it" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora ? hora + ' ' : ''}${ct}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${(t.etiquetas || []).map(e => ` <span class="gen-tag">#${esc(e)}</span>`).join('')}</div></div>
+      return `<div class="rc-it ${enSel && ctaSel().has(t.id) ? 'rc-sel' : ''}" data-act="ctaMov" data-id="${esc(t.id)}" role="button" tabindex="0" title="${enSel ? 'Tocar para seleccionar' : 'Ver todo el detalle · mantener presionado para seleccionar'}"><div class="rc-c">${izq}</div><div class="rc-m"><div class="rc-t"><b>${esc(tit)}</b>${t.det ? ' <span>' + esc(t.det) + '</span>' : ''}</div><div class="rc-s">${hora ? hora + ' ' : ''}${ct}${t.fecha > hoy() ? ' · <span class="chip warn">programado</span>' : ''}${(t.etiquetas || []).map(e => ` <span class="gen-tag">#${esc(e)}</span>`).join('')}</div></div>
         <div class="rc-v"><span class="num ${f.lado === 'd' ? 'rc-d' : f.lado === 'r' ? 'rc-r' : 'gen-t'}">${gNum(f.v)}</span>${t.web ? '<span class="rc-sl">web</span>' : ''}</div></div>`; };
     cuerpo = dias.sort().reverse().map(fe => { const ls = porDia.get(fe) || []; const dt = new Date(fe + 'T12:00'); const r = genSum(ls); const wd = dt.getDay(); const nd = S.notasDia && S.notasDia.get(fe);
       const ed = S.genNotaEd === fe;
-      return `<div class="rc-dia"><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}${S.notasDia ? ` <button class="gen-nb" data-act="genNota" data-v="${fe}" title="Nota del día" aria-label="Nota del día">✎</button>` : ''}</span><span class="num rc-d">${r.dep ? gNum(r.dep) : ''}</span><span class="num rc-r">${r.ret ? gNum(r.ret) : ''}</span></div>`
+      return `<div class="rc-dia ${puede ? 'rc-dia-n' : ''}" ${puede ? `data-act="genNuevoReg" data-f="${fe}" role="button" tabindex="0" title="Registro nuevo con fecha ${fFecha(fe)}"` : ''}><b>${fe.slice(8, 10)}</b><span class="rc-wd ${wd === 0 ? 'dom' : wd === 6 ? 'sab' : ''}">${DS[wd]}</span><span class="rc-my">${fe.slice(5, 7)}/${fe.slice(0, 4)}${puede ? ' <span class="rc-mas" aria-hidden="true">+</span>' : ''}${S.notasDia ? ` <button class="gen-nb" data-act="genNota" data-v="${fe}" title="Nota del día" aria-label="Nota del día">✎</button>` : ''}</span><span class="num rc-d">${r.dep ? gNum(r.dep) : ''}</span><span class="rc-dv"><span class="num rc-r">${r.ret ? gNum(r.ret) : ''}</span>${r.dep || r.ret ? `<span class="num rc-sl" title="Balance del día (ingresos − gastos)">${r.bal < 0 ? '-' : ''}${gNum(r.bal)}</span>` : ''}</span></div>`
         + (ed ? `<div class="gen-nota ed"><textarea class="in" id="genNotaT" rows="2" placeholder="Nota de este día">${esc(nd ? nd.texto : '')}</textarea><div class="row" style="justify-content:flex-end;gap:6px"><button class="btn sm ghost" data-act="genNotaX">Cancelar</button><button class="btn sm pri" data-act="genNotaG" data-v="${fe}">Guardar nota</button></div></div>` : nd ? `<div class="gen-nota" data-act="genNota" data-v="${fe}" role="button">📝 ${esc(nd.texto)}</div>` : '')
-        + [...ls].reverse().map(fila).join(''); }).join('') || '<div class="note" style="padding:14px">Sin movimientos en este mes.</div>';
+        + [...ls].reverse().map(fila).join(''); }).join('') || `<div class="note" style="padding:14px">${qq ? 'Ningún registro coincide con la búsqueda.' : 'Sin movimientos en este mes.'}</div>`;
   } else if (vista === 'c') {
     const l = filas.filter(f => f.t.mes === mes); cab = nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes') + franja(genSum(l));
     const porDia = new Map(); l.forEach(f => { const k = f.t.fecha; if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(f); });
@@ -5826,14 +5832,18 @@ function vCtaGeneral() {
     cuerpo = l.map(([k, v]) => `<div class="gst-it" ${nivel < 3 ? `data-act="genStIn" data-v="${esc(k)}" role="button" tabindex="0"` : ''}><div class="gst-n"><b>${esc(nom(k))}</b><span class="num">L ${gNum(v)}</span></div><div class="gst-bar"><i class="${tipo === 'r' ? 'r' : 'd'}" style="width:${Math.max(1, v / max * 100).toFixed(1)}%"></i></div><div class="gst-s"><span>${tot ? Math.round(v / tot * 100) : 0}% del total</span>${delta(v, ant.get(k) || 0)}${nivel < 3 ? '<span class="gst-go">›</span>' : ''}</div></div>`).join('')
       || '<div class="note" style="padding:14px">Sin registros en este período.</div>';
   }
-  return `<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>Todas las cuentas</h1></div></div>
-    <div class="panel gen-p">${tabs}${etqBar}${cab}<div class="rc-lst">${cuerpo}</div></div>`;
+  const LUPA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+  const genSel = vista === 'd' && S.selCtx === 'gen' && ctaSel().size > 0;
+  return `${genSel ? `<div class="gen-selbar">${ctaSelBarra()}</div>` : ''}<div class="row cta-head"><div style="margin-right:auto"><div class="eyebrow">Cuentas</div><h1>Todas las cuentas</h1></div>${vista === 'd' ? `<button class="btn sm ghost ico" data-act="genBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.genBus}">${LUPA}</button>` : ''}</div>
+    <div class="panel gen-p">${tabs}${etqBar}${cab}<div class="rc-lst">${cuerpo}</div></div>${genSel ? ctaSelHoja() : ''}`;
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
   if (act.startsWith('gen')) {
     const v = b.dataset.v;
-    if (act === 'genVista') { S.genVista = v; S.genDia = ''; return render(); }
+    if (act === 'genVista') { S.genVista = v; S.genDia = ''; if (S.selCtx === 'gen') { ctaSel().clear(); S.ctaSelMenu = null; } return render(); }
+    if (act === 'genBus') { S.genBus = !S.genBus; if (!S.genBus) S.genQ = ''; render(); const q0 = $('#genQ'); if (q0) q0.focus(); return; }
+    if (act === 'genNuevoReg') { if (!(S.me && S.me.activo && esAdmin())) return; abrirRegForm(); const F = S.regF; const fe = b.dataset.f; if (fe) { F.fecha = fe; if (fe !== hoy()) F.hora = ''; } regTjCampos(F); return pintarRegForm(); }
     if (act === 'genMes') { S.genMes = v; S.genDia = ''; S.genAnio = v.slice(0, 4); return render(); }
     if (act === 'genAnio') { S.genAnio = v; return render(); }
     if (act === 'genIrMes') { S.genMes = v; S.genVista = 'd'; S.genDia = ''; return render(); }
@@ -6572,6 +6582,7 @@ function ctaSelInfo() {
   const ids = ctaSel(); let filas, mon;
   if (S.selCtx === 'tj' && S.tjFicha && tjById(S.tjFicha)) { const t = tjById(S.tjFicha); mon = S.tjMovMon === 'USD' ? 'USD' : 'L'; const vistos = new Set();
     filas = [...tjDatos(t, mon).filas, ...tjDatos(t, mon === 'USD' ? 'L' : 'USD').filas].filter(f => ids.has(f.t.id) && !vistos.has(f.t.id) && vistos.add(f.t.id)); }
+  else if (S.selCtx === 'gen') { mon = 'L'; filas = genFilas().filter(f => ids.has(f.t.id)).map(f => Object.assign({}, f, {v: f.lado === 'd' ? f.v : f.lado === 'r' ? -f.v : 0})); }
   else { const d = S.ctaFicha ? ctaDatos(S.ctaFicha) : null; filas = d ? d.filas.filter(f => ids.has(f.t.id)) : []; mon = d ? d.i.mon : 'L'; }
   const web = filas.filter(f => f.t.web && regDe(f.t.web)); const appF = filas.filter(f => !(f.t.web && regDe(f.t.web))); const app = appF.length;
   return {filas, web, app, appF, total: crR2(filas.filter(f => !f.cta || ctaInfo(f.cta).mon === mon).reduce((s, f) => s + f.v, 0)), mon};
@@ -6625,17 +6636,18 @@ async function ctaSelAplicar(k) {
 // Mantener presionado (dedo o mouse): medio segundo sin moverse.
 let _lp = null, _lpHecho = false;   // _lpHecho: el toque que sigue a mantener presionado no debe contar como otro toque
 // selRepintar: vuelve a pintar la vista donde se está seleccionando (detalle de cuenta o de tarjeta).
-function selRepintar() { if (S.selCtx === 'tj' && tjAbierta()) pintarTjFicha(true); else pintarCtaFicha(); }
-document.addEventListener('pointerdown', e => { const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov], .tj-page .rc-it[data-act=ctaMov]'); if (!it || (e.pointerType === 'mouse' && e.button !== 0)) return;
+function selRepintar() { if (S.selCtx === 'gen' && !ctaAbierta() && !tjAbierta()) { const y = window.scrollY; render(); window.scrollTo(0, y); return; } if (S.selCtx === 'tj' && tjAbierta()) pintarTjFicha(true); else pintarCtaFicha(); }
+const selCtxDe = it => it.closest('.tj-page') ? 'tj' : it.closest('.gen-p') ? 'gen' : 'cta';
+document.addEventListener('pointerdown', e => { const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov], .tj-page .rc-it[data-act=ctaMov], .gen-p .rc-it[data-act=ctaMov]'); if (!it || (e.pointerType === 'mouse' && e.button !== 0)) return;
   const x = e.clientX, y = e.clientY; clearTimeout(_lp && _lp.t); _lpHecho = false;
-  _lp = {x, y, t: setTimeout(() => { _lp = null; const enTj = !!it.closest('.tj-page'); if (enTj !== (S.selCtx === 'tj')) ctaSel().clear(); S.selCtx = enTj ? 'tj' : 'cta'; ctaSel().add(it.dataset.id); S.ctaSelCta = enTj ? 'tj:' + S.tjFicha : S.ctaFicha; _lpHecho = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; const lst = document.querySelector('.rc-bd'); const sc = lst ? lst.scrollTop : 0; selRepintar(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; }, 500)}; });
+  _lp = {x, y, t: setTimeout(() => { _lp = null; const cx = selCtxDe(it); const enTj = cx === 'tj'; if (cx !== (S.selCtx || 'cta')) ctaSel().clear(); S.selCtx = cx; ctaSel().add(it.dataset.id); S.ctaSelCta = enTj ? 'tj:' + S.tjFicha : cx === 'gen' ? 'gen' : S.ctaFicha; _lpHecho = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} const m = document.querySelector('.cta-modal'); S.ctaScroll = m ? m.scrollTop : 0; const lst = document.querySelector('.rc-bd'); const sc = lst ? lst.scrollTop : 0; selRepintar(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; }, 500)}; });
 ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { if (_lp) { clearTimeout(_lp.t); _lp = null; } }));
 document.addEventListener('pointermove', e => { if (_lp && Math.hypot(e.clientX - _lp.x, e.clientY - _lp.y) > 10) { clearTimeout(_lp.t); _lp = null; } });
-document.addEventListener('contextmenu', e => { if (e.target.closest('.cta-modal .rc-it, .tj-page .rc-it')) e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (e.target.closest('.cta-modal .rc-it, .tj-page .rc-it, .gen-p .rc-it')) e.preventDefault(); });
 // En modo selección un toque suma o quita el registro (no abre su detalle).
 document.addEventListener('click', e => {
-  const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov], .tj-page .rc-it[data-act=ctaMov]');
-  if (it && (ctaSel().size || _lpHecho) && (!!it.closest('.tj-page') === (S.selCtx === 'tj'))) { e.stopImmediatePropagation(); e.preventDefault(); if (_lpHecho) { _lpHecho = false; return; }
+  const it = e.target.closest('.cta-modal .rc-it[data-act=ctaMov], .tj-page .rc-it[data-act=ctaMov], .gen-p .rc-it[data-act=ctaMov]');
+  if (it && (ctaSel().size || _lpHecho) && selCtxDe(it) === (S.selCtx || 'cta')) { e.stopImmediatePropagation(); e.preventDefault(); if (_lpHecho) { _lpHecho = false; return; }
     const id = it.dataset.id; ctaSel().has(id) ? ctaSel().delete(id) : ctaSel().add(id); const sc = (document.querySelector('.rc-bd') || {}).scrollTop || 0; selRepintar(); const l2 = document.querySelector('.rc-bd'); if (l2) l2.scrollTop = sc; return; }
   const b = e.target.closest('[data-act]'); if (!b) return; const act = b.dataset.act;
   if (act === 'selSalir') { ctaSel().clear(); S.ctaSelMenu = null; return selRepintar(); }
@@ -7169,6 +7181,7 @@ document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'crQ') { (S.crF = S.crF || {}).q = el.value; const pos = el.selectionStart; render(); const n = $('#crQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'tjQ') { S.tjQ = el.value; const pos = el.selectionStart; pintarTjFicha(true); const n = $('#tjQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
+  if (el.id === 'genQ') { S.genQ = el.value; const pos = el.selectionStart; const y = window.scrollY; render(); window.scrollTo(0, y); const n = $('#genQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'ctaQ') { S.ctaQ = el.value; const pos = el.selectionStart; pintarCtaFicha(); const n = $('#ctaQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'catQ') { S.catQ = el.value; const pos = el.selectionStart; render(); const n = $('#catQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'ctaAdmQ') { S.ctaAdmQ = el.value; const pos = el.selectionStart; render(); const n = $('#ctaAdmQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
