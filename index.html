@@ -846,9 +846,14 @@ body.cta-abierta{overflow:hidden}
 .gen-tag{font-size:11.5px;color:var(--accent);font-weight:600}.gen-t{color:var(--muted)}
 .gcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line)}
 .gc-h{font-size:11px;color:var(--muted);text-align:center;padding:6px 0;border-bottom:1px solid var(--line)}
-.gc{all:unset;box-sizing:border-box;min-height:64px;padding:4px 3px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:flex-end;gap:1px;cursor:pointer;position:relative;font-size:11px;font-family:var(--f-num);overflow:hidden}
+.gc{all:unset;box-sizing:border-box;min-height:88px;padding:3px 3px 4px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:stretch;gap:1px;cursor:pointer;position:relative;font-size:10.5px;font-family:var(--f-num);overflow:hidden;min-width:0}
+.gc .gc-m{margin-top:auto;display:grid;justify-items:end;gap:1px;line-height:1.15;letter-spacing:-.04em;font-size:9.5px}@media (max-width:360px){.gc .gc-m{font-size:8.5px}}@media (min-width:761px){.gc .gc-m{font-size:12px;letter-spacing:0}}.gc .gc-m span{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:clip}.gc-b{color:var(--ink);font-weight:600}
+.gc.gc-o{background:var(--sunk);cursor:default}.gc.gc-o b{color:var(--muted)!important;font-weight:400}
+.gc.hoy b{background:#163a73;color:#fff!important;margin:-3px -3px 0;padding:2px 4px;align-self:stretch}.gc .gc-n{left:auto;right:4px;top:6px;bottom:auto}
+.gc-h.sab{color:var(--azul)}.gc-h.dom{color:var(--bad)}
+@media (min-width:761px){.gc{min-height:104px;font-size:12.5px;padding:5px 6px}.gc b{font-size:14px}}
 .gc:nth-child(7n){border-right:0}.gc b{font-family:var(--f-sans, inherit);font-size:13px;align-self:flex-start;font-weight:600}.gc.dom b{color:var(--bad)}.gc.sab b{color:var(--azul)}
-.gc.hoy{background:color-mix(in srgb,var(--accent) 14%,transparent)}.gc[data-vacio]{cursor:default}.gc:not([data-vacio]):active{background:var(--sunk)}.gc-v{cursor:default}
+.gc.hoy{background:transparent}.gc[data-vacio]{cursor:default}.gc:not([data-vacio]):active{background:var(--sunk)}.gc-v{cursor:default}
 .gc-n{position:absolute;left:4px;bottom:4px;width:6px;height:6px;border-radius:50%;background:#e0a400}
 .gen-th,.gen-pr{grid-template-columns:52px repeat(3,minmax(0,1fr))!important}
 .gst-f{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;padding:8px 12px}.gst-f .dm-seg{flex:1 1 140px}
@@ -5757,10 +5762,14 @@ function vCtaGeneral() {
     const l = filas.filter(f => f.t.mes === mes); cab = nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes') + franja(genSum(l));
     const porDia = new Map(); l.forEach(f => { const k = f.t.fecha; if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(f); });
     const y = +mes.slice(0, 4), m0 = +mes.slice(5, 7) - 1; const ini = (new Date(Date.UTC(y, m0, 1)).getUTCDay() + 6) % 7; const nd = new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
-    const celdas = []; for (let k = 0; k < ini; k++) celdas.push('<div class="gc gc-v"></div>');
-    for (let d = 1; d <= nd; d++) { const fe = mes + '-' + String(d).padStart(2, '0'); const r = genSum(porDia.get(fe) || []); const n = (porDia.get(fe) || []).length; const wd = (ini + d - 1) % 7;
-      celdas.push(`<button class="gc ${fe === hoy() ? 'hoy' : ''} ${wd === 6 ? 'dom' : wd === 5 ? 'sab' : ''}" data-act="genDia" data-v="${fe}" ${n ? '' : 'data-vacio="1"'} aria-label="${fFecha(fe)}: ${n} registros"><b>${d}</b>${r.dep ? `<span class="rc-d">${gCorto(r.dep)}</span>` : ''}${r.ret ? `<span class="rc-r">${gCorto(r.ret)}</span>` : ''}${S.notasDia && S.notasDia.get(fe) ? '<i class="gc-n" title="Tiene nota"></i>' : ''}</button>`); }
-    cuerpo = `<div class="gcal"><div class="gc-h">lun</div><div class="gc-h">mar</div><div class="gc-h">mié</div><div class="gc-h">jue</div><div class="gc-h">vie</div><div class="gc-h">sáb</div><div class="gc-h">dom</div>${celdas.join('')}</div><div class="bd note">Toca un día para ver sus registros. Azul: ingresos · rojo: gastos (k = miles).</div>`;
+    // Como el calendario de Registro Contable: 6 semanas completas (días del mes anterior y siguiente en gris), número arriba y abajo
+    // ingresos (azul), gastos (rojo) y, si hubo los dos, el balance del día.
+    const celdas = []; const dIni = new Date(Date.UTC(y, m0, 1 - ini)); const semanas = Math.ceil((ini + nd) / 7) < 6 ? 6 : Math.ceil((ini + nd) / 7);
+    for (let k = 0; k < semanas * 7; k++) { const dt = new Date(dIni.getTime() + k * 864e5); const fe = dt.toISOString().slice(0, 10); const d = dt.getUTCDate(); const wd = k % 7; const otro = fe.slice(0, 7) !== mes;
+      const ls = otro ? [] : (porDia.get(fe) || []); const r = genSum(ls); const n = ls.length; const lab = otro && d === 1 ? `${d}/${fe.slice(5, 7)}` : d;
+      celdas.push(`<button class="gc ${otro ? 'gc-o' : ''} ${fe === hoy() ? 'hoy' : ''} ${wd === 6 ? 'dom' : wd === 5 ? 'sab' : ''}" data-act="genDia" data-v="${fe}" ${n ? '' : 'data-vacio="1"'} aria-label="${fFecha(fe)}: ${n} registros"><b>${lab}</b>${S.notasDia && S.notasDia.get(fe) ? '<i class="gc-n" title="Tiene nota"></i>' : ''}
+        <span class="gc-m">${r.dep ? `<span class="rc-d">${gNum(r.dep)}</span>` : ''}${r.ret ? `<span class="rc-r">${gNum(r.ret)}</span>` : ''}${r.dep && r.ret ? `<span class="gc-b">${r.bal < 0 ? '-' : ''}${gNum(r.bal)}</span>` : ''}</span></button>`); }
+    cuerpo = `<div class="gcal">${['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((x, i) => `<div class="gc-h ${i === 5 ? 'sab' : i === 6 ? 'dom' : ''}">${x}</div>`).join('')}${celdas.join('')}</div><div class="bd note">Toca un día para ver sus registros.</div>`;
   } else if (vista === 'm') {
     const l = filas.filter(f => f.t.fecha.slice(0, 4) === anio); cab = nav(anio, String(+anio - 1), String(+anio + 1), 'genAnio') + franja(genSum(l));
     cuerpo = `<div class="rc-th gen-th"><span></span><span>Ingresos</span><span>Gastos</span><span>Balance</span></div>` + Array.from({length: 12}, (_, k) => anio + '-' + String(12 - k).padStart(2, '0')).map(m => { const ls = l.filter(f => f.t.mes === m); if (!ls.length) return '';
