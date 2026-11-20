@@ -1158,6 +1158,11 @@ a.chip{text-decoration:none}
 .dist td.prev{opacity:.75;font-size:.95em}.dist td.prev .note{text-align:right}
 .modal .dist th{position:static;font-weight:600;text-transform:none;letter-spacing:0;font-size:12px;color:var(--muted);white-space:normal}
 #userBox{display:flex;align-items:center;gap:6px}
+#fidLock{position:fixed;inset:0;z-index:9999;background:var(--bg);display:grid;place-items:center;padding:24px;padding-top:max(24px,env(safe-area-inset-top,0px))}
+.fid-box{display:grid;justify-items:center;gap:10px;text-align:center;max-width:320px}.fid-box>b{font-size:20px}.fid-n{color:var(--muted);font-size:13px;margin-top:-6px}
+.fid-ico{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);margin-bottom:6px}
+.fid-b{margin-top:10px;padding:12px 20px;font-size:15px}.fid-msg{min-height:18px;font-size:12.5px;color:var(--bad)}
+html.fid-on body{overflow:hidden}
 .top .wrap{row-gap:8px}
 </style>
 </head>
@@ -1548,7 +1553,7 @@ async function arrancar() {
   if (arrancando) return; arrancando = true;
   $('#topbar').hidden = false; app().innerHTML = '<div class="loading">Cargando tus datos…</div>';
   S._sinRed = navigator.onLine === false;
-  try { await cargarTodo(); derive(); route(); render(); offBarra(); if (!S._sinRed) { try { localStorage.setItem('cg_ultimaRed', new Date().toISOString()); } catch (e) {} setTimeout(offEnviar, 1500); } if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); iniciarHistorial().catch(() => {}); } }
+  try { await cargarTodo(); fidRevisar(); derive(); route(); render(); offBarra(); if (!S._sinRed) { try { localStorage.setItem('cg_ultimaRed', new Date().toISOString()); } catch (e) {} setTimeout(offEnviar, 1500); } if (esAdmin()) { detectarServidor(); rellenarDatosApp().catch(() => {}); iniciarHistorial().catch(() => {}); } }
   catch (e) { fatal(errMsg(e)); }
   finally { arrancando = false; }
 }
@@ -1568,7 +1573,7 @@ function renderSetup() {
 }
 // renderAuth: Pantalla de entrada: iniciar sesión, crear cuenta u olvidé mi contraseña.
 function renderAuth() {
-  $('#topbar').hidden = true; S.me = null;
+  $('#topbar').hidden = true; S.me = null; if (typeof fidQuitar === 'function') fidQuitar();
   const v = S.recuperando ? 'nueva' : S.authView;
   const titulo = {login: 'Entrar', registro: 'Crear cuenta', olvido: 'Recuperar contraseña', nueva: 'Nueva contraseña'}[v];
   app().innerHTML = `<div class="auth"><div class="brand-auth"><b>Control de Gastos</b><span>Gastos familiares y proyectos compartidos</span></div>
@@ -1646,7 +1651,7 @@ function renderTabs() {
   $('#btnSync').hidden = !a;
   const ls = S.aj.ultimaSync;
   $('#syncMeta').textContent = a ? (ls ? `Sincronizado: ${new Date(ls.at).toLocaleString('es-HN', {dateStyle: 'medium', timeStyle: 'short'})}` : 'Sin sincronizar') : '';
-  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost hbtn" href="guia.html?n=${encodeURIComponent(((S.me.nombre || '').trim().split(/\s+/)[0]) || '')}&p=${encodeURIComponent(S.me.persona || '')}" target="_blank" rel="noopener" title="Cómo funciona la plataforma" aria-label="Guía"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 21V5"/><path d="M9 8h6M9 12h4"/></svg><span class="htx">Guía</span></a><button class="btn sm ghost hbtn" data-act="salir" title="Salir" aria-label="Salir"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg><span class="htx">Salir</span></button>`;
+  $('#userBox').innerHTML = `<span class="small"><b>${esc(S.me.nombre || S.me.email)}</b>${a ? ' · admin' : ''}</span><a class="btn sm ghost hbtn" href="guia.html?n=${encodeURIComponent(((S.me.nombre || '').trim().split(/\s+/)[0]) || '')}&p=${encodeURIComponent(S.me.persona || '')}" target="_blank" rel="noopener" title="Cómo funciona la plataforma" aria-label="Guía"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 21V5"/><path d="M9 8h6M9 12h4"/></svg><span class="htx">Guía</span></a><button class="btn sm ghost hbtn" data-act="fidCfg" title="Bloqueo con Face ID" aria-label="Bloqueo con Face ID"${fidCfg() && fidCfg().uid === S.me.id ? ' aria-pressed="true"' : ''}><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 ${fidCfg() && fidCfg().uid === S.me.id ? '8 0v3' : '7.6-1.7'}"/></svg><span class="htx">Bloqueo</span></button><button class="btn sm ghost hbtn" data-act="salir" title="Salir" aria-label="Salir"><svg class="hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg><span class="htx">Salir</span></button>`;
 }
 // render: DIBUJA LA PANTALLA: elige la vista según S.view y la pinta en el contenedor principal.
 function render() {
@@ -4497,6 +4502,77 @@ document.addEventListener('click', async e => { const b = e.target.closest('[dat
     const it = {id: S.prEd || crUid(), desc, cat: cat || '', sub: sub || '', det: det || '', cant, precio}; const l = presItems(c).slice(); const i = l.findIndex(x => x.id === it.id); if (i >= 0) l[i] = it; else l.push(it);
     S.prCat = $('#prCat').value; try { await presGuardar(c, l); toast(i >= 0 ? 'Ítem guardado' : 'Ítem agregado'); S.prEd = null; } catch (er) {} render(); const f = $('#prDesc'); if (f && i < 0) f.focus(); } });
 
+/* ===================== Bloqueo con Face ID (o huella / Windows Hello) =====================
+   Opcional y por dispositivo: cada usuario decide activarlo en el suyo (botón del candado arriba). Usa WebAuthn: el teléfono
+   guarda una llave protegida por Face ID; al abrir la app (o al volver tras unos minutos) se pide Face ID antes de mostrar nada.
+   Protege la pantalla; la sesión y los permisos siguen siendo los de siempre. Si Face ID falla, "Entrar con contraseña". */
+const FID_K = 'cg_fid';
+const fidCfg = () => { try { return JSON.parse(lsGet(FID_K) || 'null'); } catch (_) { return null; } };
+const fidB64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fidBin = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+const fidReto = () => crypto.getRandomValues(new Uint8Array(32));
+async function fidDisponible() { try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (_) { return false; } }
+let _fidBloq = false, _fidOcultoEl = 0, _fidPidiendo = false;
+const fidNombre = () => /iPhone|iPad|Macintosh/.test(navigator.userAgent) ? 'Face ID' : 'huella o rostro';
+function fidBloquear() {
+  const c = fidCfg(); if (!c) return; _fidBloq = true; let el = document.getElementById('fidLock');
+  if (!el) { el = document.createElement('div'); el.id = 'fidLock'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="fid-box"><div class="fid-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9v1M15 9v1M12 9v4h-1M9 16c1.7 1.3 4.3 1.3 6 0"/></svg></div>
+    <b>Control de Gastos</b><span class="fid-n">Bloqueado${c.nom ? ' · ' + esc(c.nom) : ''}</span>
+    <button class="btn pri fid-b" data-fid="abrir">Desbloquear con ${fidNombre()}</button><div class="fid-msg" role="status"></div>
+    <button class="btn ghost sm" data-fid="clave">Entrar con contraseña</button></div>`;
+  el.hidden = false; document.documentElement.classList.add('fid-on');
+}
+function fidQuitar() { _fidBloq = false; const el = document.getElementById('fidLock'); if (el) el.hidden = true; document.documentElement.classList.remove('fid-on'); }
+async function fidDesbloquear(auto) {
+  const c = fidCfg(); if (!c) return fidQuitar(); if (_fidPidiendo) return; _fidPidiendo = true; const msg = document.querySelector('#fidLock .fid-msg'); if (msg) msg.textContent = '';
+  try { await navigator.credentials.get({publicKey: {challenge: fidReto(), rpId: location.hostname, allowCredentials: [{type: 'public-key', id: fidBin(c.cred)}], userVerification: 'required', timeout: 60000}}); fidQuitar(); }
+  catch (e) { if (msg && !auto) msg.textContent = e && e.name === 'NotAllowedError' ? 'No se verificó. Toca el botón para intentarlo otra vez.' : 'No se pudo usar ' + fidNombre() + ' en este navegador. Entra con tu contraseña.'; }
+  finally { _fidPidiendo = false; }
+}
+// Al abrir la página: si este dispositivo tiene el bloqueo activo, se tapa todo antes de cargar datos.
+if (fidCfg()) { fidBloquear(); setTimeout(() => fidDesbloquear(true), 350); }
+// Al salir de la app se anota la hora; al volver, si pasaron los minutos elegidos, se bloquea. Con "Inmediato" se tapa ya al salir
+// (así la vista previa del selector de apps del iPhone no muestra los datos).
+document.addEventListener('visibilitychange', () => { const c = fidCfg(); if (!c || !S.me) return;
+  if (document.hidden) { _fidOcultoEl = Date.now(); if (!+c.min) fidBloquear(); return; }
+  if (_fidBloq) return setTimeout(() => fidDesbloquear(true), 300); if (_fidOcultoEl && Date.now() - _fidOcultoEl >= (+c.min || 0) * 60000) { fidBloquear(); setTimeout(() => fidDesbloquear(true), 300); } });
+document.addEventListener('click', async e => { const b = e.target.closest('[data-fid]'); if (!b) return; const k = b.dataset.fid;
+  if (k === 'abrir') return fidDesbloquear();
+  if (k === 'clave') { fidQuitar(); try { await sb.auth.signOut(); } catch (_) {} S.me = null; renderAuth(); return; } });
+// fidRevisar: con la sesión ya cargada, el bloqueo es de quien lo activó; si entró otra persona, no aplica.
+function fidRevisar() { const c = fidCfg(); if (c && S.me && c.uid !== S.me.id) fidQuitar(); }
+// Ventana de configuración (botón del candado).
+async function fidAbrirCfg() {
+  const c = fidCfg(); const mio = c && S.me && c.uid === S.me.id; const disp = await fidDisponible(); const n = fidNombre();
+  const MIN = [[0, 'Inmediato'], [1, '1 minuto'], [5, '5 minutos'], [15, '15 minutos'], [60, '1 hora']];
+  $('#modalRoot').innerHTML = `<div class="modal-bg" data-act="cerrarModal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="fidT" style="max-width:460px">
+    <div class="hd"><h2 id="fidT" style="margin-right:auto">Bloqueo con ${n}</h2><button class="btn sm ghost" data-act="cerrarModal" aria-label="Cerrar">✕</button></div>
+    <div class="bd stack">
+      <p class="small" style="margin:0">Pide ${n} para mostrar la plataforma en <b>este dispositivo</b>. Es opcional y solo para ti: los demás usuarios deciden en el suyo.</p>
+      ${!disp ? `<div class="tj-aviso">Este navegador no ofrece ${n} o no está configurado en el dispositivo.</div>` : mio ? `
+        <div class="row" style="gap:8px"><span class="chip ok">Activado</span><span class="note">desde ${fFecha((c.el || '').slice(0, 10))}</span></div>
+        <label class="fld">Volver a pedirlo al regresar a la app después de<select class="in" id="fidMin">${MIN.map(([v, t]) => `<option value="${v}" ${+c.min === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><button class="btn ghost danger" data-act="fidDesactivar">Desactivar</button><button class="btn" data-act="fidProbar">Probar</button></div>`
+      : `${c && !mio ? `<div class="note">En este dispositivo lo tenía activado otro usuario; al activarlo queda para ti.</div>` : ''}
+        <label class="fld">Volver a pedirlo al regresar a la app después de<select class="in" id="fidMin">${MIN.map(([v, t]) => `<option value="${v}" ${v === 5 ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <button class="btn pri" data-act="fidActivar">Activar ${n}</button>`}
+      <div class="note">Si ${n} falla, siempre puedes entrar con tu correo y contraseña. Borrar los datos del navegador quita el bloqueo.</div>
+    </div></div></div>`;
+}
+document.addEventListener('change', e => { if (e.target.id !== 'fidMin') return; const c = fidCfg(); if (c && S.me && c.uid === S.me.id) { c.min = +e.target.value; lsSet(FID_K, JSON.stringify(c)); toast('Guardado'); } });
+document.addEventListener('click', async e => { const b = e.target.closest('[data-act]'); if (!b || !/^fid[A-Z]/.test(b.dataset.act)) return; const act = b.dataset.act;
+  if (act === 'fidCfg') return fidAbrirCfg();
+  if (act === 'fidActivar') { b.disabled = true;
+    try { const uid = new TextEncoder().encode(S.me.id).slice(0, 64);
+      const cr = await navigator.credentials.create({publicKey: {rp: {name: 'Control de Gastos', id: location.hostname}, user: {id: uid, name: S.me.email || S.me.id, displayName: S.me.nombre || S.me.email || 'Usuario'}, challenge: fidReto(),
+        pubKeyCredParams: [{type: 'public-key', alg: -7}, {type: 'public-key', alg: -257}], authenticatorSelection: {authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred'}, timeout: 60000, attestation: 'none'}});
+      lsSet(FID_K, JSON.stringify({uid: S.me.id, cred: fidB64(cr.rawId), min: +(($('#fidMin') || {}).value || 5), nom: (S.me.nombre || '').trim().split(/\s+/)[0] || '', el: new Date().toISOString()}));
+      toast(fidNombre() + ' activado'); fidAbrirCfg(); render(); }
+    catch (er) { b.disabled = false; toast(er && er.name === 'NotAllowedError' ? 'Cancelado.' : 'No se pudo activar: ' + ((er && er.message) || er)); } return; }
+  if (act === 'fidProbar') { fidBloquear(); return fidDesbloquear(); }
+  if (act === 'fidDesactivar') { try { localStorage.removeItem(FID_K); } catch (_) {} fidQuitar(); toast('Bloqueo desactivado en este dispositivo'); fidAbrirCfg(); render(); }
+});
 /* ================= acciones ================= */
 // asignar: Asigna registros de la app a un control (crea movimientos válidos).
 async function asignar(ids, ctrlId, tipo, mesFijo, grupo) {
