@@ -379,7 +379,7 @@ svg.crg{width:100%;height:auto;display:block;overflow:visible}
 .tj-aviso{padding:10px 14px;border:1px solid var(--warn);background:var(--warn-soft);color:var(--fg);border-radius:10px;font-size:13px;line-height:1.5}.tj-aviso .btn{margin-left:8px}
 .tj-glob{background:var(--sunk)}
 /* ===== Tarjetas · Análisis ===== */
-.tjg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;align-items:start}
+.tjg-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
 .tjg .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:nowrap}.tjg .hd>div:first-child{min-width:0}
 .tjg-ult{font-size:15px;font-weight:600;white-space:nowrap}
 .tjg-plot{position:relative;height:240px;box-sizing:border-box;touch-action:pan-y;margin:0 10px 6px}
@@ -4841,11 +4841,11 @@ function tjDashCfg() {
 function tjDashDatos(cards, c) {
   const tasa = tasaUSD() || 0; const val = (l, u) => c.mon === 'L' ? l : c.mon === 'U' ? u : crR2(l + u * tasa);
   const meses = []; for (let m = c.desde; m <= c.hasta && meses.length < 120; m = tjMesAdd(m, 1)) meses.push(m);
-  const filas = meses.map(m => ({m, g: 0, s: 0, a: 0, n: 0}));
+  const filas = meses.map(m => ({m, g: 0, s: 0, a: 0, p: 0, n: 0}));
   cards.forEach(t => { const ps = tjPeriodos(t); const porMes = new Map(ps.map(p => [p.corte.slice(0, 7), p])); let ult = null;
     ps.filter(p => p.corte.slice(0, 7) < c.desde).forEach(p => { ult = p; });
-    filas.forEach(f => { const p = porMes.get(f.m); if (p) { f.g += val(p.gL, p.gU); f.s += val(p.sL, p.sU); f.n++; ult = p; } if (ult) f.a += val(ult.tL, ult.tU); }); });
-  filas.forEach(f => { f.g = crR2(f.g); f.s = crR2(f.s); f.a = crR2(f.a); });
+    filas.forEach(f => { const p = porMes.get(f.m); if (p) { f.g += val(p.gL, p.gU); f.s += val(p.sL, p.sU); f.p += val(p.abL || 0, p.abU || 0); f.n++; ult = p; } if (ult) f.a += val(ult.tL, ult.tU); }); });
+  filas.forEach(f => { f.g = crR2(f.g); f.s = crR2(f.s); f.a = crR2(f.a); f.p = crR2(f.p); });
   return filas;
 }
 // tjCurva: trazado suave que no se pasa de los puntos (interpolación monótona, Fritsch–Carlson).
@@ -4903,7 +4903,7 @@ function vTjDash(lista) {
     </div>`;
   const notaRango = `${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'} · ${tjMesCorto(c.desde)} – ${tjMesCorto(c.hasta)} · ${monTxt}`;
   // Gráficos disponibles (id, título, nota, campo).
-  const GR = [['g', 'Gasto por corte', 'Cargos de cada período de corte'], ['s', 'Saldo por corte', 'Gastos menos pagos vinculados de cada corte'], ['a', 'Saldo acumulado por corte', 'Saldo global: arrastra lo que quedó de los cortes anteriores']];
+  const GR = [['g', 'Gasto por corte', 'Cargos de cada período de corte'], ['p', 'Abonos por corte', 'Pagos aplicados a cada corte'], ['s', 'Saldo por corte', 'Gastos menos pagos vinculados de cada corte'], ['a', 'Saldo acumulado por corte', 'Saldo global: arrastra lo que quedó de los cortes anteriores']];
   // Pantalla completa: un solo gráfico grande, con los filtros a mano y botones para pasar a los otros dos.
   if (S.tjDashFull && cards.length) { const g = GR.find(x => x[0] === S.tjDashFull) || GR[0];
     return `<div class="tjg-full" role="dialog" aria-label="${esc(g[1])}">
@@ -4923,8 +4923,8 @@ function vTjDash(lista) {
     <div class="tjg-grid">
       ${GR.map(x => tjGraf(x[0], x[1], x[2], filas, x[0], fmt)).join('')}
     </div>
-    <details class="panel tjg-tabla"><summary class="hd"><h2>Ver los datos en tabla</h2></summary><div class="tbl-wrap"><table><thead><tr><th>Mes del corte</th><th class="num">Gasto</th><th class="num">Saldo del corte</th><th class="num">Saldo acumulado</th></tr></thead><tbody>
-      ${filas.slice().reverse().map(f => `<tr><td>${mesLargo(f.m)}${f.n ? '' : ' <span class="note">· sin corte</span>'}</td><td class="num">${fmt(f.g)}</td><td class="num">${fmt(f.s)}</td><td class="num">${fmt(f.a)}</td></tr>`).join('')}</tbody></table></div></details>`
+    <details class="panel tjg-tabla"><summary class="hd"><h2>Ver los datos en tabla</h2></summary><div class="tbl-wrap"><table><thead><tr><th>Mes del corte</th><th class="num">Gasto</th><th class="num">Abonos</th><th class="num">Saldo del corte</th><th class="num">Saldo acumulado</th></tr></thead><tbody>
+      ${filas.slice().reverse().map(f => `<tr><td>${mesLargo(f.m)}${f.n ? '' : ' <span class="note">· sin corte</span>'}</td><td class="num">${fmt(f.g)}</td><td class="num">${fmt(f.p)}</td><td class="num">${fmt(f.s)}</td><td class="num">${fmt(f.a)}</td></tr>`).join('')}</tbody></table></div></details>`
     : '<div class="panel"><div class="bd note">No hay tarjetas con esos filtros.</div></div>'}`;
 }
 // Cursor sobre los gráficos: línea vertical, punto y recuadro con el mes y el valor del punto más cercano (mouse o dedo).
