@@ -1788,14 +1788,17 @@ function vInicio() {
   const visibles = abiertos();
   const tarjeta = c => {
     const mes = c.porMes ? hoy().slice(0, 7) : 'general';
-    const R = resumen(c, hoja(c.id, mes)); const mio = R.per.find(x => x.p.toUpperCase() === yo);
+    const H = hoja(c.id, mes); const R = resumen(c, H); const mio = R.per.find(x => x.p.toUpperCase() === yo);
+    const pr = !c.porMes && esProy(c) && presItems(c).length ? (() => { const x = presCruce(c, H); const pres = crR2(x.items.reduce((t, it) => t + presTot(it), 0)); const ej = crR2([...x.ej.values()].reduce((t, e) => t + e.v, 0) + x.sinV); return {pres, ej, dif: crR2(pres - ej)}; })() : null;
     return `<a class="panel card-link" href="${hrefC(c)}" data-act="irMes" data-c="${c.id}" data-m="${mes}"><div class="bd stack" style="gap:8px">
       <div class="row" style="justify-content:space-between"><span class="chip"><span class="dot ${colorClass(c)}"></span>${esProy(c) ? 'Proyecto' : esc(mesLargo(mes))}</span>${R.pendientes ? `<span class="chip warn">${R.pendientes} por validar</span>` : ''}</div>
       <h2>${esc(c.nombre)}</h2>
       <div class="row small" style="gap:18px"><div><div class="eyebrow">Egresos</div><div class="num" style="text-align:left">${L(R.egreso)}</div></div>
         ${esProy(c) ? `<div><div class="eyebrow">Ingresos</div><div class="num" style="text-align:left">${L(R.ingreso)}</div></div>` : ''}
+        ${pr ? `<div><div class="eyebrow">Presupuesto</div><div class="num" style="text-align:left">${L(pr.pres)}</div></div>` : ''}
         ${mio && c.porMes ? `<div><div class="eyebrow">Tu saldo</div><div class="num ${mio.saldo < -0.004 ? 'neg' : 'pos'}" style="text-align:left">${L(mio.saldo)}</div></div>` : ''}</div>
-      <div class="note">${mio && c.porMes ? (mio.saldo < -0.004 ? `Te falta aportar ${L(-mio.saldo)} este mes.` : 'Estás al día este mes.') : 'Abre para ver el detalle o registrar un gasto.'}</div>
+      ${pr && pr.pres ? `<span class="cr-bar pr-bar" style="width:100%;max-width:none" title="Ejecutado ${Math.round(pr.ej / pr.pres * 100)} % del presupuesto"><i style="width:${Math.min(100, pr.ej / pr.pres * 100).toFixed(1)}%;${pr.dif < -0.004 ? 'background:var(--bad)' : ''}"></i></span>` : ''}
+      <div class="note">${pr ? (pr.dif < -0.004 ? `<span class="neg">Sobre el presupuesto por ${L(-pr.dif)}</span> · ${Math.round(pr.ej / (pr.pres || 1) * 100)} % ejecutado` : `${pr.pres ? Math.round(pr.ej / pr.pres * 100) : 0} % ejecutado · quedan ${L(pr.dif)}`) : mio && c.porMes ? (mio.saldo < -0.004 ? `Te falta aportar ${L(-mio.saldo)} este mes.` : 'Estás al día este mes.') : 'Abre para ver el detalle o registrar un gasto.'}</div>
     </div></a>`;
   };
   const sinTx = a && !D.txs.length;
