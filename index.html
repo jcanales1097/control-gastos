@@ -818,7 +818,14 @@ body.cta-abierta{overflow:hidden}
 .cr-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}.cr-filtros .in{width:auto;min-width:0;flex:0 1 auto}.cr-filtros #crQ{flex:1 1 220px}
 @media (max-width:760px){.cr-filtros select.in{flex:1 1 45%}.cr-filtros #crQ{flex-basis:100%}}
 .pr-k{margin:0;border-radius:0;border-width:0 0 1px}.pr-bar{display:inline-block;width:90px;max-width:100%}.pr-t tfoot td{border-top:2px solid var(--ink)}.pr-sin td{background:var(--sunk)}
-.pr-form{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:12px 14px;border-top:1px solid var(--line)}.pr-form>b{flex-basis:100%;font-size:13px}.pr-form #prDesc{flex:2 1 200px}.pr-form #prCat{flex:2 1 200px;width:auto}
+.pr-form{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:12px 14px;border-top:1px solid var(--line)}.pr-form>b{flex-basis:100%;font-size:13px}.pr-form #prDesc{flex:2 1 200px}.pr-form .prc{flex:2 1 220px;position:relative;min-width:0}
+.prc-btn{width:100%;text-align:left;display:flex;align-items:center;gap:6px;cursor:pointer;overflow:hidden}.prc-btn span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prc-btn i{font-style:normal;color:var(--muted)}
+.prc-pop{position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:8px;display:grid;gap:6px;min-width:260px}
+.prc-list{max-height:min(320px,50vh);overflow-y:auto;display:grid}
+.prc-r{display:flex;align-items:center;gap:4px;border-radius:6px}.prc-r:hover{background:var(--sunk)}.prc-r.sel{background:var(--accent-soft)}
+.prc-r button{background:none;border:0;color:var(--fg);font:inherit;text-align:left;padding:7px 6px;cursor:pointer}.prc-r .prc-n{flex:1;min-width:0}
+.prc-g .prc-n{font-weight:700;font-size:12px}.prc-s .prc-n{padding-left:16px;font-size:13px}.prc-d .prc-n{padding-left:34px;font-size:12.5px;color:var(--muted)}
+.prc-x{color:var(--muted)!important;font-size:11px!important;white-space:nowrap;padding:7px 8px!important}.prc-vacio{padding:10px;font-size:12px;color:var(--muted)}
 .pr-form label{display:grid;gap:3px;font-size:11px;color:var(--muted);flex:1 1 90px}.pr-form label .in{width:100%}
 @media (max-width:760px){.pr-k{grid-template-columns:repeat(2,minmax(0,1fr))!important}.pr-t th:nth-child(2),.pr-t td:nth-child(2),.pr-t th:nth-child(3),.pr-t td:nth-child(3),.pr-t th:nth-child(4),.pr-t td:nth-child(4),.pr-t th:nth-child(8),.pr-t td:nth-child(8){display:none}}
 .copia-q{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sunk);margin:6px 0}
@@ -4430,6 +4437,21 @@ function presCruce(c, h) { const items = presItems(c); const ej = new Map(items.
     const [g, s2, dt] = presNiv(r); const it = (dt && items.find(x => x.det && x.cat === g && x.sub === s2 && x.det === dt)) || items.find(x => x.cat && x.sub && !x.det && x.cat === g && x.sub === s2) || items.find(x => x.cat && !x.sub && x.cat === g);
     if (it) { const e = ej.get(it.id); e.v += v; e.n++; } else { sinV += v; sinN++; } });
   return {items, ej, sinV: crR2(sinV), sinN}; }
+// Selector de categoría del presupuesto: grupal y subgrupal a la vista; el detalle aparece al expandir el subgrupal (o al buscar).
+function prcEtiqueta(v) { if (!v) return 'Sin categoría'; const [g, s2, d] = v.split('|'); const n = presVer({cat: g, sub: s2, det: d}); return n.join(' › ') + (s2 ? '' : ' (todo)'); }
+function prcLista() { const box = $('.prc-list'); if (!box) return; const q = (($('#prcQ') || {}).value || '').trim().toLowerCase(); const cv = ($('#prCat') || {}).value || '';
+  const exp = S.prcExp || (S.prcExp = new Set()); const has = t => !q || t.toLowerCase().includes(q); const cat0 = regCatalogo('gasto');
+  const fila = (cls, v, t, extra) => `<div class="prc-r ${cls}${v === cv ? ' sel' : ''}"><button type="button" class="prc-n" data-act="prCatSel" data-v="${esc(v)}">${esc(t)}</button>${extra || ''}</div>`;
+  let h = q ? '' : fila('prc-g', '', 'Sin categoría');
+  (cat0.length ? cat0 : presCats().map(([g, subs]) => ({nom: g, ver: g, hijos: subs.map(x => ({nom: x, ver: x, hijos: []}))}))).forEach(g => { let gh = '';
+    g.hijos.forEach(s2 => { const k = g.nom + '|' + s2.nom; const ds = s2.hijos.filter(d => has(d.ver) || has(s2.ver) || has(g.ver)); const sOk = has(s2.ver) || has(g.ver);
+      if (!sOk && !ds.length) return; const abierto = !!(q && ds.length && !has(s2.ver)) || exp.has(k);
+      gh += fila('prc-s', k + '|', s2.ver, s2.hijos.length ? `<button type="button" class="prc-x" data-act="prCatExp" data-k="${esc(k)}" aria-expanded="${abierto}">${abierto ? '▾' : '▸'} ${s2.hijos.length}</button>` : '');
+      if (abierto) (q ? ds : s2.hijos).forEach(d => { gh += fila('prc-d', k + '|' + d.nom, d.ver); }); });
+    if (gh || has(g.ver)) h += fila('prc-g', g.nom + '||', g.ver + ' (todo)') + gh; });
+  box.innerHTML = h || '<div class="prc-vacio">Ninguna categoría coincide.</div>'; }
+document.addEventListener('input', e => { if (e.target.id === 'prcQ') prcLista(); });
+document.addEventListener('click', e => { const p = $('.prc-pop'); if (p && !p.hidden && !e.target.closest('.prc')) p.hidden = true; });
 function vPresup(c, h) {
   const {items, ej, sinV, sinN} = presCruce(c, h); const a = esAdmin(); const ed = items.find(x => x.id === S.prEd) || null;
   const pres = crR2(items.reduce((s, it) => s + presTot(it), 0)); const ejT = crR2([...ej.values()].reduce((s, e) => s + e.v, 0) + sinV); const dif = crR2(pres - ejT);
@@ -4441,13 +4463,11 @@ function vPresup(c, h) {
       <td class="num ${d < -0.004 ? 'neg' : 'pos'}">${L(d)}</td><td>${barra(e, p)}</td>
       <td class="acc">${a ? `<div class="acc-row">${icoBtn('editar', 'Editar ítem', 'prEdit').replace('data-act=', `data-id="${it.id}" data-act=`)}${S.prBorrarQ === it.id ? `<button class="btn sm danger" data-act="prBorrar" data-id="${it.id}">¿Quitar? Sí</button><button class="btn sm ghost" data-act="prBorrarNo">No</button>` : icoBtn('borrar', 'Quitar ítem', 'prBorrarQ', '', 'danger').replace('data-act=', `data-id="${it.id}" data-act=`)}</div>` : ''}</td></tr>`; }).join('');
   const sinFila = sinN ? `<tr class="pr-sin"><td><b>Sin presupuestar</b><div class="cat">${sinN} ${sinN === 1 ? 'registro' : 'registros'} cuya categoría no está en ningún ítem</div></td><td></td><td></td><td></td><td class="num muted">—</td><td class="num">${L(sinV)}</td><td class="num neg">${L(-sinV)}</td><td></td><td></td></tr>` : '';
-  const cv = ed ? (ed.cat ? [ed.cat, ed.sub || '', ed.det || ''].join('|') : '') : (S.prCat || ''); const cat0 = regCatalogo('gasto');
-  const op = (v, t) => `<option value="${esc(v)}" ${v === cv ? 'selected' : ''}>${t}</option>`;
-  let catOpts = `<option value="">Sin categoría</option>` + (cat0.length ? cat0.map(g => `<optgroup label="${esc(g.ver)}">${op(g.nom + '||', esc(g.ver) + ' (todo)')}${g.hijos.map(s2 => op(g.nom + '|' + s2.nom + '|', esc(s2.ver) + (s2.hijos.length ? ' (todo)' : '')) + s2.hijos.map(d => op(g.nom + '|' + s2.nom + '|' + d.nom, '&nbsp;&nbsp;&nbsp;' + esc(d.ver))).join('')).join('')}</optgroup>`).join('') : presCats().map(([g, subs]) => `<optgroup label="${esc(g)}">${op(g + '||', esc(g) + ' (todo)')}${subs.map(s2 => op(g + '|' + s2 + '|', esc(s2))).join('')}</optgroup>`).join(''));
-  if (cv && !catOpts.includes(`value="${esc(cv)}"`)) catOpts += op(cv, esc([ed ? ed.cat : '', ed ? ed.sub : '', ed ? ed.det : ''].filter(Boolean).join(' › ') || cv) + ' (actual)');
+  const cv = ed ? (ed.cat ? [ed.cat, ed.sub || '', ed.det || ''].join('|') : '') : (S.prCat || '');
   const form = a ? `<div class="pr-form"><b>${ed ? 'Editar ítem' : 'Agregar ítem'}</b>
     <input class="in" id="prDesc" placeholder="Descripción (ej. Pintura, Mano de obra)" value="${esc(ed ? ed.desc || '' : '')}" autocomplete="off">
-    <select class="in" id="prCat" title="Los egresos de esta categoría cuentan como ejecutado de este ítem">${catOpts}</select>
+    <div class="prc"><input type="hidden" id="prCat" value="${esc(cv)}"><button type="button" class="in prc-btn" data-act="prCatAbrir" title="Los egresos de esta categoría cuentan como ejecutado de este ítem"><span>${esc(prcEtiqueta(cv))}</span><i>▾</i></button>
+      <div class="prc-pop" hidden><input class="in" id="prcQ" type="search" placeholder="Buscar categoría…" autocomplete="off"><div class="prc-list"></div></div></div>
     <label>Cant.<input class="in num" id="prCant" inputmode="decimal" value="${ed ? ed.cant : '1'}"></label>
     <label>Precio unitario (L)<input class="in num" id="prPrecio" inputmode="decimal" value="${ed ? ed.precio : ''}" placeholder="0.00"></label>
     <span class="row" style="gap:6px">${ed ? '<button class="btn sm ghost" data-act="prCancelar">Cancelar</button>' : ''}<button class="btn sm pri" data-act="prGuardar">${ed ? 'Guardar' : 'Agregar'}</button></span></div>` : '';
@@ -4462,6 +4482,9 @@ function vPresup(c, h) {
     ${form}</div>`; }
 document.addEventListener('click', async e => { const b = e.target.closest('[data-act]'); if (!b || !/^pr[A-Z]/.test(b.dataset.act)) return; const act = b.dataset.act;
   const c = /^[cp]-/.test(String(S.view || '')) ? ctrlById(S.view.slice(2)) : null; if (!c) return;
+  if (act === 'prCatAbrir') { const p = $('.prc-pop'); p.hidden = !p.hidden; if (!p.hidden) { const cv = $('#prCat').value.split('|'); if (cv[2]) (S.prcExp || (S.prcExp = new Set())).add(cv[0] + '|' + cv[1]); $('#prcQ').value = ''; prcLista(); const sel = $('.prc-list .sel'); if (sel) sel.scrollIntoView({block: 'nearest'}); if (matchMedia('(hover:hover)').matches) $('#prcQ').focus(); } return; }
+  if (act === 'prCatExp') { const exp = S.prcExp || (S.prcExp = new Set()); const k = b.dataset.k; if (exp.has(k)) exp.delete(k); else exp.add(k); return prcLista(); }
+  if (act === 'prCatSel') { $('#prCat').value = b.dataset.v; $('.prc-btn span').textContent = prcEtiqueta(b.dataset.v); $('.prc-pop').hidden = true; return; }
   if (act === 'prEdit') { S.prEd = b.dataset.id; render(); const f = $('#prDesc'); if (f) { f.scrollIntoView({block: 'center'}); f.focus(); } return; }
   if (act === 'prCancelar') { S.prEd = null; return render(); }
   if (act === 'prBorrarQ') { S.prBorrarQ = b.dataset.id; return render(); }
