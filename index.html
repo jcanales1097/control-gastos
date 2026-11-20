@@ -4417,15 +4417,23 @@ function presCats() { const g = new Map(); const add = (a, b) => { if (!a) retur
   D.txs.forEach(t => { if (t.code === 1 && !tjEsTras(t)) add(t.cat, t.sub); }); (S.reg || []).forEach(r => { if (r.tipo === 'gasto') add(r.grupal, r.subgrupal); });
   return [...g.keys()].sort((a, b) => a.localeCompare(b, 'es', {numeric: true})).map(a => [a, [...g.get(a)].sort((x, y) => x.localeCompare(y, 'es', {numeric: true}))]); }
 // presCruce: ejecutado de cada ítem y lo que quedó sin presupuestar.
+// presNiv: los tres niveles del catálogo (grupal, subgrupal, detalle) de un egreso: los del registro ligado, o deducidos del
+// movimiento (que guarda subgrupal en cat y detalle en sub) buscando su grupal en el catálogo.
+function presNiv(r) { const t = r.tx_id && D.byId && D.byId.get(r.tx_id); if (t && t.cat) return [t.cat, t.sub || '', t.nota || ''];
+  const g = regCatalogo('gasto').find(x => x.hijos.some(y => y.nom === r.cat)); if (g) return [g.nom, r.cat || '', r.sub || ''];
+  return regCatalogo('gasto').some(x => x.nom === r.cat) ? [r.cat, r.sub || '', ''] : [r.cat || '', r.sub || '', '']; }
+// presVer: nombre visible de cada nivel según el catálogo.
+function presVer(it) { const g = regCatalogo('gasto').find(x => x.nom === it.cat); const s2 = g && g.hijos.find(x => x.nom === it.sub); const d = s2 && s2.hijos.find(x => x.nom === it.det);
+  return [g ? g.ver : it.cat, it.sub ? (s2 ? s2.ver : it.sub) : '', it.det ? (d ? d.ver : it.det) : ''].filter(Boolean); }
 function presCruce(c, h) { const items = presItems(c); const ej = new Map(items.map(it => [it.id, {v: 0, n: 0}])); let sinV = 0, sinN = 0;
   h.egresos.filter(r => r.estado === 'valido').forEach(r => { const v = +r.valor || 0;
-    const it = items.find(x => x.cat && x.sub && x.cat === r.cat && x.sub === r.sub) || items.find(x => x.cat && !x.sub && x.cat === r.cat);
+    const [g, s2, dt] = presNiv(r); const it = (dt && items.find(x => x.det && x.cat === g && x.sub === s2 && x.det === dt)) || items.find(x => x.cat && x.sub && !x.det && x.cat === g && x.sub === s2) || items.find(x => x.cat && !x.sub && x.cat === g);
     if (it) { const e = ej.get(it.id); e.v += v; e.n++; } else { sinV += v; sinN++; } });
   return {items, ej, sinV: crR2(sinV), sinN}; }
 function vPresup(c, h) {
   const {items, ej, sinV, sinN} = presCruce(c, h); const a = esAdmin(); const ed = items.find(x => x.id === S.prEd) || null;
   const pres = crR2(items.reduce((s, it) => s + presTot(it), 0)); const ejT = crR2([...ej.values()].reduce((s, e) => s + e.v, 0) + sinV); const dif = crR2(pres - ejT);
-  const pct = v => pres ? Math.min(100, v / pres * 100) : 0; const catTxt = it => it.cat ? esc(it.cat) + (it.sub ? '<br><span class="cat">' + esc(it.sub) + '</span>' : '') : '<span class="muted">sin categoría</span>';
+  const pct = v => pres ? Math.min(100, v / pres * 100) : 0; const catTxt = it => { if (!it.cat) return '<span class="muted">sin categoría</span>'; const v = presVer(it); return esc(v[0]) + (v.length > 1 ? '<br><span class="cat">' + v.slice(1).map(esc).join(' › ') + '</span>' : ''); };
   const barra = (e, p) => `<span class="cr-bar pr-bar"><i style="width:${p ? Math.min(100, e / p * 100).toFixed(1) : (e ? 100 : 0)}%;${p && e > p + 0.004 ? 'background:var(--bad)' : ''}"></i></span>`;
   const filas = items.map(it => { const p = presTot(it), e = crR2(ej.get(it.id).v), d = crR2(p - e);
     return `<tr><td><b>${esc(it.desc || '—')}</b>${ej.get(it.id).n ? `<div class="cat">${ej.get(it.id).n} ${ej.get(it.id).n === 1 ? 'registro' : 'registros'}</div>` : ''}</td><td class="small">${catTxt(it)}</td>
@@ -4433,8 +4441,10 @@ function vPresup(c, h) {
       <td class="num ${d < -0.004 ? 'neg' : 'pos'}">${L(d)}</td><td>${barra(e, p)}</td>
       <td class="acc">${a ? `<div class="acc-row">${icoBtn('editar', 'Editar ítem', 'prEdit').replace('data-act=', `data-id="${it.id}" data-act=`)}${S.prBorrarQ === it.id ? `<button class="btn sm danger" data-act="prBorrar" data-id="${it.id}">¿Quitar? Sí</button><button class="btn sm ghost" data-act="prBorrarNo">No</button>` : icoBtn('borrar', 'Quitar ítem', 'prBorrarQ', '', 'danger').replace('data-act=', `data-id="${it.id}" data-act=`)}</div>` : ''}</td></tr>`; }).join('');
   const sinFila = sinN ? `<tr class="pr-sin"><td><b>Sin presupuestar</b><div class="cat">${sinN} ${sinN === 1 ? 'registro' : 'registros'} cuya categoría no está en ningún ítem</div></td><td></td><td></td><td></td><td class="num muted">—</td><td class="num">${L(sinV)}</td><td class="num neg">${L(-sinV)}</td><td></td><td></td></tr>` : '';
-  const cats = presCats(); const cv = ed ? (ed.cat ? ed.cat + (ed.sub ? '|' + ed.sub : '') : '') : (S.prCat || '');
-  const catOpts = `<option value="">Sin categoría</option>` + cats.map(([g, subs]) => `<optgroup label="${esc(g)}"><option value="${esc(g)}" ${cv === g ? 'selected' : ''}>${esc(g)} (todo)</option>${subs.map(s2 => `<option value="${esc(g + '|' + s2)}" ${cv === g + '|' + s2 ? 'selected' : ''}>${esc(s2)}</option>`).join('')}</optgroup>`).join('');
+  const cv = ed ? (ed.cat ? [ed.cat, ed.sub || '', ed.det || ''].join('|') : '') : (S.prCat || ''); const cat0 = regCatalogo('gasto');
+  const op = (v, t) => `<option value="${esc(v)}" ${v === cv ? 'selected' : ''}>${t}</option>`;
+  let catOpts = `<option value="">Sin categoría</option>` + (cat0.length ? cat0.map(g => `<optgroup label="${esc(g.ver)}">${op(g.nom + '||', esc(g.ver) + ' (todo)')}${g.hijos.map(s2 => op(g.nom + '|' + s2.nom + '|', esc(s2.ver) + (s2.hijos.length ? ' (todo)' : '')) + s2.hijos.map(d => op(g.nom + '|' + s2.nom + '|' + d.nom, '&nbsp;&nbsp;&nbsp;' + esc(d.ver))).join('')).join('')}</optgroup>`).join('') : presCats().map(([g, subs]) => `<optgroup label="${esc(g)}">${op(g + '||', esc(g) + ' (todo)')}${subs.map(s2 => op(g + '|' + s2 + '|', esc(s2))).join('')}</optgroup>`).join(''));
+  if (cv && !catOpts.includes(`value="${esc(cv)}"`)) catOpts += op(cv, esc([ed ? ed.cat : '', ed ? ed.sub : '', ed ? ed.det : ''].filter(Boolean).join(' › ') || cv) + ' (actual)');
   const form = a ? `<div class="pr-form"><b>${ed ? 'Editar ítem' : 'Agregar ítem'}</b>
     <input class="in" id="prDesc" placeholder="Descripción (ej. Pintura, Mano de obra)" value="${esc(ed ? ed.desc || '' : '')}" autocomplete="off">
     <select class="in" id="prCat" title="Los egresos de esta categoría cuentan como ejecutado de este ítem">${catOpts}</select>
@@ -4457,9 +4467,9 @@ document.addEventListener('click', async e => { const b = e.target.closest('[dat
   if (act === 'prBorrarQ') { S.prBorrarQ = b.dataset.id; return render(); }
   if (act === 'prBorrarNo') { S.prBorrarQ = null; return render(); }
   if (act === 'prBorrar') { S.prBorrarQ = null; try { await presGuardar(c, presItems(c).filter(x => x.id !== b.dataset.id)); toast('Ítem quitado'); } catch (er) {} return render(); }
-  if (act === 'prGuardar') { const desc = ($('#prDesc').value || '').trim(); const [cat, sub] = ($('#prCat').value || '').split('|'); const num = id => parseFloat((($(id) || {}).value || '').replace(/[^0-9.]/g, '')) || 0;
+  if (act === 'prGuardar') { const desc = ($('#prDesc').value || '').trim(); const [cat, sub, det] = ($('#prCat').value || '').split('|'); const num = id => parseFloat((($(id) || {}).value || '').replace(/[^0-9.]/g, '')) || 0;
     const cant = num('#prCant'), precio = num('#prPrecio'); if (!desc) return toast('Escribe la descripción del ítem.'); if (!(cant > 0)) return toast('Escribe la cantidad.');
-    const it = {id: S.prEd || crUid(), desc, cat: cat || '', sub: sub || '', cant, precio}; const l = presItems(c).slice(); const i = l.findIndex(x => x.id === it.id); if (i >= 0) l[i] = it; else l.push(it);
+    const it = {id: S.prEd || crUid(), desc, cat: cat || '', sub: sub || '', det: det || '', cant, precio}; const l = presItems(c).slice(); const i = l.findIndex(x => x.id === it.id); if (i >= 0) l[i] = it; else l.push(it);
     S.prCat = $('#prCat').value; try { await presGuardar(c, l); toast(i >= 0 ? 'Ítem guardado' : 'Ítem agregado'); S.prEd = null; } catch (er) {} render(); const f = $('#prDesc'); if (f && i < 0) f.focus(); } });
 
 /* ================= acciones ================= */
