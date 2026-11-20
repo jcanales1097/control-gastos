@@ -1350,8 +1350,23 @@ function derive() {
   if (esAdmin() && S.reg) S.reg.forEach(r => { if (r.estado === 'oficial') regATx(r).forEach(t => txs.push(reclasificar(t))); });
   txs.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
   const asig = new Map(); for (const m of S.movs.values()) if (m.tx_id && m.estado !== 'rechazado') { if (!asig.has(m.tx_id)) asig.set(m.tx_id, []); asig.get(m.tx_id).push(m); }
-  D = {txs, byId: new Map(txs.map(t => [t.id, t])), asig};
+  // registros eliminados en la web (de la app o de la plataforma): sus filas en los controles dejan de contar solas
+  const txElim = new Set(elim.map(t => t.id)); (S.reg || []).forEach(r => { if (r.estado === 'eliminado') ['', '-o', '-d', '-c'].forEach(x => txElim.add('W' + r.id + x)); });
+  D = {txs, byId: new Map(txs.map(t => [t.id, t])), asig, txElim, txPost: new Set(post.map(t => t.id))};
+  if (esAdmin() && !_movsSigue) setTimeout(movsSeguir, 0);
 }
+// movsSeguir: con la operación 100 % en la web ya no hay "cambios por revisar": si un registro ligado a un control se edita
+// (monto, fecha, descripción…), su fila en el control se pone al día sola. Si está repartido en varias partes, el monto de cada
+// parte no se toca (solo fecha y descripción) y, si las partes suman más que el registro, queda en "Revisar reparto".
+let _movsSigue = false; const _movsIntentados = new Set();
+async function movsSeguir() {
+  if (_movsSigue || !esAdmin() || !S.me || !S.me.activo) return; const lista = [...S.movs.values()].filter(m => !_movsIntentados.has(m.id)).map(m => ({m, c: cambioDe(m, true)})).filter(x => x.c && x.c.tipo === 'modificado');
+  if (!lista.length) return; _movsSigue = true;
+  try { for (const {m, c: {t}} of lista) { _movsIntentados.add(m.id); const solo = partes(m.tx_id).length === 1; const campos = snapApp(t);
+      if (solo) campos.valor = t.monto; if (!m.app_fecha || m.fecha === m.app_fecha) { campos.fecha = t.fecha; const ct = ctrlById(m.control); if (solo && ct && ct.porMes && m.app_fecha && m.mes === m.app_fecha.slice(0, 7)) campos.mes = t.fecha.slice(0, 7); }
+      if (m.app_detalle == null || m.descripcion === m.app_detalle) campos.descripcion = t.det;
+      try { const {data, error} = await sb.from('movimientos').update(campos).eq('id', m.id).select(); if (!error && data && data[0]) S.movs.set(m.id, normMov(data[0])); } catch (_) {} }
+  } finally { _movsSigue = false; } derive(); render(); }
 // partes: Partes (movimientos) en que se asignó un registro de la app.
 const partes = id => D.asig.get(id) || [];
 // asignado: Total ya asignado de un registro de la app.
@@ -1363,9 +1378,10 @@ const snapApp = t => ({app_monto: t.monto, app_fecha: t.fecha, app_detalle: t.de
 // personasDe: Participantes de un control en un mes: los del mes si se cambiaron, si no "los de siempre".
 const personasDe = (c, mes) => { if (!c) return []; const pm = c.personasMes || {}; return c.porMes && mes && Array.isArray(pm[mes]) ? pm[mes] : (c.personas || []); };
 // cambioDe: Detecta si un movimiento asignado cambió o se borró en la app, o si está duplicado / asignado de más.
-function cambioDe(m) {
+function cambioDe(m, conMod) {
   if (!esAdmin() || !m.tx_id || m.estado === 'rechazado') return null;
   const t = D.byId.get(m.tx_id);
+  if (!t && D.txElim && (D.txElim.has(m.tx_id) || D.txPost.has(m.tx_id))) return null;   // eliminado en la web o registrado después del corte: no es un cambio por revisar
   if (!t) { const mes = (m.app_fecha || m.fecha || '').slice(0, 7); return S.tx.has(mes) ? {tipo: 'eliminado'} : null; }
   const pp = partes(t.id);
   if (pp.length > 1 && asignado(t.id) > t.monto + 0.005) {
@@ -1383,7 +1399,7 @@ function cambioDe(m) {
   if (m.app_detalle != null && t.det !== m.app_detalle) d.push(['Detalle', m.app_detalle, t.det]);
   if (m.app_cuenta && t.cuenta !== m.app_cuenta) d.push(['Cuenta', m.app_cuenta, t.cuenta]);
   if (m.app_categoria && t.cat !== m.app_categoria) d.push(['Categoría', m.app_categoria, t.cat]);
-  return d.length ? {tipo: 'modificado', d, t} : null;
+  return d.length && conMod ? {tipo: 'modificado', d, t} : null;   // las ediciones se aplican solas (movsSeguir); ya no se revisan a mano
 }
 // cambios: Lista de movimientos con cambios pendientes de revisar (vista "Cambios").
 const cambios = () => esAdmin() ? [...S.movs.values()].map(m => ({m, c: cambioDe(m)})).filter(x => x.c).sort((a, b) => (a.m.fecha || '') < (b.m.fecha || '') ? -1 : 1) : [];
@@ -1424,7 +1440,7 @@ const bandeja = () => esAdmin() ? D.txs.filter(t => estadoTx(t) === 'pendiente')
 const porValidar = () => [...S.movs.values()].filter(m => m.estado === 'pendiente');
 // hoja: Arma la "hoja" de un control en un mes: egresos e ingresos válidos y pendientes.
 function hoja(controlId, mes) {
-  const rows = [...S.movs.values()].filter(m => m.control === controlId && m.mes === mes);
+  const rows = [...S.movs.values()].filter(m => m.control === controlId && m.mes === mes && !(m.tx_id && D.txElim && D.txElim.has(m.tx_id)));
   const ord = (a, b) => (a.fecha || '') < (b.fecha || '') ? -1 : (a.fecha || '') > (b.fecha || '') ? 1 : (a.creado_el < b.creado_el ? -1 : 1);
   return {control: controlId, mes, egresos: rows.filter(r => r.lado === 'egreso').sort(ord), ingresos: rows.filter(r => r.lado === 'ingreso').sort(ord)};
 }
@@ -1643,7 +1659,7 @@ function renderTabs() {
   if (proyectos().length || a) items.push(['proyectos', `Proyectos <span class="count muted-bg">${proyectos().filter(c => !cerrado(c)).length}</span>`]);
   familiares().forEach(c => items.push(['c-' + c.id, `<span class="dot ${colorClass(c)}"></span>${esc(c.corto || c.nombre)}`]));
   if (a) items.push(['bandeja', `Bandeja ${nb ? `<span class="count">${nb}</span>` : ''}`], ['validar', `Por validar ${nv ? `<span class="count warn-bg">${nv}</span>` : ''}`]);
-  const nc = a ? cambios().length : 0; if (nc || S.view === 'cambios') items.push(['cambios', `Cambios ${nc ? `<span class="count bad-bg">${nc}</span>` : ''}`]);
+  const nc = a ? cambios().length : 0; if (nc || S.view === 'cambios') items.push(['cambios', `Revisar reparto ${nc ? `<span class="count bad-bg">${nc}</span>` : ''}`]);
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
   const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
   $('#tabs').innerHTML = items.map(([h, l]) => `<a href="#${h}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`).join('');
@@ -1805,7 +1821,7 @@ function vInicio() {
   return `<div class="stack">
     <div><div class="eyebrow">Inicio</div><h1>Hola, ${esc((S.me.nombre || S.me.email || '').split(' ')[0])}</h1>
     <div class="note">${a ? 'Tienes el control completo: sincroniza, asigna, valida lo que registren los demás y administra los accesos.' : 'Aquí ves los controles y proyectos que compartes. Puedes registrar gastos e ingresos; quedan por validar hasta que el administrador los revise.'}</div></div>
-    ${a ? `<div class="kpis"><a class="kpi" href="#bandeja"><div class="eyebrow">En la bandeja</div><div class="v">${bandeja().length}</div></a><a class="kpi" href="#validar"><div class="eyebrow">Por validar</div><div class="v ${porValidar().length ? 'warn-t' : ''}">${porValidar().length}</div></a><a class="kpi" href="#cambios"><div class="eyebrow">Cambios en la app</div><div class="v ${cambios().length ? 'neg' : ''}">${cambios().length}</div></a>
+    ${a ? `<div class="kpis"><a class="kpi" href="#bandeja"><div class="eyebrow">En la bandeja</div><div class="v">${bandeja().length}</div></a><a class="kpi" href="#validar"><div class="eyebrow">Por validar</div><div class="v ${porValidar().length ? 'warn-t' : ''}">${porValidar().length}</div></a>${cambios().length ? `<a class="kpi" href="#cambios"><div class="eyebrow">Revisar reparto</div><div class="v neg">${cambios().length}</div></a>` : ''}
       <a class="kpi" href="#usuarios"><div class="eyebrow">Cuentas esperando acceso</div><div class="v">${S.perfiles.filter(p => !p.activo).length}</div></a><a class="kpi" href="#proyectos"><div class="eyebrow">Proyectos abiertos</div><div class="v">${proyectos().filter(c => !cerrado(c)).length}</div></a></div>` : ''}
     ${sinTx ? `<div class="panel"><div class="bd row" style="justify-content:space-between"><div><h2>Primer paso: sincroniza con Registro Contable</h2><div class="note">Trae los movimientos de la app para empezar a asignarlos.</div></div><button class="btn pri" data-act="sync">Sincronizar</button></div></div>` : ''}
     ${visibles.length ? `<div class="cards">${visibles.map(tarjeta).join('')}</div>` : `<div class="panel"><div class="empty"><b>Todavía no tienes controles asignados</b>${a ? 'Crea proyectos o revisa los controles en Ajustes.' : 'Pídele al administrador que te dé acceso.'}</div></div>`}
@@ -2194,8 +2210,8 @@ function vParticipantes(c, mes) {
 // vCambios: VISTA CAMBIOS (admin): registros modificados, borrados o duplicados en la app.
 function vCambios() {
   const lista = cambios();
-  return `<div class="stack"><div><div class="eyebrow">Cambios en la app</div><h1>${lista.length ? `${lista.length} ${lista.length === 1 ? 'fila por revisar' : 'filas por revisar'}` : 'Sin cambios pendientes'}</h1>
-    <div class="note">Movimientos ya asignados que se modificaron o borraron en la app, o que quedaron asignados más de una vez. Decide qué hacer con cada uno.${lista.filter(x => x.c.tipo === 'duplicado').length > 1 ? ` <button class="btn sm danger" data-act="cbQuitarDups">Quitar los ${lista.filter(x => x.c.tipo === 'duplicado').length} duplicados</button>` : ''}</div></div>
+  return `<div class="stack"><div><div class="eyebrow">Revisar reparto</div><h1>${lista.length ? `${lista.length} ${lista.length === 1 ? 'fila por revisar' : 'filas por revisar'}` : 'Todo en orden'}</h1>
+    <div class="note">Las ediciones de los registros ya se aplican solas a sus filas en los controles. Aquí solo quedan los registros asignados más de una vez o cuyas partes suman más que el registro.${lista.filter(x => x.c.tipo === 'duplicado').length > 1 ? ` <button class="btn sm danger" data-act="cbQuitarDups">Quitar los ${lista.filter(x => x.c.tipo === 'duplicado').length} duplicados</button>` : ''}</div></div>
     <div class="panel">${lista.length ? `<div class="tbl-wrap"><table><thead><tr><th>Control</th><th>Fila en el control</th><th>Qué cambió en la app</th><th></th></tr></thead><tbody>${lista.map(({m, c: cb}) => { const c = ctrlById(m.control);
       return `<tr data-mov="${esc(m.id)}"><td><span class="chip"><span class="dot ${colorClass(c)}"></span>${esc(c ? (c.corto || c.nombre) : m.control)}</span><div class="cat">${esc(mesLargo(m.mes))}</div></td>
       <td class="small"><button class="linkish" data-act="detalle">${esc(m.descripcion || '(sin descripción)')}</button><div class="cat">${fFecha(m.fecha)} · ${L(m.valor)}${partes(m.tx_id).length > 1 ? ' · repartido' : ''}</div></td>
