@@ -1291,7 +1291,7 @@ const hrefC = c => '#' + (esProy(c) ? 'p-' : 'c-') + c.id;
 const nombreDe = id => { if (S.me && id === S.me.id) return 'Tú'; const p = S.perfiles.find(x => x.id === id); return p ? (p.nombre || p.email) : 'Otro usuario'; };
 
 // fromC: Convierte un control tal como viene de la base de datos al formato que usa la app.
-const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, porMes: r.tipo === 'mensual', personas: r.personas || [], categorias: r.categorias || [], incluye: r.incluye || '', excluye: r.excluye || '', tipoDefecto: r.tipo_defecto || 'COMPARTIDO', sugerirPorNombre: !!r.sugerir_por_nombre, color: r.color || 'a', estado: r.estado || 'abierto', abiertoEl: r.abierto_el, cerradoEl: r.cerrado_el, orden: r.orden || 0, personasMes: r.personas_mes || {}});
+const fromC = r => ({id: r.id, nombre: r.nombre, corto: r.corto || r.nombre, porMes: r.tipo === 'mensual', personas: r.personas || [], categorias: r.categorias || [], incluye: r.incluye || '', excluye: r.excluye || '', tipoDefecto: r.tipo_defecto || 'COMPARTIDO', sugerirPorNombre: !!r.sugerir_por_nombre, color: r.color || 'a', estado: r.estado || 'abierto', abiertoEl: r.abierto_el, cerradoEl: r.cerrado_el, orden: r.orden || 0, personasMes: r.personas_mes || {}, presupuesto: Array.isArray(r.presupuesto) ? r.presupuesto : null});
 // toC: Convierte un control de la app al formato de la base de datos para guardarlo.
 const toC = c => ({id: c.id, nombre: c.nombre, corto: c.corto || c.nombre, tipo: c.porMes ? 'mensual' : 'proyecto', personas: c.personas, categorias: c.categorias, incluye: c.incluye, excluye: c.excluye, tipo_defecto: c.tipoDefecto, sugerir_por_nombre: c.sugerirPorNombre, color: c.color, estado: c.estado, abierto_el: c.abiertoEl || null, cerrado_el: c.cerradoEl || null, orden: c.orden || 0, personas_mes: c.personasMes || {}});
 // normMov: Normaliza un movimiento leído de la base (números, fechas, campos vacíos).
@@ -4442,9 +4442,15 @@ document.addEventListener('click', async e => { const b = e.target.closest('[dat
    Lista de ítems que se presupuestan (descripción, categoría, cantidad y precio) para estimar el proyecto y compararlo con lo
    ejecutado: cada egreso validado del proyecto cuenta en el ítem de su categoría (el más específico: subgrupal antes que grupal).
    Lo que no cae en ningún ítem se ve como "Sin presupuestar". Se guarda en el ajuste "presup" ({id del proyecto: [ítems]}). */
-const presItems = c => ((S.aj && S.aj.presup) || {})[c.id] || [];
+// Se guarda en la columna "presupuesto" del proyecto (controles), así lo ve todo el que tiene acceso al proyecto; los no
+// administradores solo lo ven. Antes de correr presupuesto.sql se usa el ajuste "presup" (solo lo ve el administrador).
+const presItems = c => Array.isArray(c.presupuesto) ? c.presupuesto : ((S.aj && S.aj.presup) || {})[c.id] || [];
 const presTot = it => crR2((+it.cant || 0) * (+it.precio || 0));
-async function presGuardar(c, items) { const m = Object.assign({}, (S.aj && S.aj.presup) || {}, {[c.id]: items}); await guardarAjuste('presup', m); S.aj.presup = m; }
+async function presGuardar(c, items) {
+  const {error} = await sb.from('controles').update({presupuesto: items}).eq('id', c.id);
+  if (!error) { c.presupuesto = items; return; }
+  if (!/presupuesto/.test(error.message || '')) { toast('No se guardó: ' + error.message); throw error; }
+  toast('Para que los demás vean el presupuesto corre presupuesto.sql en Supabase.'); const m = Object.assign({}, (S.aj && S.aj.presup) || {}, {[c.id]: items}); await guardarAjuste('presup', m); S.aj.presup = m; }
 // presCats: categorías para elegir (grupal y grupal › subgrupal) de los gastos registrados y del catálogo.
 function presCats() { const g = new Map(); const add = (a, b) => { if (!a) return; if (!g.has(a)) g.set(a, new Set()); if (b) g.get(a).add(b); };
   D.txs.forEach(t => { if (t.code === 1 && !tjEsTras(t)) add(t.cat, t.sub); }); (S.reg || []).forEach(r => { if (r.tipo === 'gasto') add(r.grupal, r.subgrupal); });
