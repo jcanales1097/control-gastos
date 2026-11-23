@@ -815,6 +815,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .cta-page>.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}
 body.cta-abierta{overflow:hidden}
 @media (max-width:760px){.cta-page>.modal.cta-modal{border:0}}
+.rg-vinc{background:var(--panel)}.rg-vinc>span:first-child{font-weight:600}
 .rg-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk);font-size:13px}.rg-ctl select{width:auto;min-width:160px}
 .unif-p .unif-l{display:grid;gap:8px}.unif-l>div{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.unif-m{font-size:12.5px}.unif-n{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cr-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}.cr-filtros .in{width:auto;min-width:0;flex:0 1 auto}.cr-filtros #crQ{flex:1 1 220px}
@@ -3638,10 +3639,31 @@ function regCtrlHtml(F) { const R = S.regCtrl; const c = ctrlById(R.cid); if (!c
   const donde = `<b>${esc(c.nombre)}</b>${c.porMes && R.mes && R.mes !== 'general' ? ' · ' + esc(mesLargo(R.mes)) : ''}`;
   if (!['gasto', 'ingreso'].includes(F.tipo)) return `<div class="rg-ctl note">Los traslados y ajustes no se asignan a ${donde}.</div>`;
   return `<div class="rg-ctl"><span>Se asigna a ${donde} como</span><select class="in" id="rgCtlTipo">${tipoOptions(c, eg ? R.tipoE : R.tipoI, eg ? 'egreso' : 'ingreso', R.mes)}</select>${c.porMes ? '<span class="note">en el mes de la fecha del registro</span>' : ''}</div>`; }
-document.addEventListener('change', e => { if (e.target.id === 'rgCtlTipo' && S.regCtrl) { if (S.regF && S.regF.tipo === 'ingreso') S.regCtrl.tipoI = e.target.value; else S.regCtrl.tipoE = e.target.value; } });
+document.addEventListener('change', e => { if (e.target.id !== 'rgCtlTipo' || !S.regF) return; const V = regVincActual(S.regF); if (!V) return; S.regCtrl = Object.assign({}, V, {auto: false}); if (S.regF.tipo === 'ingreso') S.regCtrl.tipoI = e.target.value; else S.regCtrl.tipoE = e.target.value; });
 // regAsignarCtrl: asigna al gestor los registros recién creados (gastos e ingresos) con el TIPO elegido.
-async function regAsignarCtrl(ids, tipo) { const R = S.regCtrl; if (!R || !['gasto', 'ingreso'].includes(tipo)) return; const sel = $('#rgCtlTipo'); const tp = sel ? sel.value : tipo === 'ingreso' ? R.tipoI : R.tipoE;
-  const txs = ids.map(id => 'W' + id).filter(x => D.byId.get(x)); if (txs.length) await asignar(txs, R.cid, tp); }
+async function regAsignarCtrl(ids, tipo, V) { V = V || regVincLeer(); if (!V || !['gasto', 'ingreso'].includes(tipo)) return;
+  const txs = ids.map(id => 'W' + id).filter(x => D.byId.get(x)); if (txs.length) await asignar(txs, V.cid, V.tipo, undefined, V.grupo || undefined); }
+// Vincular desde el formulario: el administrador elige a qué gestor de gastos o proyecto va el registro nuevo (con su tipo o
+// persona y, si aplica, el micro proyecto). Abierto desde un gestor viene elegido; si no, lo propone la etiqueta del registro.
+function regVincAuto(F) { const etqs = etqLista(F.etq); if (!etqs.length) return null; const t = {etiquetas: etqs};
+  const p = proyectos().find(c => !cerrado(c) && etqCoincide(t, [c.incluye, c.nombre, c.corto])); if (p) return {cid: p.id, auto: true};
+  for (const c of familiares()) { const x = microsDe(c.id, true).find(x => etqCoincide(t, [x.clave, x.nombre])); if (x) return {cid: c.id, grupo: x.id, auto: true}; } return null; }
+function regVincActual(F) { return S.regCtrl && S.regCtrl.cid ? S.regCtrl : S.regCtrl && S.regCtrl.ninguno ? null : regVincAuto(F); }
+function regVincHtml(F) { if (!['gasto', 'ingreso'].includes(F.tipo)) return S.regCtrl && S.regCtrl.cid ? `<div class="rg-ctl note">Los traslados y ajustes no se asignan a gestores ni proyectos.</div>` : '';
+  const V = regVincActual(F); const c = V && ctrlById(V.cid); const eg = F.tipo === 'gasto'; const mes = (F.fecha || hoy()).slice(0, 7);
+  const tp = c ? (eg ? (V.tipoE || c.tipoDefecto || 'COMPARTIDO') : (V.tipoI || S.me.persona || personasDe(c, mes)[0] || 'COMPARTIDO')) : '';
+  const mps = c && c.porMes ? microsDe(c.id, true) : [];
+  return `<div class="rg-ctl rg-vinc"><span>Vincular a</span>${ctrlSelect(c ? c.id : '', 'class="in" id="rgVinc" aria-label="Gestor de gastos o proyecto"').replace('<option value="" selected>Elegir…</option>', '').replace('<select class="in" id="rgVinc" aria-label="Gestor de gastos o proyecto">', `<select class="in" id="rgVinc" aria-label="Gestor de gastos o proyecto"><option value="" ${c ? '' : 'selected'}>No vincular</option>`)}
+    ${c ? `<span>como</span><select class="in" id="rgCtlTipo" aria-label="Tipo o persona">${tipoOptions(c, tp, eg ? 'egreso' : 'ingreso', mes)}</select>` : ''}
+    ${mps.length ? `<select class="in" id="rgVincMp" aria-label="Micro proyecto"><option value="">Sin micro proyecto</option>${mps.map(x => `<option value="${esc(x.id)}" ${V.grupo === x.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select>` : ''}
+    ${c && V.auto ? '<span class="note">por la etiqueta</span>' : c && c.porMes ? '<span class="note">en el mes de la fecha del registro</span>' : ''}</div>`; }
+// regVincLeer: lo elegido en el formulario (o null si no se vincula).
+function regVincLeer() { const s = $('#rgVinc'); const cid = s ? s.value : (S.regCtrl && S.regCtrl.cid) || ''; if (!cid || !ctrlById(cid)) return null;
+  const t = $('#rgCtlTipo'), m = $('#rgVincMp'); const c = ctrlById(cid); return {cid, tipo: t ? t.value : c.tipoDefecto || 'COMPARTIDO', grupo: m ? m.value : ''}; }
+document.addEventListener('change', e => { const el = e.target; if (!S.regF || !['rgVinc', 'rgVincMp'].includes(el.id)) return; regLeerForm();
+  if (el.id === 'rgVinc') { const cid = el.value; S.regCtrl = cid ? {cid, mes: S.regCtrl && S.regCtrl.mes} : {ninguno: true}; }
+  else { const V = regVincActual(S.regF); S.regCtrl = Object.assign({}, V || {}, {grupo: el.value, auto: false}); }
+  S._regFoco = true; pintarRegForm(); });
 /* ================= detalle de una fila ================= */
 // abrirDetalle: Ficha completa de una fila: datos, datos de la app, historial y comprobantes.
 function abrirDetalle(id) {
@@ -5556,7 +5578,7 @@ function pintarRegForm() {
           ${vin.length ? `<div class="note etq-vin">Se vincula a: <b>${vin.map(esc).join(', ')}</b></div>` : ''}</div>`; })())}
         ${a && !ed && F.tipo !== 'ajuste' && S.series !== null ? fila('Repetir', `<button type="button" class="rg-sel ${F.rep && F.rep.frec ? '' : 'vacio'}" data-act="regPick" data-v="rep">↻ ${repTxt(F)}</button>`, pk === 'rep' ? 'activo' : '') : ''}
         ${fila('Descripción', `<textarea class="rg-in" id="rgDesc" rows="1" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
-      </div>${S.regCtrl && !F.id ? regCtrlHtml(F) : ''}
+      </div>${a && !F.id ? regVincHtml(F) : ''}
       <div id="rgMsg" class="note"></div>
       ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
     </div>
@@ -5642,7 +5664,7 @@ async function regGuardar(seguir) {
   if (!F.id) { const fz = regFirma(row); const hace = Date.now() - 15 * 60e3;
     const igual = S.reg.find(r => r.creado_por === S.me.id && ['oficial', 'pendiente'].includes(r.estado) && Date.parse(r.creado_el) > hace && regFirma(r) === fz);
     if (igual && S._regDupOk !== fz) { S._regDupOk = fz; msg.innerHTML = `<span class="neg">Hace un momento guardaste uno igual (${fFecha(igual.fecha)} · ${L(+igual.monto)}). Si de verdad es otro, toca de nuevo el botón.</span>`; return; } }
-  S._regGuardando = true; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = true);
+  S._regGuardando = true; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = true); const vinc = a && !F.id ? regVincLeer() : null;
   try {
     if (F.id) { const antes = Object.assign({}, regDe(F.id)); row.actualizado_el = new Date().toISOString(); const d = await q(sb.from('registros').update(row).eq('id', F.id).select(), 'Registro actualizado');
       const nuevo = d && d[0] ? d[0] : Object.assign(antes, row); Object.assign(regDe(F.id), nuevo); await regHist(F.id, 'editado', antes, nuevo); }
@@ -5659,7 +5681,7 @@ async function regGuardar(seguir) {
       const d = await q(sb.from('registros').insert(row).select(), seguir ? '' : a ? 'Registro guardado' : 'Enviado para aprobación'); const nuevo = d && d[0] ? d[0] : row; S.reg.push(nuevo); S._regCreados = [nuevo.id]; await regHist(nuevo.id, 'creado', null, nuevo); if (a) { derive(); await tjPagoAuto(F, nuevo); }
       S.regUlt = {tipo: F.tipo, cuenta: F.cuenta, destino: F.destino, fecha: F.fecha}; S._regDupOk = null; S._regN = (S._regN || 0) + 1; }
     if (a) derive();
-    if (a && S.regCtrl && !F.id && S._regCreados) { const ids = S._regCreados; S._regCreados = null; await regAsignarCtrl(ids, F.tipo); }
+    if (a && vinc && S._regCreados) { const ids = S._regCreados; S._regCreados = null; await regAsignarCtrl(ids, F.tipo, vinc); }
     if (seguir) { const res = regResumen(row);
       Object.assign(F, {monto: '', montoD: '', comision: '', conComision: false, grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null, id: undefined}); F.hora = ahoraHora(); S.regPick = null; S.regPickG = null;
       pintarRegForm(); $('#rgMsg').innerHTML = `<div class="rg-ok"><div>✓ Guardado: ${res}</div><span>${S._regN} en esta sesión · ahora el siguiente</span></div>`; const m = $('#rgMonto'); if (m) m.focus(); render(); if (ctaAbierta() && S.ctaFicha) pintarCtaFicha(); if (tjAbierta()) pintarTjFicha(true); return; }
