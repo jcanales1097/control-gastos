@@ -840,7 +840,7 @@ body.cta-abierta{overflow:hidden}
 .rg-mk-b b{font-size:15px}.rg-mk-s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rg-mk-x{position:absolute;top:4px;right:4px;border:0;background:var(--bad);color:#fff;border-radius:999px;min-width:24px;height:24px;font-size:12px;cursor:pointer;z-index:1;padding:0 6px}
 .rg-mkn{display:grid;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}.rg-mkn .in{width:100%!important;max-width:none!important;font-size:16px}
-.rg-etqw{width:100%;display:grid;gap:4px}.rg-etqs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:6px}.rg-etqs .chip{cursor:pointer;font-size:12.5px}.chip.on{background:var(--accent);color:var(--bg, #fff);border-color:var(--accent)}
+.rg-etqw{width:100%;display:grid;gap:4px}.chip.etq-pr{border-color:var(--accent);color:var(--accent);font-weight:600}.etq-vin{font-size:12px}.rg-etqs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:6px}.rg-etqs .chip{cursor:pointer;font-size:12.5px}.chip.on{background:var(--accent);color:var(--bg, #fff);border-color:var(--accent)}
 .rg-rep{display:grid;gap:12px;padding:12px}
 .rg-repn{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px}
 .rg-step{display:flex;align-items:center;gap:4px}.rg-step .in{width:64px!important;text-align:center;font-size:17px}.rg-step .btn{min-width:40px;min-height:40px;font-size:20px}
@@ -1403,16 +1403,21 @@ function cambioDe(m, conMod) {
 }
 // cambios: Lista de movimientos con cambios pendientes de revisar (vista "Cambios").
 const cambios = () => esAdmin() ? [...S.movs.values()].map(m => ({m, c: cambioDe(m)})).filter(x => x.c).sort((a, b) => (a.m.fecha || '') < (b.m.fecha || '') ? -1 : 1) : [];
+// Vincular por etiqueta: un registro con la etiqueta igual a la clave o al nombre de un proyecto (o micro proyecto) se sugiere
+// para ese proyecto, sin tener que escribir la clave en la descripción. Sin acentos, mayúsculas ni "#".
+const etqNorm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/^#/, '').replace(/\s+/g, ' ').trim().toUpperCase();
+const etqCoincide = (t, nombres) => { const e = (t.etiquetas || []).map(etqNorm); if (!e.length) return false; return nombres.filter(Boolean).map(etqNorm).some(n => n && e.includes(n)); };
 // applies: true si un registro de la app cumple las reglas (categorías, cuentas, fechas) de un control.
 function applies(c, t) {
   const cat = (t.cat || '').trim();
   if (cerrado(c)) return false;
   const cats = (c.categorias || []).filter(Boolean);
-  if (esProy(c) && !c.incluye) return false;
+  const porEtq = etqCoincide(t, esProy(c) ? [c.incluye, c.nombre, c.corto] : [c.incluye]);
+  if (esProy(c) && !c.incluye && !porEtq) return false;
   if (!cats.length && !esProy(c)) return false;
   if (cats.length && !cats.some(p => cat.startsWith(p))) return false;
   const hay = (t.det + ' ' + t.nota + ' ' + t.sub).toUpperCase();
-  if (c.incluye && !hay.includes(c.incluye.toUpperCase())) return false;
+  if (c.incluye && !hay.includes(c.incluye.toUpperCase()) && !porEtq) return false;
   if (c.excluye && t.det.toUpperCase().includes(c.excluye.toUpperCase())) return false;
   return true;
 }
@@ -3448,7 +3453,15 @@ const microsDe = (cid, soloAbiertos) => (S.micro || []).filter(x => x.control ==
 // microById: Busca un micro proyecto por id.
 const microById = id => (S.micro || []).find(x => x.id === id);
 // microSugerido: Micro proyecto sugerido según la clave en el texto del registro.
-function microSugerido(c, t) { if (!c || !t) return ''; const d = (t.det + ' ' + t.nota).toUpperCase(); const x = microsDe(c.id, true).find(x => x.clave && d.includes(x.clave.toUpperCase())); return x ? x.id : ''; }
+function microSugerido(c, t) { if (!c || !t) return ''; const d = (t.det + ' ' + t.nota).toUpperCase(); const l = microsDe(c.id, true); const x = l.find(x => etqCoincide(t, [x.clave, x.nombre])) || l.find(x => x.clave && d.includes(x.clave.toUpperCase())); return x ? x.id : ''; }
+// etqVinculos: proyectos y micro proyectos abiertos a los que llevarían las etiquetas (para avisarlo en el formulario).
+function etqVinculos(etqs) { const t = {etiquetas: etqs}; const out = []; if (!etqs.length) return out;
+  proyectos().filter(c => !cerrado(c) && etqCoincide(t, [c.incluye, c.nombre, c.corto])).forEach(c => out.push(c.nombre));
+  familiares().forEach(c => microsDe(c.id, true).filter(x => etqCoincide(t, [x.clave, x.nombre])).forEach(x => out.push(x.nombre + ' (' + (c.corto || c.nombre) + ')'))); return out; }
+// etqOpciones: etiquetas para elegir: las ya usadas y los nombres de proyectos y micro proyectos abiertos.
+function etqOpciones() { const vis = new Set(); const out = []; const add = (v, pr) => { const k = etqNorm(v); if (!k || vis.has(k)) return; vis.add(k); out.push({v, pr}); };
+  proyectos().filter(c => !cerrado(c)).forEach(c => add(c.nombre, true)); familiares().forEach(c => microsDe(c.id, true).forEach(x => add(x.nombre, true)));
+  etqUsadas().forEach(v => add(v, false)); return out; }
 // microOptions: Opciones de micro proyecto para listas desplegables.
 const microOptions = (cid, sel, vacio) => `<option value="">${vacio || 'Sin micro proyecto'}</option>` + microsDe(cid).filter(x => x.estado === 'abierto' || x.id === sel).map(x => `<option value="${esc(x.id)}" ${x.id === sel ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
 // resumenMicro: Totales y meses de un micro proyecto.
@@ -5442,7 +5455,13 @@ function abrirRegForm(id) {
   S.regVista = 'form'; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
-  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); }
+  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); const nE = v('rgEtqN'); if (nE && nE.trim()) F.etq = etqAgregar(F.etq, nE); }
+// etqAgregar: suma una etiqueta (sin repetir, aunque cambien mayúsculas o acentos; si es un proyecto, con su nombre tal cual).
+function etqAgregar(lista, v) { v = String(v || '').replace(/^#/, '').replace(/,/g, ' ').trim(); if (!v) return lista || ''; const l = etqLista(lista); if (l.some(x => etqNorm(x) === etqNorm(v))) return l.join(', ');
+  const o = etqOpciones().find(o => etqNorm(o.v) === etqNorm(v)); return [...l, o ? o.v : v].join(', '); }
+function etqNuevaDesde(el) { if (!el.value.trim() || !S.regF) return; regLeerForm(); el.value = ''; S._regFoco = true; pintarRegForm(); const n = $('#rgEtqN'); if (n) n.focus(); }
+document.addEventListener('change', e => { const el = e.target; if (el.id === 'rgEtqN' && etqOpciones().some(o => etqNorm(o.v) === etqNorm(el.value))) etqNuevaDesde(el); });   // elegida de la lista; lo escrito se agrega con Enter o al guardar
+document.addEventListener('keydown', e => { if (e.target.id === 'rgEtqN' && (e.key === 'Enter' || e.key === ',')) { e.preventDefault(); etqNuevaDesde(e.target); } });
 const numDe = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : NaN; };
 /* Formulario con la mecánica de Registro Contable: filas "etiqueta · valor"; al tocar Categoría o Cuenta se abre abajo un panel
    en cuadrícula de 3 columnas. Al tocar un Grupal se despliegan sus Subgrupales debajo de su fila; al elegir uno pasa solo a Cuenta.
@@ -5529,7 +5548,12 @@ function pintarRegForm() {
       <div class="rg-filas">
         ${fila('Fecha', `<input class="rg-in" type="date" id="rgFecha" value="${esc(F.fecha)}"><input class="rg-in rg-hora" type="time" id="rgHora" value="${esc(F.hora)}">`, 'rg-fh')}
         ${filas}
-        ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', `<div class="rg-etqw"><input class="rg-in" id="rgEtq" value="${esc(F.etq || '')}" placeholder="ej. Viaje Roatán, Navidad" autocomplete="off">${(() => { const ya = etqLista(F.etq); const sug = etqUsadas().filter(x => !ya.includes(x)).slice(0, 6); return ya.length || sug.length ? `<div class="rg-etqs">${ya.map(x => `<button type="button" class="chip on" data-act="etqTog" data-v="${esc(x)}">#${esc(x)} ✕</button>`).join('')}${sug.map(x => `<button type="button" class="chip" data-act="etqTog" data-v="${esc(x)}">+ ${esc(x)}</button>`).join('')}</div>` : ''; })()}</div>`)}
+        ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', (() => { const ya = etqLista(F.etq); const ops = etqOpciones(); const yaN = ya.map(etqNorm); const sug = ops.filter(o => !yaN.includes(etqNorm(o.v))).slice(0, 6); const vin = etqVinculos(ya);
+          return `<div class="rg-etqw"><input type="hidden" id="rgEtq" value="${esc(F.etq || '')}">
+          ${ya.length ? `<div class="rg-etqs">${ya.map(x => `<button type="button" class="chip on" data-act="etqTog" data-v="${esc(x)}" aria-label="Quitar ${esc(x)}">#${esc(x)} ✕</button>`).join('')}</div>` : ''}
+          <input class="rg-in" id="rgEtqN" list="rgEtqL" placeholder="Elegir o escribir una etiqueta…" autocomplete="off" enterkeyhint="done"><datalist id="rgEtqL">${ops.filter(o => !yaN.includes(etqNorm(o.v))).map(o => `<option value="${esc(o.v)}">${o.pr ? 'Proyecto' : ''}</option>`).join('')}</datalist>
+          ${sug.length ? `<div class="rg-etqs">${sug.map(o => `<button type="button" class="chip ${o.pr ? 'etq-pr' : ''}" data-act="etqTog" data-v="${esc(o.v)}" title="${o.pr ? 'Proyecto: lo vincula a este proyecto' : 'Etiqueta usada antes'}">+ ${esc(o.v)}</button>`).join('')}</div>` : ''}
+          ${vin.length ? `<div class="note etq-vin">Se vincula a: <b>${vin.map(esc).join(', ')}</b></div>` : ''}</div>`; })())}
         ${a && !ed && F.tipo !== 'ajuste' && S.series !== null ? fila('Repetir', `<button type="button" class="rg-sel ${F.rep && F.rep.frec ? '' : 'vacio'}" data-act="regPick" data-v="rep">↻ ${repTxt(F)}</button>`, pk === 'rep' ? 'activo' : '') : ''}
         ${fila('Descripción', `<textarea class="rg-in" id="rgDesc" rows="1" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
       </div>${S.regCtrl && !F.id ? regCtrlHtml(F) : ''}
@@ -5973,7 +5997,7 @@ document.addEventListener('click', async e => {
     try { await q(sb.from('marcadores').delete().eq('id', m.id), 'Marcador borrado'); S.marc = S.marc.filter(x => x.id !== m.id); } catch (er) {} S._regFoco = true; return pintarRegForm(); }
   if (act === 'repFrec') { regLeerForm(); F.rep = Object.assign(F.rep || {n: 12, cuotas: false}, {frec: b.dataset.v}); S._regFoco = true; return pintarRegForm(); }
   if (act === 'repN') { regLeerForm(); F.rep.n = Math.min(120, Math.max(2, (+F.rep.n || 2) + (+b.dataset.v))); S._regFoco = true; return pintarRegForm(); }
-  if (act === 'etqTog') { regLeerForm(); const l = etqLista(F.etq); const v = b.dataset.v; F.etq = (l.includes(v) ? l.filter(x => x !== v) : [...l, v]).join(', '); S._regFoco = true; return pintarRegForm(); }
+  if (act === 'etqTog') { regLeerForm(); const l = etqLista(F.etq); const v = b.dataset.v; F.etq = l.includes(v) ? l.filter(x => x !== v).join(', ') : etqAgregar(F.etq, v); S._regFoco = true; return pintarRegForm(); }
 });
 document.addEventListener('change', e => { const F = S.regF; if (!F || !F.rep) return;
   if (e.target.id === 'rgRepN') { F.rep.n = Math.min(120, Math.max(2, Math.round(+e.target.value || 2))); regLeerForm(); S._regFoco = true; pintarRegForm(); }
