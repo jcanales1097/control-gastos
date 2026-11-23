@@ -232,7 +232,7 @@ tr.en-grupo td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .bulk select{background:var(--bg);color:var(--fg);border:0}
 .bulk .btn{background:var(--bg);color:var(--fg);border:0}
 .bulk-ops{display:contents}.bulk-min{display:none}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:50;max-width:90vw}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:50;max-width:90vw;pointer-events:none}
 .modal-bg{position:fixed;inset:0;background:rgba(10,16,13,.55);z-index:40;display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 16px 24px;overflow:auto}
 .modal{background:var(--panel);border-radius:12px;max-width:640px;width:100%;border:1px solid var(--line)}
 .modal .hd{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
@@ -756,7 +756,9 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .corte-ck>div span:nth-child(2){flex:1}.corte-ck .ok span:first-child{color:#2e9d5b;font-weight:700}.corte-ck .warn span:first-child{color:var(--bad);font-weight:700}.corte-ck .warn b{color:var(--bad)}
 .corte-f{display:grid;gap:4px;font-size:12px;color:var(--muted);max-width:320px}.corte-f .in{font-size:16px}
 .corte-post{border:1px solid var(--line);border-radius:12px;max-height:420px;overflow:auto}
-#offBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 6px);z-index:70;max-width:calc(100% - 24px);padding:7px 14px;border-radius:999px;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:auto}
+#offBar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:70;max-width:calc(100% - 120px);padding:5px 11px;border-radius:999px;font-size:12px;line-height:1.3;display:flex;align-items:center;gap:6px;box-shadow:0 2px 10px rgba(0,0,0,.22);pointer-events:none;opacity:.96;transition:opacity .3s}
+#offBar .btn{pointer-events:auto}#offBar .off-pt{width:8px;height:8px;border-radius:50%;background:#F5B342;flex:none}#offBar.cola .off-pt{background:currentColor}
+#offBar.corto .off-mas{display:none}body:has(.modal-bg) #offBar,body.cta-abierta #offBar{opacity:.75}
 #offBar.off{background:#5A3F0B;color:#fff}#offBar.cola{background:var(--accent);color:var(--accent-ink)}#offBar .btn{min-height:28px;padding:3px 10px}
 .tj-fhd{flex-wrap:wrap;row-gap:10px}
 .tj-vico{flex-basis:100%;display:flex;gap:4px;background:var(--sunk);border-radius:12px;padding:3px}
@@ -6482,10 +6484,14 @@ function offBarra(estado) {
   let el = document.getElementById('offBar'); if (!el) { el = document.createElement('div'); el.id = 'offBar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   const cl = offCola(); const n = cl.filter(x => x.t !== 'registro_hist').length || cl.length; const sinRed = navigator.onLine === false || S._sinRed; let ult = ''; try { ult = localStorage.getItem('cg_ultimaRed') || ''; } catch (e) {}
   if (!sinRed && !n) { el.hidden = true; return; }
-  el.hidden = false; el.className = sinRed ? 'off' : 'cola';
-  el.innerHTML = estado === 'enviando' ? `Enviando ${n} ${n === 1 ? 'cambio' : 'cambios'}…`
-    : sinRed ? `<b>Sin conexión</b> · datos guardados${ult ? ' del ' + new Date(ult).toLocaleString('es-HN', {day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit'}) : ''}${n ? ` · ${n} por enviar` : ''}`
-    : `${n} ${n === 1 ? 'cambio' : 'cambios'} por enviar <button class="btn sm" data-act="offEnviar">Enviar ahora</button>`;
+  // Aviso discreto abajo a la izquierda: no tapa el menú ni recibe toques (salvo "Enviar"); el detalle se ve unos segundos y queda
+  // solo "Sin conexión" o "N por enviar".
+  const clave = (sinRed ? 'off' : 'cola') + n + (estado || ''); const nuevo = el.dataset.k !== clave; el.dataset.k = clave;
+  el.hidden = false; el.className = (sinRed ? 'off' : 'cola') + (nuevo ? '' : ' corto');
+  el.innerHTML = '<i class="off-pt" aria-hidden="true"></i>' + (estado === 'enviando' ? `Enviando ${n}…`
+    : sinRed ? `<span><b>Sin conexión</b><span class="off-mas"> · datos${ult ? ' del ' + new Date(ult).toLocaleString('es-HN', {day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit'}) : ''}</span>${n ? ` · ${n} por enviar` : ''}</span>`
+    : `<span>${n} por enviar</span><button class="btn sm" data-act="offEnviar">Enviar</button>`);
+  clearTimeout(offBarra._t); if (nuevo) offBarra._t = setTimeout(() => { if (!el.hidden) el.classList.add('corto'); }, 5000);
 }
 window.addEventListener('online', () => { S._sinRed = false; offBarra(); setTimeout(offEnviar, 800); });
 window.addEventListener('offline', () => { S._sinRed = true; offBarra(); });
