@@ -1474,57 +1474,86 @@ async function q(promesa, okMsg) {
 }
 // todo: Lee una tabla completa en bloques de 1,000 filas.
 async function todo(tabla, orden) {
-  const out = [];
-  for (let a = 0; ; a += 1000) {
-    let qq = sb.from(tabla).select('*'); if (orden) qq = qq.order(orden);
-    const {data, error} = await qq.range(a, a + 999);
-    if (error) throw error;
-    out.push(...data); if (data.length < 1000) break;
-  }
-  return out;
+  // Primera página con el total; si hay más de 1000 filas, el resto de páginas se piden todas a la vez (antes iban una tras otra).
+  const pag = a => { let qq = sb.from(tabla).select('*', a ? undefined : {count: 'exact'}); if (orden) qq = qq.order(orden); return qq.range(a, a + 999); };
+  const {data, error, count} = await pag(0); if (error) throw error; const out = data.slice();
+  if (data.length < 1000) return out;
+  if (!(count > 1000)) { for (let a = 1000; ; a += 1000) { const r = await pag(a); if (r.error) throw r.error; out.push(...r.data); if (r.data.length < 1000) break; } return out; }
+  const resto = await Promise.all(Array.from({length: Math.ceil(count / 1000) - 1}, (_, k) => pag((k + 1) * 1000)));
+  resto.forEach(r => { if (r.error) throw r.error; out.push(...r.data); }); return out;
 }
-// cargarTodo: CARGA INICIAL: perfil del usuario, controles, movimientos, adjuntos, micro proyectos, vehículos y, si es admin, datos de la app, ajustes, usuarios y créditos.
+// cargarTodo: CARGA INICIAL: perfil del usuario, controles, movimientos, adjuntos, micro proyectos, vehículos y, si es admin, datos
+// de la app, ajustes, usuarios, créditos, tarjetas y cuentas. Todo se pide a la vez (antes, una consulta tras otra).
 async function cargarTodo() {
-  const {data: u} = await sb.auth.getUser();
-  const uid = u && u.user && u.user.id;
+  const {data: ss} = await sb.auth.getSession(); let uid = ss && ss.session && ss.session.user && ss.session.user.id; let email = ss && ss.session && ss.session.user.email;
+  if (!uid) { const {data: u} = await sb.auth.getUser(); uid = u && u.user && u.user.id; email = u && u.user && u.user.email; }
   const {data: me, error} = await sb.from('perfiles').select('*').eq('id', uid).maybeSingle();
   if (error) throw error;
-  S.me = me || {id: uid, email: u.user.email, activo: false, rol: 'usuario'};
+  S.me = me || {id: uid, email, activo: false, rol: 'usuario'};
   if (!S.me.activo) return;
-  const [ctr, movs] = await Promise.all([todo('controles', 'orden'), todo('movimientos', 'creado_el')]);
-  S.ctrls = ctr.map(fromC); S.movs = new Map(movs.map(m => [m.id, normMov(m)]));
-  try { S.adj = await todo('adjuntos', 'subido_el'); } catch (e) { S.adj = null; }
-  try { S.micro = await todo('microproyectos', 'creado_el'); } catch (e) { S.micro = null; }
-  try { S.veh = await todo('vehiculos', 'creado_el'); S.vreg = await todo('veh_registros', 'fecha'); S.vplan = await todo('veh_planes'); } catch (e) { S.veh = null; S.vreg = null; S.vplan = null; }
-  if (esAdmin()) {
-    const [tx, ign, aj, pf, ac] = await Promise.all([todo('tx_mes', 'mes'), todo('ignorados'), todo('ajustes'), todo('perfiles', 'creado_el'), todo('accesos')]);
-    S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
-    S.aj = Object.fromEntries(aj.map(a => [a.clave, a.valor])); S.perfiles = pf; S.accesos = ac;
-    if (!S.aj.inicio) S.aj.inicio = hoy().slice(0, 8) + '01';
-    try { S.hist = new Map((await todo('tx_hist')).map(x => [x.tx_id, x])); } catch (e) { S.hist = null; }
-    try { S.mon = new Map((await todo('tx_moneda')).map(x => [x.tx_id, x])); } catch (e) { S.mon = null; }
-    try { const [cr, cq, ce] = await Promise.all([todo('creditos', 'nombre'), todo('credito_cuotas', 'numero'), todo('credito_enlaces')]); S.cred = cr; S.ccuo = cq; S.cenl = ce; } catch (e) { S.cred = null; S.ccuo = []; S.cenl = []; }
-    // Tarjetas de crédito (si aún no se corrió tarjetas.sql, S.tj queda en null y la pestaña lo avisa).
-    try { const [tj, tp, tg] = await Promise.all([todo('tarjetas', 'banco'), todo('tarjeta_periodos', 'corte'), todo('tarjeta_pagos')]); S.tj = tj; S.tjp = tp; S.tjpg = tg; } catch (e) { S.tj = null; S.tjp = []; S.tjpg = []; }
-    // Cuentas: tipos, configuración de cada cuenta y ajustes de categorías (si aún no se corrió cuentas.sql quedan en null y la pestaña lo avisa).
-    try { const [ct, cu, ca] = await Promise.all([todo('cuenta_tipos', 'orden'), todo('cuentas'), todo('categoria_ajustes')]); S.ctT = ct; S.cta = new Map(cu.map(x => [x.nombre, x])); S.catAj = new Map(ca.map(x => [x.cat, x])); } catch (e) { S.ctT = []; S.cta = null; S.catAj = null; }
-    try { S.cats = await todo('categorias', 'orden'); } catch (e) { S.cats = null; }   // catálogo de categorías (fase2.sql)
+  const ad = esAdmin(); const opc = (p, def) => p.then(v => v, () => def);   // las tablas opcionales que falten no detienen la carga
+  const N = Symbol('falta');
+  const P = {
+    ctr: todo('controles', 'orden'), movs: todo('movimientos', 'creado_el'),
+    adj: opc(todo('adjuntos', 'subido_el'), null), micro: opc(todo('microproyectos', 'creado_el'), null),
+    veh: opc(Promise.all([todo('vehiculos', 'creado_el'), todo('veh_registros', 'fecha'), todo('veh_planes')]), null),
+    cats: opc(todo('categorias', 'orden'), null),
+    reg: opc(Promise.all([todo('registros', 'creado_el'), ad ? todo('registro_hist', 'el') : Promise.resolve([])]), null),
+    marc: opc(todo('marcadores', 'orden'), null),
+  };
+  if (ad) Object.assign(P, {
+    base: Promise.all([todo('tx_mes', 'mes'), todo('ignorados'), todo('ajustes'), todo('perfiles', 'creado_el'), todo('accesos')]),
+    hist: opc(todo('tx_hist'), null), mon: opc(todo('tx_moneda'), null),
+    cred: opc(Promise.all([todo('creditos', 'nombre'), todo('credito_cuotas', 'numero'), todo('credito_enlaces')]), null),
+    tj: opc(Promise.all([todo('tarjetas', 'banco'), todo('tarjeta_periodos', 'corte'), todo('tarjeta_pagos')]), null),
+    cta: opc(Promise.all([todo('cuenta_tipos', 'orden'), todo('cuentas'), todo('categoria_ajustes')]), null),
+    f4b: opc(sb.from('tarjetas').select('titular').limit(1).then(r => !r.error), false),
+    fPl: opc(sb.from('registros').select('plastico').limit(1).then(r => !r.error), false),
+    notas: opc(todo('notas_dia', 'fecha'), null), series: opc(todo('registro_series', 'creado_el'), null),
+  }); else P.acc = q(sb.from('accesos').select('*').eq('usuario', uid));
+  const k = Object.keys(P); const v = await Promise.all(k.map(x => P[x])); const R = Object.fromEntries(k.map((x, i) => [x, v[i]]));
+  S.ctrls = R.ctr.map(fromC); S.movs = new Map(R.movs.map(m => [m.id, normMov(m)]));
+  S.adj = R.adj; S.micro = R.micro; [S.veh, S.vreg, S.vplan] = R.veh || [null, null, null]; S.cats = R.cats;
+  if (ad) {
+    const [tx, ign, aj, pf, ac] = R.base; S.tx = new Map(tx.map(t => [t.mes, t])); S.ign = new Map(ign.map(i => [i.tx_id, i]));
+    S.aj = Object.fromEntries(aj.map(a => [a.clave, a.valor])); S.perfiles = pf; S.accesos = ac; if (!S.aj.inicio) S.aj.inicio = hoy().slice(0, 8) + '01';
+    S.hist = R.hist ? new Map(R.hist.map(x => [x.tx_id, x])) : null; S.mon = R.mon ? new Map(R.mon.map(x => [x.tx_id, x])) : null;
+    if (R.cred) [S.cred, S.ccuo, S.cenl] = R.cred; else { S.cred = null; S.ccuo = []; S.cenl = []; }
+    if (R.tj) [S.tj, S.tjp, S.tjpg] = R.tj; else { S.tj = null; S.tjp = []; S.tjpg = []; }
+    if (R.cta) { const [ct, cu, ca] = R.cta; S.ctT = ct; S.cta = new Map(cu.map(x => [x.nombre, x])); S.catAj = new Map(ca.map(x => [x.cat, x])); } else { S.ctT = []; S.cta = null; S.catAj = null; }
+    S.f4b = R.f4b; S.fPl = R.fPl; S.notasDia = R.notas ? new Map(R.notas.map(r => [r.fecha, r])) : null; S.series = R.series;
     S._ctaVer = (S._ctaVer || 0) + 1; catMapas();
-  } else {
-    S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me];
-    S.accesos = await q(sb.from('accesos').select('*').eq('usuario', uid));
-    try { S.cats = await todo('categorias', 'orden'); } catch (e) { S.cats = null; }   // catálogo para el formulario de registro (fase3.sql da permiso de lectura)
-  }
-  // Registros hechos en la plataforma (fase3.sql). Sin la tabla, S.reg queda en null y el botón + lo avisa.
-  try { S.reg = await todo('registros', 'creado_el'); S.regHist = esAdmin() ? await todo('registro_hist', 'el') : []; } catch (e) { S.reg = null; S.regHist = []; }
-  // Fase 4 (fase4.sql): marcadores, series de repetición y notas del día. Sin la tabla, cada función se esconde.
-  try { S.marc = await todo('marcadores', 'orden'); } catch (e) { S.marc = null; }
-  if (esAdmin()) { try { const {error} = await sb.from('tarjetas').select('titular').limit(1); S.f4b = !error; } catch (e) { S.f4b = false; } }
-  if (esAdmin()) { try { const {error} = await sb.from('registros').select('plastico').limit(1); S.fPl = !error; } catch (e) { S.fPl = false; } }   // tarjeta = cuenta: plástico de cada registro
-  if (esAdmin()) { try { S.notasDia = new Map((await todo('notas_dia', 'fecha')).map(r => [r.fecha, r])); } catch (e) { S.notasDia = null; } try { S.series = await todo('registro_series', 'creado_el'); } catch (e) { S.series = null; } }
-  if (esAdmin()) setTimeout(regPublicarCatalogo, 1500);
+  } else { S.tx = new Map(); S.ign = new Map(); S.aj = {}; S.perfiles = [S.me]; S.accesos = R.acc; }
+  if (R.reg) [S.reg, S.regHist] = R.reg; else { S.reg = null; S.regHist = []; }
+  S.marc = R.marc;
+  if (ad) setTimeout(regPublicarCatalogo, 1500);
   offAplicar();   // lo hecho sin conexión que todavía no se envió
+  copiaGuardar();
 }
+/* ===== Copia local para abrir al instante =====
+   Tras cada carga se guarda una copia de los datos en el teléfono (IndexedDB, solo de este usuario). Al abrir la app se muestra
+   esa copia de inmediato y los datos nuevos se traen por detrás; sin internet, la app abre igual con la última copia. Al salir
+   (botón Salir) la copia se borra. */
+const COPIA_K = ['me', 'ctrls', 'movs', 'adj', 'micro', 'veh', 'vreg', 'vplan', 'cats', 'tx', 'ign', 'aj', 'perfiles', 'accesos', 'hist', 'mon', 'cred', 'ccuo', 'cenl', 'tj', 'tjp', 'tjpg', 'ctT', 'cta', 'catAj', 'f4b', 'fPl', 'notasDia', 'series', 'reg', 'regHist', 'marc'];
+function copiaDB() { return new Promise((ok, mal) => { try { const r = indexedDB.open('cg-copia', 1); r.onupgradeneeded = () => r.result.createObjectStore('c'); r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); } catch (e) { mal(e); } }); }
+async function copiaGuardar() { try { const o = {el: new Date().toISOString()}; COPIA_K.forEach(k => { o[k] = S[k]; }); const db = await copiaDB();
+  await new Promise((ok, mal) => { const tr = db.transaction('c', 'readwrite'); tr.objectStore('c').put(o, S.me.id); tr.oncomplete = ok; tr.onerror = () => mal(tr.error); }); db.close(); } catch (e) {} }
+async function copiaLeer(uid) { try { const db = await copiaDB(); const o = await new Promise((ok, mal) => { const g = db.transaction('c').objectStore('c').get(uid); g.onsuccess = () => ok(g.result); g.onerror = () => mal(g.error); }); db.close(); return o || null; } catch (e) { return null; } }
+async function copiaBorrar() { try { const db = await copiaDB(); await new Promise(ok => { const tr = db.transaction('c', 'readwrite'); tr.objectStore('c').clear(); tr.oncomplete = ok; tr.onerror = ok; }); db.close(); } catch (e) {} }
+// uidGuardado: el usuario de la sesión guardada en este navegador (sin preguntar a internet).
+function uidGuardado() { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sb-.*-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); const u = v && (v.user || (v.currentSession && v.currentSession.user)); if (u && u.id) return u.id; } } } catch (e) {} return null; }
+// arrancarCopia: abre al instante con la copia guardada (si la hay) y luego trae lo nuevo por detrás.
+let _copiaAbierta = false;
+async function arrancarCopia() { const uid = uidGuardado(); if (!uid) return false; const o = await copiaLeer(uid); if (!o || !o.me || S.me) return false;
+  COPIA_K.forEach(k => { if (k in o) S[k] = o[k]; }); S._copiaEl = o.el; _copiaAbierta = true; $('#topbar').hidden = false;
+  try { if (S.cats) catMapas(); fidRevisar(); derive(); route(); render(); S._sinRed = navigator.onLine === false; offBarra(); } catch (e) { _copiaAbierta = false; S.me = null; return false; }
+  return true; }
+// refrescarFondo: trae los datos nuevos sin tapar la pantalla; si no hay internet, se queda con la copia.
+let _refrescando = false;
+async function refrescarFondo() { if (_refrescando) return; _refrescando = true; const ind = document.getElementById('cargaFondo'); if (ind) ind.hidden = false;
+  try { await cargarTodo(); S._sinRed = false; derive(); if (!document.querySelector('#modalRoot .modal') && !document.querySelector('input:focus,textarea:focus,select:focus')) render(); offBarra(); try { localStorage.setItem('cg_ultimaRed', new Date().toISOString()); } catch (e) {} setTimeout(offEnviar, 1500); if (esAdmin() && !refrescarFondo._extras) { refrescarFondo._extras = true; detectarServidor(); rellenarDatosApp().catch(() => {}); iniciarHistorial().catch(() => {}); } }
+  catch (e) { S._sinRed = true; offBarra(); }
+  finally { _refrescando = false; if (ind) ind.hidden = true; } }
 // guardarAjuste: Guarda un ajuste general (tabla ajustes).
 const guardarAjuste = (clave, valor) => { S.aj[clave] = valor; return q(sb.from('ajustes').upsert({clave, valor})); };
 // guardarControl: Guarda los cambios de un control (nombre, participantes, reglas…).
@@ -1565,9 +1594,13 @@ async function init() {
   if (!window.supabase || !window.supabase.createClient) return fatal('No se pudo cargar la conexión con la base de datos. Revisa tu internet y recarga la página.');
   sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, {auth: {persistSession: true, autoRefreshToken: true, detectSessionInUrl: true}});
   { const _from = sb.from.bind(sb); sb.from = t => { if (!OFF_T.has(t)) return _from(t); const o = offFrom(t, _from); o._real = () => _from(t); return o; }; }   // escrituras sin conexión → cola (fase 6)
+  const conCopia = await arrancarCopia();   // abre al instante con la última copia de este teléfono
+  if (conCopia) setTimeout(() => { if (_copiaAbierta && !_refrescando && navigator.onLine !== false) refrescarFondo(); }, 4000);   // por si la sesión tarda en responder
   sb.auth.onAuthStateChange((ev, session) => {
     if (ev === 'PASSWORD_RECOVERY') { S.recuperando = true; renderAuth(); return; }
-    if (ev === 'SIGNED_OUT' || !session) { S.me = null; renderAuth(); return; }
+    if (_copiaAbierta && session && S.me && S.me.id === session.user.id) { if (ev === 'INITIAL_SESSION' || ev === 'SIGNED_IN') setTimeout(refrescarFondo, 0); return; }
+    if (_copiaAbierta && !session && ev !== 'SIGNED_OUT' && navigator.onLine === false) return;   // sin internet no se pudo renovar la sesión: se sigue con la copia
+    if (ev === 'SIGNED_OUT' || !session) { _copiaAbierta = false; S.me = null; renderAuth(); return; }
     if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && !S.recuperando && (!S.me || S.me.id !== session.user.id)) arrancar();
   });
 }
@@ -7361,7 +7394,7 @@ document.addEventListener('click', async e => {
   if (act === 'cerrarModal') { if (e.target === b || b.tagName !== 'DIV') cerrarCapa(); return; }
   if (act === 'recargar') return location.reload();
   if (act === 'salir') { const nc = offCola().length; if (nc) return toast(`Tienes ${nc} ${nc === 1 ? 'cambio' : 'cambios'} sin enviar: conéctate a internet antes de salir.`);
-    try { navigator.serviceWorker && navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage('limpiarDatos'); } catch (e) {} await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
+    try { navigator.serviceWorker && navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage('limpiarDatos'); } catch (e) {} await copiaBorrar(); _copiaAbierta = false; await sb.auth.signOut(); S.me = null; location.hash = ''; return renderAuth(); }
   if (act === 'guardarSetup') { const u = $('#sbUrl').value.trim().replace(/\/$/, ''), k = $('#sbKey').value.trim(); if (!/^https:\/\/.+/.test(u) || k.length < 20) return toast('Revisa la URL y la clave.'); lsSet('cg-sb-url', u); lsSet('cg-sb-key', k); return location.reload(); }
   if (act === 'sync') return abrirSync(true);
   if (act === 'syncDirecto') return syncDirecto();
