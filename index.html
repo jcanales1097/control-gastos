@@ -843,7 +843,8 @@ body.cta-abierta{overflow:hidden}
 .rg-mk-b b{font-size:15px}.rg-mk-s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rg-mk-x{position:absolute;top:4px;right:4px;border:0;background:var(--bad);color:#fff;border-radius:999px;min-width:24px;height:24px;font-size:12px;cursor:pointer;z-index:1;padding:0 6px}
 .rg-mkn{display:grid;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}.rg-mkn .in{width:100%!important;max-width:none!important;font-size:16px}
-.rg-etqw{width:100%;display:grid;gap:4px}.chip.etq-pr{border-color:var(--accent);color:var(--accent);font-weight:600}.etq-vin{font-size:12px}.rg-etqs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:6px}.rg-etqs .chip{cursor:pointer;font-size:12.5px}.chip.on{background:var(--accent);color:var(--bg, #fff);border-color:var(--accent)}
+.rg-etqw{width:100%;display:grid;gap:4px}.rg-etqw .rg-etqs{align-items:center;padding-bottom:0}.rg-etqsel{border:1px dashed var(--line);background:transparent;color:var(--accent);font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:5px 10px;max-width:100%;cursor:pointer}.rg-etqn{flex:1 1 160px;min-width:140px}
+.rg-desc{resize:none;overflow:hidden;min-height:2.6em;line-height:1.35}.chip.etq-pr{border-color:var(--accent);color:var(--accent);font-weight:600}.etq-vin{font-size:12px}.rg-etqs{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:6px}.rg-etqs .chip{cursor:pointer;font-size:12.5px}.chip.on{background:var(--accent);color:var(--bg, #fff);border-color:var(--accent)}
 .rg-rep{display:grid;gap:12px;padding:12px}
 .rg-repn{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px}
 .rg-step{display:flex;align-items:center;gap:4px}.rg-step .in{width:64px!important;text-align:center;font-size:17px}.rg-step .btn{min-width:40px;min-height:40px;font-size:20px}
@@ -5476,14 +5477,18 @@ function abrirRegForm(id) {
   if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
   { const F = S.regF; const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); }
     if (r && r.plastico && F.tj && tjById(r.plastico)) F.tj = r.plastico; }
-  S.regVista = 'form'; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
+  S.regVista = 'form'; S.etqNueva = false; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
   [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); const nE = v('rgEtqN'); if (nE && nE.trim()) F.etq = etqAgregar(F.etq, nE); }
 // etqAgregar: suma una etiqueta (sin repetir, aunque cambien mayúsculas o acentos; si es un proyecto, con su nombre tal cual).
 function etqAgregar(lista, v) { v = String(v || '').replace(/^#/, '').replace(/,/g, ' ').trim(); if (!v) return lista || ''; const l = etqLista(lista); if (l.some(x => etqNorm(x) === etqNorm(v))) return l.join(', ');
   const o = etqOpciones().find(o => etqNorm(o.v) === etqNorm(v)); return [...l, o ? o.v : v].join(', '); }
-function etqNuevaDesde(el) { if (!el.value.trim() || !S.regF) return; regLeerForm(); el.value = ''; S._regFoco = true; pintarRegForm(); const n = $('#rgEtqN'); if (n) n.focus(); }
+function etqNuevaDesde(el) { if (!el.value.trim() || !S.regF) return; regLeerForm(); el.value = ''; S.etqNueva = false; S._regFoco = true; pintarRegForm(); }
+document.addEventListener('change', e => { const el = e.target; if (el.id !== 'rgEtqSel' || !S.regF) return; const v = el.value; if (!v) return; regLeerForm();
+  if (v === '__nueva') { S.etqNueva = true; S._regFoco = true; pintarRegForm(); setTimeout(() => { const n = $('#rgEtqN'); if (n) n.focus(); }, 60); return; }
+  S.regF.etq = etqAgregar(S.regF.etq, v); S._regFoco = true; pintarRegForm(); });
+document.addEventListener('focusout', e => { if (e.target.id === 'rgEtqN' && !e.target.value.trim() && S.etqNueva) setTimeout(() => { const ae = document.activeElement; if (ae && ae.id === 'rgEtqN') return; if (S.etqNueva && !($('#rgEtqN') || {}).value) { S.etqNueva = false; if (S.regF && $('#rgEtqN')) { regLeerForm(); S._regFoco = true; pintarRegForm(); } } }, 150); });
 document.addEventListener('change', e => { const el = e.target; if (el.id === 'rgEtqN' && etqOpciones().some(o => etqNorm(o.v) === etqNorm(el.value))) etqNuevaDesde(el); });   // elegida de la lista; lo escrito se agrega con Enter o al guardar
 document.addEventListener('keydown', e => { if (e.target.id === 'rgEtqN' && (e.key === 'Enter' || e.key === ',')) { e.preventDefault(); etqNuevaDesde(e.target); } });
 const numDe = x => { const n = parseFloat(String(x == null ? '' : x).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : NaN; };
@@ -5526,6 +5531,9 @@ function regPickHtml() {
   }
   return `<div class="rg-pick" role="dialog" aria-label="${titulo}"><div class="rg-pickh"><b>${titulo}</b>${pk === 'det' ? '<button type="button" class="btn sm ghost" data-act="regDetEsc">✎ Escribir otro</button>' : ''}${pk === 'marc' ? `<span class="row" style="gap:4px;margin-left:auto">${(S.marc || []).length ? `<button type="button" class="btn sm ghost" data-act="marcEditar">${S.marcEdit ? 'Listo' : 'Editar'}</button>` : ''}${S.marcNuevo ? '' : '<button type="button" class="btn sm ghost" data-act="marcNuevo">☆ Guardar este</button>'}</span>` : ''}<button type="button" class="btn sm ghost ico" data-act="regPickX" aria-label="Cerrar">✕</button></div><div class="rg-pickb">${cuerpo}</div></div>`;
 }
+// rgDescAjustar: la descripción crece con el texto (sin barra de desplazamiento).
+function rgDescAjustar() { const t = $('#rgDesc'); if (!t) return; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
+document.addEventListener('input', e => { if (e.target.id === 'rgDesc') rgDescAjustar(); });
 function pintarRegForm() {
   const F = S.regF; const a = esAdmin(); const tipos = a ? ['ingreso', 'gasto', 'traslado', 'ajuste'] : ['ingreso', 'gasto'];
   const cat = regCatalogo(F.tipo); const g = cat.find(x => x.nom === F.grupal); const sg = g && g.hijos.find(x => x.nom === F.subgrupal);
@@ -5572,14 +5580,16 @@ function pintarRegForm() {
       <div class="rg-filas">
         ${fila('Fecha', `<input class="rg-in" type="date" id="rgFecha" value="${esc(F.fecha)}"><input class="rg-in rg-hora" type="time" id="rgHora" value="${esc(F.hora)}">`, 'rg-fh')}
         ${filas}
-        ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', (() => { const ya = etqLista(F.etq); const ops = etqOpciones(); const yaN = ya.map(etqNorm); const sug = ops.filter(o => !yaN.includes(etqNorm(o.v))).slice(0, 6); const vin = etqVinculos(ya);
+        ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', (() => { const ya = etqLista(F.etq); const yaN = ya.map(etqNorm); const ops = etqOpciones().filter(o => !yaN.includes(etqNorm(o.v))); const vin = etqVinculos(ya);
+          const pr = ops.filter(o => o.pr), us = ops.filter(o => !o.pr);
           return `<div class="rg-etqw"><input type="hidden" id="rgEtq" value="${esc(F.etq || '')}">
-          ${ya.length ? `<div class="rg-etqs">${ya.map(x => `<button type="button" class="chip on" data-act="etqTog" data-v="${esc(x)}" aria-label="Quitar ${esc(x)}">#${esc(x)} ✕</button>`).join('')}</div>` : ''}
-          <input class="rg-in" id="rgEtqN" list="rgEtqL" placeholder="Elegir o escribir una etiqueta…" autocomplete="off" enterkeyhint="done"><datalist id="rgEtqL">${ops.filter(o => !yaN.includes(etqNorm(o.v))).map(o => `<option value="${esc(o.v)}">${o.pr ? 'Proyecto' : ''}</option>`).join('')}</datalist>
-          ${sug.length ? `<div class="rg-etqs">${sug.map(o => `<button type="button" class="chip ${o.pr ? 'etq-pr' : ''}" data-act="etqTog" data-v="${esc(o.v)}" title="${o.pr ? 'Proyecto: lo vincula a este proyecto' : 'Etiqueta usada antes'}">+ ${esc(o.v)}</button>`).join('')}</div>` : ''}
+          <div class="rg-etqs">${ya.map(x => `<button type="button" class="chip on" data-act="etqTog" data-v="${esc(x)}" aria-label="Quitar ${esc(x)}">#${esc(x)} ✕</button>`).join('')}
+          ${S.etqNueva ? `<input class="rg-in rg-etqn" id="rgEtqN" placeholder="Nueva etiqueta y Enter" autocomplete="off" enterkeyhint="done">` : `<select class="rg-etqsel" id="rgEtqSel" aria-label="Agregar etiqueta"><option value="">${ya.length ? '+ otra' : '+ Agregar etiqueta'}</option>
+            ${pr.length ? `<optgroup label="Proyectos">${pr.map(o => `<option value="${esc(o.v)}">${esc(o.v)}</option>`).join('')}</optgroup>` : ''}${us.length ? `<optgroup label="Usadas antes">${us.map(o => `<option value="${esc(o.v)}">${esc(o.v)}</option>`).join('')}</optgroup>` : ''}
+            <option value="__nueva">✎ Escribir una nueva…</option></select>`}</div>
           ${vin.length ? `<div class="note etq-vin">Se vincula a: <b>${vin.map(esc).join(', ')}</b></div>` : ''}</div>`; })())}
         ${a && !ed && F.tipo !== 'ajuste' && S.series !== null ? fila('Repetir', `<button type="button" class="rg-sel ${F.rep && F.rep.frec ? '' : 'vacio'}" data-act="regPick" data-v="rep">↻ ${repTxt(F)}</button>`, pk === 'rep' ? 'activo' : '') : ''}
-        ${fila('Descripción', `<textarea class="rg-in" id="rgDesc" rows="1" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
+        ${fila('Descripción', `<textarea class="rg-in rg-desc" id="rgDesc" rows="2" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
       </div>${a && !F.id ? regVincHtml(F) : ''}
       <div id="rgMsg" class="note"></div>
       ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
@@ -5589,7 +5599,7 @@ function pintarRegForm() {
   const bd = document.querySelector('.rg-bd'); if (bd && scr) bd.scrollTop = scr;
   if (pk) { const on = document.querySelector('.rg-pick .rg-cel.on, .rg-pick .rg-subs'); if (on) on.scrollIntoView({block: 'nearest'}); const act = document.querySelector('.rg-row.activo'); if (act) act.scrollIntoView({block: 'nearest'}); }
   else if (!ed && !S._regFoco) setTimeout(() => { const m = $('#rgMonto'); if (m && !m.value) m.focus(); }, 30);
-  S._regFoco = false;
+  S._regFoco = false; rgDescAjustar();
 }
 // regPickSig: después de elegir, abre lo que sigue (como la app): categoría → cuenta → detalle.
 function regPickSig(despues) {
