@@ -3746,6 +3746,25 @@ const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.
 const AUTOTABLE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
 // cargarScript: Carga un script externo una sola vez.
 function cargarScript(src) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de PDF. Revisa tu internet.')); document.head.appendChild(s); }); }
+/* Marca de los reportes: logo de la app (dibujado igual que el ícono) y la paleta azul de la plataforma. */
+const MARCA = {azul: [5, 38, 89], azulX: 'FF052659', tinta: [2, 16, 36], gris: [74, 102, 136], linea: [201, 221, 240], suave: [227, 238, 249], alterna: [244, 248, 253], celeste: [193, 232, 255], celesteX: 'FFC1E8FF', suaveX: 'FFE3EEF9'};
+let _logoUrl = null;
+function marcaLogo() { if (_logoUrl) return _logoUrl; const n = 192, cv = document.createElement('canvas'); cv.width = cv.height = n; const g = cv.getContext('2d');
+  const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); g.fill(); };
+  g.fillStyle = '#052659'; rr(0, 0, n, n, 40);
+  [[47, 98, '#C1E8FF'], [84, 72, '#DDF1FF'], [121, 46, '#FFFFFF']].forEach(([x, y, c]) => { g.fillStyle = c; rr(x, y, 24, 142 - y, 7); });
+  g.fillStyle = '#C1E8FF'; rr(36, 152, 120, 6, 3); return (_logoUrl = cv.toDataURL('image/png')); }
+// pdfEncabezado / pdfPies: cabecera con logo y título, y pie de cada página con el logo pequeño.
+function pdfEncabezado(doc, titulo, sub, W, M) { const A = MARCA;
+  doc.addImage(marcaLogo(), 'PNG', M, 26, 34, 34);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...A.gris); doc.text('CONTROL DE GASTOS', M + 44, 36, {charSpace: 0.6});
+  doc.setFontSize(17); doc.setTextColor(...A.azul); doc.text(titulo, M + 44, 55);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...A.gris);
+  doc.text(`Generado el ${new Date().toLocaleString('es-HN', {dateStyle: 'long', timeStyle: 'short'})}`, W - M, 36, {align: 'right'});
+  doc.setFontSize(10); doc.text(sub, M, 78); doc.setDrawColor(...A.azul); doc.setLineWidth(1.2); doc.line(M, 86, W - M, 86); return 106; }
+function pdfPies(doc, texto, W, H, M) { const n = doc.getNumberOfPages(); const A = MARCA;
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setDrawColor(...A.linea); doc.setLineWidth(0.6); doc.line(M, H - 34, W - M, H - 34); doc.addImage(marcaLogo(), 'PNG', M, H - 28, 11, 11);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...A.gris); doc.text(texto, M + 16, H - 19.5); doc.text(`Página ${i} de ${n}`, W - M, H - 19.5, {align: 'right'}); } }
 // exportarPDF: Genera el reporte PDF de un control y mes (completo o por persona).
 async function exportarPDF(c, mes, persona) {
   toast('Preparando PDF…');
@@ -3754,15 +3773,11 @@ async function exportarPDF(c, mes, persona) {
     if (!window.jspdf.jsPDF.API.autoTable) await cargarScript(AUTOTABLE_URL);
     const {jsPDF} = window.jspdf; const doc = new jsPDF({unit: 'pt', format: 'letter'});
     const h = hoja(c.id, mes); const R = resumen(c, h); const val = r => r.estado === 'valido';
-    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40; let y = 50;
-    const verde = [30, 106, 80], gris = [93, 107, 100], tinta = [24, 33, 29];
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(...tinta); doc.text(c.nombre, M, y);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...gris); y += 17;
-    doc.text((c.porMes ? mesLargo(mes) : (cerrado(c) ? `Proyecto cerrado el ${fFecha(c.cerradoEl)}` : 'Proyecto abierto')) + (persona ? ` · Reporte para ${persona}` : ''), M, y);
-    doc.text(`Generado el ${new Date().toLocaleString('es-HN', {dateStyle: 'long', timeStyle: 'short'})}`, W - M, y, {align: 'right'});
-    y += 24;
-    const titulo = t => { if (y > H - 110) { doc.addPage(); y = 50; } doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...tinta); doc.text(t, M, y); y += 7; };
-    const tabla = o => { doc.autoTable(Object.assign({startY: y, margin: {left: M, right: M, bottom: 44}, showFoot: 'lastPage', showHead: 'everyPage', rowPageBreak: 'avoid', styles: {font: 'helvetica', fontSize: 9, cellPadding: 4, textColor: tinta, lineColor: [215, 221, 214], lineWidth: 0.4}, headStyles: {fillColor: verde, textColor: 255, fontStyle: 'bold'}, footStyles: {fillColor: [235, 239, 234], textColor: tinta, fontStyle: 'bold'}, alternateRowStyles: {fillColor: [246, 248, 245]}}, o)); y = doc.lastAutoTable.finalY + 20; };
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40;
+    const verde = MARCA.azul, gris = MARCA.gris, tinta = MARCA.tinta;
+    let y = pdfEncabezado(doc, c.nombre, (c.porMes ? mesLargo(mes) : (cerrado(c) ? `Proyecto cerrado el ${fFecha(c.cerradoEl)}` : 'Proyecto abierto')) + (persona ? ` · Reporte para ${persona}` : ''), W, M);
+    const titulo = t => { if (y > H - 110) { doc.addPage(); y = 50; } doc.setFillColor(...MARCA.azul); doc.rect(M, y - 9, 3, 12, 'F'); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...MARCA.azul); doc.text(t, M + 9, y); y += 8; };
+    const tabla = o => { doc.autoTable(Object.assign({startY: y, margin: {left: M, right: M, bottom: 48, top: 40}, showFoot: 'lastPage', showHead: 'everyPage', rowPageBreak: 'avoid', styles: {font: 'helvetica', fontSize: 9, cellPadding: 4, textColor: tinta, lineColor: MARCA.linea, lineWidth: 0.4}, headStyles: {fillColor: verde, textColor: 255, fontStyle: 'bold'}, footStyles: {fillColor: MARCA.suave, textColor: MARCA.azul, fontStyle: 'bold'}, alternateRowStyles: {fillColor: MARCA.alterna}}, o)); y = doc.lastAutoTable.finalY + 20; };
     const der = cols => Object.fromEntries(cols.map(i => [i, {halign: 'right'}]));
     if (persona) return pdfPersona(doc, {c, mes, h, R, persona, val, titulo, tabla, der, W, H, M, gris, y: () => y});
     titulo('Resumen');
@@ -3790,8 +3805,7 @@ async function exportarPDF(c, mes, persona) {
       if (filasMp.length) { titulo('Micro proyectos del mes'); tabla({head: [['Micro proyecto', 'Responsable', 'Egresos', 'Ingresos']], body: filasMp, columnStyles: der([2, 3])}); }
     }
     if (R.pendientes) { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...gris); doc.text(`No incluye ${R.pendientes} registros por validar.`, M, Math.min(y, H - 40)); }
-    const n = doc.getNumberOfPages();
-    for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gris); doc.text(`Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''} · página ${i} de ${n}`, W / 2, H - 22, {align: 'center'}); }
+    pdfPies(doc, `Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''}`, W, H, M);
     const base = c.nombre.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_');
     descargar(`${base}${c.porMes ? '_' + mes : ''}.pdf`, doc.output('blob'));
   } catch (e) { toast('No se pudo generar el PDF: ' + (e && e.message || e)); }
@@ -3821,8 +3835,7 @@ function pdfPersona(doc, o) {
   tabla({head: [['Fecha', 'Persona', 'Descripción', 'Valor']], body: ing.length ? ing.map(r => [fFecha(r.fecha), r.tipo, r.descripcion || r.detalle, L(r.valor)]) : [['', '', 'Sin ingresos', '']], foot: [['', '', 'Total', L(ingC + ingP)]], columnStyles: {0: {cellWidth: 56}, 1: {cellWidth: 110}, 3: {halign: 'right', cellWidth: 72}}});
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...gris);
   doc.text(`Incluye solo los gastos compartidos y los de ${persona}.${R.pendientes ? ` No incluye registros por validar.` : ''}`, M, Math.min(o.y() + 0, H - 40));
-  const n = doc.getNumberOfPages();
-  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gris); doc.text(`Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''} · ${persona} · página ${i} de ${n}`, W / 2, H - 22, {align: 'center'}); }
+  pdfPies(doc, `Control de Gastos · ${c.nombre}${c.porMes ? ' · ' + mesLargo(mes) : ''} · ${persona}`, W, H, M);
   const limpio = t => t.toUpperCase().normalize('NFD').replace(/[̀-ͯ()]/g, '').trim().replace(/\s+/g, '_');
   descargar(`${limpio(c.nombre)}${c.porMes ? '_' + mes : ''}_${limpio(persona)}.pdf`, doc.output('blob'));
 }
@@ -4693,7 +4706,7 @@ async function exportar(c) {
   toast('Preparando Excel…');
   try {
     if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(s); });
-    const wb = new ExcelJS.Workbook();
+    const wb = new ExcelJS.Workbook(); wb.creator = 'Control de Gastos';
     const meses = mesesDe(c.id).sort(); if (!meses.length) return toast('Este control todavía no tiene movimientos.');
     for (const m of meses) (c.porMes ? hojaFamiliar : hojaProyecto)(wb, c, hoja(c.id, m));
     const buf = await wb.xlsx.writeBuffer();
@@ -4705,7 +4718,14 @@ function descargar(nombre, blob) { const a = document.createElement('a'); a.href
 // MONEYF: Formato de moneda para Excel.
 const MONEYF = '_-"L"* #,##0.00_-;\\-"L"* #,##0.00_-;_-"L"* "-"??_-;_-@_-';
 // estiloHdr: Estilo de encabezados en Excel.
-function estiloHdr(cell) { cell.font = {bold: true, name: 'Calibri', size: 12}; cell.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFE2EFDA'}}; cell.border = {bottom: {style: 'thin'}}; }
+function estiloHdr(cell) { cell.font = {bold: true, name: 'Calibri', size: 11, color: {argb: 'FFFFFFFF'}}; cell.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: MARCA.azulX}}; cell.border = {bottom: {style: 'thin', color: {argb: MARCA.azulX}}}; cell.alignment = {vertical: 'middle'}; }
+// xlsMarca: logo de la app en la esquina (celda A1) y títulos en el azul de la plataforma.
+function xlsMarca(wb, ws, titulos) { try { if (!wb._logoId) wb._logoId = wb.addImage({base64: marcaLogo(), extension: 'png'});
+  ws.getRow(1).height = 26; if ((ws.getColumn(1).width || 0) < 4.5) ws.getColumn(1).width = 4.5; ws.addImage(wb._logoId, {tl: {col: 0.12, row: 0.12}, ext: {width: 22, height: 22}, editAs: 'oneCell'});
+  (titulos || []).forEach(a => { const x = ws.getCell(a); x.font = Object.assign({}, x.font || {}, {bold: true, size: 14, name: 'Calibri', color: {argb: MARCA.azulX}}); x.alignment = {vertical: 'middle', indent: 1}; });
+  ws.properties.tabColor = {argb: MARCA.azulX}; } catch (e) {} }
+// xlsTotal: filas de totales con el fondo azul claro de la plataforma.
+function xlsTotal(cells) { cells.forEach(x => { x.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: MARCA.suaveX}}; x.font = Object.assign({}, x.font || {}, {bold: true, color: {argb: MARCA.azulX}}); }); }
 // fechaX: Fecha para Excel.
 function fechaX(s) { if (!s) return null; const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
 // hojaFamiliar: Hoja de Excel de un control mensual (con fórmulas y reparto).
@@ -4714,7 +4734,7 @@ function hojaFamiliar(wb, c, h0) {
   const ws = wb.addWorksheet(mesHoja(h0.mes));
   ws.columns = [{width: 3}, {width: 13}, {width: 20}, {width: 30}, {width: 32}, {width: 50}, {width: 15}, {width: 16}, {width: 13}, {width: 22}, {width: 15}];
   ws.getCell('B1').value = 'DETALLE EGRESO'; ws.getCell('I1').value = 'DETALLE INGRESO';
-  ws.getCell('B1').font = ws.getCell('I1').font = {bold: true, size: 14, name: 'Calibri'};
+  xlsMarca(wb, ws, ['B1', 'I1']);
   ws.getCell('B2').value = MES[+h0.mes.slice(5) - 1]; ws.getCell('C2').value = +h0.mes.slice(0, 4);
   ['FECHA', 'TIPO', 'CATEGORIAS', 'SUBCATEGORIAS', 'DESCRIPCION', 'VALOR', 'ID APP', 'FECHA', 'DESCRIPCION', 'VALOR'].forEach((t, i) => { const cell = ws.getCell(3, i + 2); cell.value = t; estiloHdr(cell); });
   const n = Math.max(h.egresos.length, h.ingresos.length, 1) + 5; const f0 = 4, f1 = f0 + n - 1;
@@ -4725,10 +4745,10 @@ function hojaFamiliar(wb, c, h0) {
   const G = `$G$${f0}:$G$${f1}`, C = `$C$${f0}:$C$${f1}`, K = `$K$${f0}:$K$${f1}`, J = `$J$${f0}:$J$${f1}`;
   ws.getCell(T, 6).value = 'TOTAL'; ws.getCell(T, 7).value = {formula: `SUM(G${f0}:G${f1})`, result: R_.egreso};
   ws.getCell(T, 10).value = 'TOTAL'; ws.getCell(T, 11).value = {formula: `SUM(K${f0}:K${f1})`, result: R_.ingreso};
-  [ws.getCell(T, 6), ws.getCell(T, 7), ws.getCell(T, 10), ws.getCell(T, 11)].forEach(x => { x.font = {bold: true}; x.border = {top: {style: 'thin'}}; });
+  [ws.getCell(T, 6), ws.getCell(T, 7), ws.getCell(T, 10), ws.getCell(T, 11)].forEach(x => { x.font = {bold: true}; x.border = {top: {style: 'thin', color: {argb: MARCA.azulX}}}; }); xlsTotal([ws.getCell(T, 6), ws.getCell(T, 7), ws.getCell(T, 10), ws.getCell(T, 11)]);
   ws.getCell(T, 7).numFmt = ws.getCell(T, 11).numFmt = MONEYF;
   const A = T + 2; ws.getCell(A, 2).value = 'RESUMEN'; ws.getCell(A, 6).value = 'RESUMEN DISTIBUCION'; ws.getCell(A, 9).value = 'DISTIBUCION';
-  [2, 6, 9].forEach(col => ws.getCell(A, col).font = {bold: true});
+  [2, 6, 9].forEach(col => ws.getCell(A, col).font = {bold: true, size: 12, color: {argb: MARCA.azulX}});
   [[2, 'DESCRIPCION'], [3, 'VALOR'], [6, 'DESCRIPCION'], [7, 'VALOR'], [9, 'DESCRIPCION'], [10, 'TOTAL A PAGAR'], [11, 'SALDO']].forEach(([col, t]) => { const x = ws.getCell(A + 1, col); x.value = t; estiloHdr(x); });
   const B = A + 2; const np = R_.per.length;
   ws.getCell(B, 2).value = 'INGRESO'; ws.getCell(B, 3).value = {formula: `K${T}`, result: R_.ingreso};
@@ -4744,7 +4764,7 @@ function hojaFamiliar(wb, c, h0) {
   const sg = B + 1 + np; ws.getCell(sg, 6).value = 'SALDO'; ws.getCell(sg, 7).value = {formula: `SUM(G${B}:G${sg - 1})`, result: R_.comp + R_.per.reduce((s, x) => s + x.g, 0)};
   const st = B + Math.max(np, 1) + 1; ws.getCell(st, 10).value = 'SALDO TOTAL'; ws.getCell(st, 11).value = {formula: np ? `SUM(K${B}:K${B + np - 1})` : '0', result: R_.per.reduce((s, x) => s + x.saldo, 0)};
   for (let r = B; r <= Math.max(sg, st, B + 2); r++) [3, 7, 10, 11].forEach(col => ws.getCell(r, col).numFmt = MONEYF);
-  [ws.getCell(B + 2, 2), ws.getCell(sg, 6), ws.getCell(st, 10)].forEach(x => x.font = {bold: true});
+  xlsTotal([ws.getCell(B + 2, 2), ws.getCell(B + 2, 3), ws.getCell(sg, 6), ws.getCell(sg, 7), ws.getCell(st, 10), ws.getCell(st, 11)]);
   ws.views = [{state: 'frozen', ySplit: 3}];
 }
 // hojaProyecto: Hoja de Excel de un proyecto.
@@ -4753,7 +4773,7 @@ function hojaProyecto(wb, c, h0) {
   const ws = wb.addWorksheet((c.corto || c.nombre).replace(/[\\/?*[\]:]/g, '').slice(0, 28) || 'Proyecto');
   ws.columns = [{width: 3}, {width: 13}, {width: 20}, {width: 50}, {width: 15}, {width: 16}, {width: 13}, {width: 26}, {width: 15}];
   ws.getCell('B1').value = 'DETALLE EGRESO'; ws.getCell('G1').value = 'DETALLE INGRESO';
-  ws.getCell('B1').font = ws.getCell('G1').font = {bold: true, size: 14};
+  xlsMarca(wb, ws, ['B1', 'G1']);
   ['FECHA', 'TIPO', 'DESCRIPCION', 'VALOR', 'ID APP', 'FECHA', 'DESCRIPCION', 'VALOR'].forEach((t, i) => { const x = ws.getCell(2, i + 2); x.value = t; estiloHdr(x); });
   const n = Math.max(h.egresos.length, h.ingresos.length, 1) + 5; const f0 = 3, f1 = f0 + n - 1;
   h.egresos.forEach((r, i) => { const R = f0 + i; ws.getCell(R, 2).value = fechaX(r.fecha); ws.getCell(R, 3).value = r.tipo; ws.getCell(R, 4).value = r.descripcion; ws.getCell(R, 5).value = +r.valor; ws.getCell(R, 6).value = r.tx_id || null; });
@@ -4763,7 +4783,7 @@ function hojaProyecto(wb, c, h0) {
   ws.getCell(T, 4).value = 'TOTAL'; ws.getCell(T, 5).value = {formula: `SUM(E${f0}:E${f1})`, result: R_.egreso};
   ws.getCell(T, 8).value = 'TOTAL'; ws.getCell(T, 9).value = {formula: `SUM(I${f0}:I${f1})`, result: R_.ingreso};
   ws.getCell(T + 2, 4).value = 'SALDO (INGRESO - EGRESO)'; ws.getCell(T + 2, 5).value = {formula: `I${T}-E${T}`, result: R_.ingreso - R_.egreso};
-  [T, T + 2].forEach(r => { ws.getCell(r, 4).font = {bold: true}; ws.getCell(r, 5).numFmt = MONEYF; ws.getCell(r, 9).numFmt = MONEYF; });
+  [T, T + 2].forEach(r => { ws.getCell(r, 4).font = {bold: true}; ws.getCell(r, 5).numFmt = MONEYF; ws.getCell(r, 9).numFmt = MONEYF; }); xlsTotal([ws.getCell(T, 4), ws.getCell(T, 5), ws.getCell(T, 8), ws.getCell(T, 9), ws.getCell(T + 2, 4), ws.getCell(T + 2, 5)]);
   ws.views = [{state: 'frozen', ySplit: 2}];
 }
 // movDe: Movimiento de la fila donde se tocó un botón.
@@ -7248,6 +7268,7 @@ async function catExcel() {
       ws.getRow(1).eachCell(estiloHdr);
       catPlano(catArbol(tipo)).forEach(r => { const nd = r[r.length - 1]; const row = ws.addRow([nd.nivel, CAT_NIV[nd.nivel], r[0].nombre, r[1] ? r[1].nombre : '', r[2] ? r[2].nombre : '', nd.app, nd.u ? nd.u.n : 0, nd.u ? nd.u.tot : 0, nd.row && nd.row.activa === false ? 'No' : 'Sí', nd.row && nd.row.origen === 'web' ? 'Web' : 'App', nd.row && nd.row.validada ? 'Sí' : 'No']);
         row.getCell(8).numFmt = MONEYF; if (nd.nivel === 1) row.font = {bold: true}; }); }
+    wb.worksheets.forEach(ws => { ws.spliceRows(1, 0, [], []); ws.getCell('B1').value = 'Catálogo de categorías · ' + ws.name; xlsMarca(wb, ws, ['B1']); ws.views = [{state: 'frozen', ySplit: 3}]; });
     const buf = await wb.xlsx.writeBuffer(); descargar('CATALOGO_CATEGORIAS.xlsx', new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   } catch (e) { toast('No se pudo exportar: ' + (e && e.message || e)); }
 }
