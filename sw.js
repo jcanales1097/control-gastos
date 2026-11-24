@@ -3,7 +3,7 @@
    - Las lecturas de la base de datos van primero a internet; si no hay, se usa la última copia guardada de cada consulta.
    - Lo que se registra sin conexión lo guarda la app en una cola y lo envía al volver internet (no pasa por aquí).
    Cambia VERSION cuando cambie esta lista para que el teléfono tome la nueva. */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const APP = 'cg-app-' + VERSION, LIB = 'cg-lib', DATOS = 'cg-datos';
 const PRE = ['./', 'index.html', 'config.js', 'guia.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
@@ -25,10 +25,17 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.open(DATOS).then(c => c.match(req.url)).then(r => { avisar({tipo: 'sinRed'}); return r || new Response(JSON.stringify({message: 'Sin conexión y sin copia guardada de estos datos', code: 'offline'}), {status: 503, headers: {'Content-Type': 'application/json'}}); })));
     return;
   }
-  // La app misma: internet primero (para tener siempre la última versión); sin internet, la guardada.
+  // La app misma: internet primero (para tener siempre la última versión), pero si tarda más de 3 s o no hay internet se abre la
+  // guardada al instante (con señal débil ya no se queda en blanco); la descarga sigue por detrás y queda para la próxima vez.
   if (url.origin === self.location.origin) {
-    e.respondWith(fetch(req).then(res => { if (res.ok) { const cp = res.clone(); caches.open(APP).then(c => c.put(req, cp)); } return res; })
-      .catch(() => caches.open(APP).then(c => c.match(req, {ignoreSearch: true}).then(r => r || (req.mode === 'navigate' ? c.match('index.html') : null))).then(r => r || Response.error())));
+    const guardada = () => caches.open(APP).then(c => c.match(req, {ignoreSearch: true}).then(r => r || (req.mode === 'navigate' ? c.match('index.html') : null)));
+    const red = fetch(req).then(res => { if (res.ok) { const cp = res.clone(); caches.open(APP).then(c => c.put(req, cp)); } return res; });
+    e.respondWith(new Promise(ok => {
+      let listo = false; const dar = r => { if (!listo && r) { listo = true; ok(r); } };
+      const t = setTimeout(() => guardada().then(dar), 3000);
+      red.then(r => { clearTimeout(t); dar(r); }).catch(() => { clearTimeout(t); guardada().then(r => { dar(r || Response.error()); if (!r) ok(Response.error()); }); });
+    }));
+    e.waitUntil(red.catch(() => null));
     return;
   }
   // Librerías y letras: de la copia guardada; si no está, de internet y se guarda.
