@@ -2,6 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://open.er-api.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com http://localhost:8765 http://127.0.0.1:8765; frame-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><!-- maximum-scale=1: el iPhone no hace zoom al tocar un campo (se puede seguir ampliando con dos dedos) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#052659" id="metaTheme">
@@ -1330,7 +1332,7 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
 <div id="masRoot"></div>
 <div id="ctaRoot"></div><div id="tjRoot"></div><div id="modalRoot"></div><div id="capaFantasma" aria-hidden="true"></div>
 <script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
 <script>
 /* =====================================================================
    CONTROL DE GASTOS · código principal (versión comentada)
@@ -3984,11 +3986,14 @@ function abrirDetalle(id) {
 
 /* ================= reporte PDF ================= */
 // JSPDF_URL: Biblioteca para generar PDF (se carga solo cuando se usa).
-const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const JSPDF_URL = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
 // AUTOTABLE_URL: Complemento de tablas para PDF.
-const AUTOTABLE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+const AUTOTABLE_URL = 'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';
+const EXCEL_URL = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+// Huella (SRI) de cada librería: si el archivo del CDN fuera alterado, el navegador no lo ejecuta.
+const SRI = {[JSPDF_URL]: 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk', [AUTOTABLE_URL]: 'sha384-fCAW/rDWORTbQXSiB7mOg0QtQ5c+r0f544y6XoKjuVva0nMBlCpNUjiFeG5iMdS3', [EXCEL_URL]: 'sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz'};
 // cargarScript: Carga un script externo una sola vez.
-function cargarScript(src) { return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de PDF. Revisa tu internet.')); document.head.appendChild(s); }); }
+function cargarScript(src) { return new Promise((ok, ko) => { const s = document.createElement('script'); if (SRI[src]) { s.integrity = SRI[src]; s.crossOrigin = 'anonymous'; } s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de PDF. Revisa tu internet.')); document.head.appendChild(s); }); }
 /* Marca de los reportes: logo de la app (dibujado igual que el ícono) y la paleta azul de la plataforma. */
 const MARCA = {azul: [5, 38, 89], azulX: 'FF052659', tinta: [2, 16, 36], gris: [74, 102, 136], linea: [201, 221, 240], suave: [227, 238, 249], alterna: [244, 248, 253], celeste: [193, 232, 255], celesteX: 'FFC1E8FF', suaveX: 'FFE3EEF9'};
 let _logoUrl = null;
@@ -4480,7 +4485,7 @@ const fxFilas = (t, fila) => t && t.moneda ? fila('Moneda', `<span class="chip f
 // importarMonedas: Importa el Excel exportado de la app para obtener la moneda y el valor en lempiras.
 async function importarMonedas(file, msg) {
   msg.textContent = 'Leyendo Excel…';
-  if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el lector de Excel')); document.head.appendChild(s); });
+  if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.integrity = SRI[EXCEL_URL]; s.crossOrigin = 'anonymous'; s.src = EXCEL_URL; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el lector de Excel')); document.head.appendChild(s); });
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer()); const ws = wb.worksheets[0];
   const val = c => { const v = c && c.value; return v && typeof v === 'object' && !(v instanceof Date) ? (v.result ?? v.text ?? (v.richText ? v.richText.map(x => x.text).join('') : '')) : v; };
   const hdr = []; ws.getRow(1).eachCell({includeEmpty: true}, (c, i) => { hdr[i] = String(val(c) || '').trim(); });
@@ -4948,7 +4953,7 @@ async function ignorar(ids) {
 async function exportar(c) {
   toast('Preparando Excel…');
   try {
-    if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(s); });
+    if (!window.ExcelJS) await new Promise((ok, ko) => { const s = document.createElement('script'); s.integrity = SRI[EXCEL_URL]; s.crossOrigin = 'anonymous'; s.src = EXCEL_URL; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(s); });
     const wb = new ExcelJS.Workbook(); wb.creator = 'Control de Gastos';
     const meses = mesesDe(c.id).sort(); if (!meses.length) return toast('Este control todavía no tiene movimientos.');
     for (const m of meses) (c.porMes ? hojaFamiliar : hojaProyecto)(wb, c, hoja(c.id, m));
@@ -7504,7 +7509,7 @@ async function catGuardar(c, campos) {
 }
 async function catExcel() {
   toast('Preparando Excel…');
-  try { if (!window.ExcelJS) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js'; sc.onload = ok; sc.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(sc); });
+  try { if (!window.ExcelJS) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.integrity = SRI[EXCEL_URL]; sc.crossOrigin = 'anonymous'; sc.src = EXCEL_URL; sc.onload = ok; sc.onerror = () => ko(new Error('No se pudo cargar el generador de Excel')); document.head.appendChild(sc); });
     const wb = new ExcelJS.Workbook();
     for (const tipo of ['gasto', 'ingreso']) { const ws = wb.addWorksheet(tipo === 'gasto' ? 'Gastos' : 'Ingresos');
       ws.columns = [{header: 'Nivel', width: 8}, {header: 'Tipo de nivel', width: 12}, {header: 'Grupal', width: 34}, {header: 'Subgrupal', width: 34}, {header: 'Detalle', width: 34}, {header: 'Nombre en la app', width: 34}, {header: 'Registros', width: 10}, {header: 'Total', width: 16}, {header: 'Activa', width: 8}, {header: 'Origen', width: 10}, {header: 'Validada', width: 10}];
