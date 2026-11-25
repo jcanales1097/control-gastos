@@ -1377,6 +1377,23 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rg-modal .rg-fin{background:#C1E8FF;border-color:#C1E8FF;color:#052659}}
 @media (min-width:761px){.rg-modal.picking{min-height:min(660px,88vh)}.rg-modal .rg-pie .btn{flex:0 1 220px}.rg-modal .rg-pie{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.rg-pick.entra,.rg-pickb.push,.rg-pickb.pop,.rg-pickbg{animation:none}}
+
+/* barra inferior compacta al desplazarse */
+@media (max-width:760px){
+  .tabbar{transition:height .32s var(--ease-ios),left .32s var(--ease-ios),right .32s var(--ease-ios),bottom .32s var(--ease-ios),border-radius .32s var(--ease-ios),padding .32s var(--ease-ios)}
+  .tb-i svg{transition:width .32s var(--ease-ios),height .32s var(--ease-ios)}
+  .tb-i span{display:block;max-height:14px;overflow:hidden;transition:max-height .28s var(--ease-ios),opacity .2s ease}
+  .tb-i .tb-n{transition:top .32s var(--ease-ios)}
+  .tabbar.tb-min{height:48px;left:calc(max(12px,env(safe-area-inset-left,0px)) + 9%);right:calc(max(12px,env(safe-area-inset-right,0px)) + 9%);bottom:calc(6px + env(safe-area-inset-bottom,0px));border-radius:24px;padding:4px}
+  .tabbar.tb-min .tb-i span{max-height:0;opacity:0}
+  .tabbar.tb-min .tb-i svg{width:20px;height:20px}
+  .tabbar.tb-min .tb-i .tb-n{top:1px}
+  .tabbar.tb-min>.pill{border-radius:20px}
+  .rg-fab{transition:opacity .25s ease,transform .3s var(--ease-ios),bottom .32s var(--ease-ios),box-shadow .25s ease!important}
+  body.tb-compacta .rg-fab{bottom:calc(64px + env(safe-area-inset-bottom,0px))!important}
+  body.tb-compacta #offBar{bottom:calc(62px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){.tabbar,.tb-i svg,.tb-i span{transition:none!important}}
 </style>
 </head>
 <body>
@@ -6215,6 +6232,15 @@ const regPendientes = () => esAdmin() && S.reg ? S.reg.filter(r => r.estado === 
 // Mientras se desplaza la página el botón + se transparenta; vuelve a verse al detenerse.
 let _fabT = null; const fabMov = () => { const fs = document.querySelectorAll('.rg-fab'); if (!fs.length) return; fs.forEach(f => f.classList.add('moviendo')); clearTimeout(_fabT); _fabT = setTimeout(() => { document.querySelectorAll('.rg-fab').forEach(g => g.classList.remove('moviendo')); }, 650); };
 document.addEventListener('scroll', fabMov, {passive: true, capture: true}); document.addEventListener('touchmove', fabMov, {passive: true});
+// Barra inferior que se encoge al desplazarse (como iOS 26 / Instagram): al bajar se hace compacta (solo íconos); al subir, o
+// cuando dejas de moverte un momento, vuelve a su tamaño. La cápsula del activo acompaña el cambio de tamaño.
+let _tbY = 0, _tbT = null, _tbMin = false;
+function tbCompacta(min) { const tb = document.getElementById('tabbar'); if (!tb || _tbMin === min) return; _tbMin = min; tb.classList.toggle('tb-min', min); document.body.classList.toggle('tb-compacta', min);
+  const t0 = performance.now(); const seguir = () => { pildora(tb, 'tab'); if (performance.now() - t0 < 360) requestAnimationFrame(seguir); }; requestAnimationFrame(seguir); }
+window.addEventListener('scroll', () => { if (!matchMedia('(max-width:760px)').matches) return; const y = window.scrollY, dy = y - _tbY; _tbY = y;
+  if (y < 30) { clearTimeout(_tbT); return tbCompacta(false); }
+  if (dy > 4) tbCompacta(true); else if (dy < -10) tbCompacta(false);
+  clearTimeout(_tbT); _tbT = setTimeout(() => tbCompacta(false), 900); }, {passive: true});
 const regFab = () => S.me && S.me.activo && esAdmin() ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
 // regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
 // Copiar un registro: abre el formulario de registro nuevo con los mismos datos (cuenta, monto, categoría, descripción…);
