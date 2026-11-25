@@ -3,15 +3,15 @@
    - Las lecturas de la base de datos van primero a internet; si no hay, se usa la última copia guardada de cada consulta.
    - Lo que se registra sin conexión lo guarda la app en una cola y lo envía al volver internet (no pasa por aquí).
    Cambia VERSION cuando cambie esta lista para que el teléfono tome la nueva. */
-const VERSION = 'v3';
-const APP = 'cg-app-' + VERSION, LIB = 'cg-lib', DATOS = 'cg-datos';
+const VERSION = 'v4';
+const APP = 'cg-app-' + VERSION, LIB = 'cg-lib-2', DATOS = 'cg-datos';   // cg-lib-2: las librerías ahora se piden con huella SRI (CORS); la copia vieja no sirve
 const PRE = ['./', 'index.html', 'config.js', 'guia.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(APP).then(c => Promise.all(PRE.map(u => c.add(new Request(u, {cache: 'reload'})).catch(() => null)))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('cg-app-') && k !== APP).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => (k.startsWith('cg-app-') && k !== APP) || k === 'cg-lib').map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('message', e => { if (e.data === 'limpiarDatos') e.waitUntil(caches.delete(DATOS)); });
 const avisar = msg => self.clients.matchAll({includeUncontrolled: true}).then(cs => cs.forEach(c => c.postMessage(msg)));
@@ -39,7 +39,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Librerías y letras: de la copia guardada; si no está, de internet y se guarda.
-  if (/(cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/.test(url.hostname)) {
-    e.respondWith(caches.open(LIB).then(c => c.match(req).then(r => r || caches.match(req).then(r2 => r2 || fetch(req).then(res => { if (res.ok || res.type === 'opaque') c.put(req, res.clone()); return res; })))));
+  if (/(cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com)$/.test(url.hostname)) {
+    e.respondWith(caches.open(LIB).then(c => c.match(req).then(r => r || caches.match(req).then(r2 => r2 || fetch(req).then(res => { if (res.ok || (res.type === 'opaque' && url.hostname.startsWith('fonts.'))) c.put(req, res.clone()); return res; })))));
   }
 });
