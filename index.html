@@ -1312,6 +1312,71 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
 }
 #capaFantasma>*{pointer-events:none!important}
 @media (prefers-reduced-motion:reduce){.pill{transition:none}.vista-in,.capa-in,.capa-in>.modal{animation:none!important}}
+
+/* ===== Formulario de registro estilo iOS 26 ===== */
+.rg-modal .rg-bd{background:var(--sunk)}
+.rg-modal .hd{background:var(--glass-hi);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-line)}
+.rg-modal .hd h2{font-size:17px;font-weight:700}
+.rg-tipos{position:relative;background:color-mix(in srgb,var(--fg) 8%,transparent);border-radius:12px;padding:3px;gap:0;margin-bottom:4px}
+.rg-tt{position:relative;z-index:1;border-radius:9px;padding:8px 4px;font-size:13.5px;transition:color .2s}
+.rg-tipos.con-pill>.rg-tt.on{background:transparent;box-shadow:none}
+.rg-tipos>.pill{border-radius:9px;background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.14)}
+.rg-filas.rg-grp{border-top:0;background:var(--panel);border-radius:14px;border:1px solid var(--glass-line);overflow:hidden;margin:12px 0 0}
+.rg-grp>.rg-row{padding:3px 14px;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);min-height:50px;grid-template-columns:104px minmax(0,1fr)}
+.rg-grp>.rg-row:last-child,.rg-grp>*:last-child{border-bottom:0}
+.rg-grp .rg-lab{color:var(--fg);font-size:15.5px;padding-top:13px}
+.rg-grp .rg-nota,.rg-grp .rg-swapw{padding-left:14px;padding-right:14px}
+.rg-row.activo{border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent);background:color-mix(in srgb,var(--azul) 10%,transparent)}
+.rg-in:focus{box-shadow:none}
+.rg-grp .rg-imp{min-height:64px}.rg-grp .rg-imp .rg-lab{padding-top:20px}
+.rg-in.rg-num{font-size:30px!important;letter-spacing:-.01em}
+.rg-sel{display:flex;align-items:center;gap:6px;justify-content:flex-end;text-align:right;color:var(--fg);white-space:normal;line-height:1.25;padding:9px 0}
+.rg-sel::after{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);border-top:2px solid var(--muted);transform:rotate(45deg);margin:0 2px 0 4px;opacity:.7}
+.rg-sel.vacio{color:var(--muted)}
+.rg-sel:has(.rg-cg){flex-wrap:wrap;align-content:center}.rg-sel .rg-cg{width:100%;text-align:right}
+.rg-lbtn{border:0;background:color-mix(in srgb,var(--azul) 12%,transparent);color:var(--fg);border-radius:999px;padding:6px 12px;font:600 13px var(--f-ui);cursor:pointer;white-space:nowrap}
+/* hoja del selector */
+.rg-modal{position:relative}
+.rg-pickbg{position:absolute;inset:0;z-index:6;background:rgba(2,8,20,.32);animation:fadeIn .2s ease}
+.rg-pickbg.sale{animation:fadeOut .2s ease forwards}
+.rg-modal .rg-pick{position:absolute;left:0;right:0;bottom:0;z-index:7;max-height:84%!important;min-height:52%!important;display:flex;flex-direction:column;border:1px solid var(--glass-line);border-bottom:0;border-radius:24px 24px 0 0;background:var(--glass-hi);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);box-shadow:0 -12px 40px rgba(0,0,0,.25)}
+.rg-pick.entra{animation:sheetIn .34s var(--ease-pop)}.rg-pick.sale{animation:sheetOut .2s ease forwards}
+.rg-grab{width:38px;height:5px;border-radius:3px;background:color-mix(in srgb,var(--fg) 25%,transparent);margin:8px auto 2px;flex:none}
+.rg-modal .rg-pickh{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:6px 14px 8px;background:transparent}
+.rg-pickh b{font-size:16px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rg-pickr{display:flex;justify-content:flex-end;gap:4px}
+.rg-pok,.rg-plink,.rg-pback{border:0;background:transparent;color:var(--azul);font:600 15px var(--f-ui);cursor:pointer;padding:6px 4px;display:inline-flex;align-items:center;gap:2px;white-space:nowrap}
+:root[data-theme="dark"] .rg-pok,:root[data-theme="dark"] .rg-plink,:root[data-theme="dark"] .rg-pback{color:#C1E8FF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rg-pok,:root:not([data-theme="light"]) .rg-plink,:root:not([data-theme="light"]) .rg-pback{color:#C1E8FF}}
+.rg-pok{font-weight:700}.rg-pback svg{width:20px;height:20px;margin-left:-6px}.rg-pback{justify-self:start}
+.rg-psearch{display:flex;align-items:center;gap:8px;margin:2px 14px 8px;padding:0 12px;height:38px;border-radius:12px;background:color-mix(in srgb,var(--fg) 8%,transparent);color:var(--muted);flex:none}
+.rg-psearch svg{width:17px;height:17px;flex:none}.rg-psearch input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:16px var(--f-ui);outline:none;height:100%}
+.rg-modal .rg-pickb{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px calc(16px + env(safe-area-inset-bottom,0px))}
+.rg-pickb.push{animation:pushIn .28s var(--ease-ios)}.rg-pickb.pop{animation:popIn .28s var(--ease-ios)}
+@keyframes pushIn{from{opacity:0;transform:translateX(36px)}}@keyframes popIn{from{opacity:0;transform:translateX(-36px)}}
+.rg-lhd{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:14px 4px 6px}
+.rg-lgrp{background:var(--panel);border-radius:14px;border:1px solid var(--glass-line);overflow:hidden}
+.rg-lgrp .rg-grid{display:block}
+.rg-li{width:100%;display:flex;align-items:center;gap:10px;min-height:50px;padding:9px 14px;border:0;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);background:transparent;color:var(--fg);font:16px var(--f-ui);text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background-color .15s}
+.rg-li:last-child{border-bottom:0}.rg-li:active{background:color-mix(in srgb,var(--fg) 8%,transparent)}
+@media (hover:hover){.rg-li:hover{background:color-mix(in srgb,var(--fg) 5%,transparent)}}
+.rg-lit{flex:1;min-width:0;display:grid;gap:1px}.rg-lit span{overflow:hidden;text-overflow:ellipsis}.rg-lit small{font-size:12.5px;color:var(--muted)}
+.rg-lid{font-size:14px;color:var(--muted);white-space:nowrap}
+.rg-li.on{font-weight:600}.rg-ck{width:20px;height:20px;flex:none;color:var(--azul)}
+:root[data-theme="dark"] .rg-ck{color:#C1E8FF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rg-ck{color:#C1E8FF}}
+.rg-cv{width:16px;height:16px;flex:none;color:var(--muted);opacity:.7}
+.rg-lvacio{padding:22px 8px;text-align:center;color:var(--muted);font-size:14px}
+/* botones de guardar: cápsulas */
+.rg-modal .rg-pie{border-top:1px solid var(--glass-line);background:var(--glass-hi);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+.rg-modal .rg-pie .btn{min-height:50px;border-radius:25px;flex:1;font-size:16px}
+.rg-modal .rg-pie .btn b{font-size:16px;font-weight:700}
+.rg-modal .rg-otro{background:color-mix(in srgb,var(--fg) 8%,transparent);border:1px solid var(--glass-line);color:var(--fg)}
+.rg-modal .rg-fin{background:var(--azul);border-color:var(--azul);color:#fff;box-shadow:0 6px 18px color-mix(in srgb,var(--azul) 35%,transparent)}
+:root[data-theme="dark"] .rg-modal .rg-fin{background:#C1E8FF;border-color:#C1E8FF;color:#052659}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rg-modal .rg-fin{background:#C1E8FF;border-color:#C1E8FF;color:#052659}}
+@media (min-width:761px){.rg-modal.picking{min-height:min(660px,88vh)}.rg-modal .rg-pie .btn{flex:0 1 220px}.rg-modal .rg-pie{justify-content:flex-end}}
+@media (prefers-reduced-motion:reduce){.rg-pick.entra,.rg-pickb.push,.rg-pickb.pop,.rg-pickbg{animation:none}}
 </style>
 </head>
 <body>
@@ -5808,30 +5873,56 @@ function regDetListaHtml() {
   const F = S.regF; const q0 = sinAc((($('#rgDet') || {}).value) || ''); const l = regDetalles(F).filter(d => !q0 || sinAc(d.ver + ' ' + d.nom).includes(q0)).slice(0, 40);
   return l.map(d => `<button type="button" class="rg-dli" data-act="regDetSel" data-v="${esc(d.nom)}">${esc(d.ver)}</button>`).join('');
 }
+// Selectores de cuenta, categoría y detalle: hoja de iOS (se desliza desde abajo) con buscador, listas agrupadas y marca ✓.
+const RG_CHK = '<svg class="rg-ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const RG_CHEV = '<svg class="rg-cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+const rgNorm = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function regPickCuerpo() {
+  const F = S.regF; const pk = S.regPick; const q = rgNorm(S.regPickQ || '').trim();
+  // fila de lista: [texto principal, texto secundario, a la derecha], marcada si está elegida
+  const fila = (act, v, txt, sub, der, on, extra) => `<button type="button" class="rg-li ${on ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}" ${extra || ''}><span class="rg-lit"><span>${txt}</span>${sub ? `<small>${sub}</small>` : ''}</span>${der ? `<span class="rg-lid">${der}</span>` : ''}${on ? RG_CHK : ''}</button>`;
+  const vacio = t => `<div class="rg-lvacio">${t}</div>`;
+  if (pk === 'marc') return marcPanelHtml();
+  if (pk === 'rep') return repPanelHtml();
+  if (pk === 'det') { const l = regDetalles(F).filter(d => !q || rgNorm(d.ver).includes(q));
+    return `<div class="rg-lgrp">${l.map(d => fila('regPickD', d.nom, esc(d.ver), '', '', d.nom === F.detalle)).join('')}${q ? '' : fila('regPickD', '', '<span class="muted">Sin detalle</span>', '', '', !F.detalle)}</div>` + (l.length ? '' : vacio('Ningún detalle coincide.')); }
+  if (pk === 'cat') { const cat = regCatalogo(F.tipo);
+    if (q) { const out = [];
+      cat.forEach(g => { if (!g.hijos.length) { if (rgNorm(g.ver).includes(q)) out.push(fila('regPickG', g.nom, esc(g.ver), '', '', g.nom === F.grupal && !F.subgrupal, 'data-hoja="1"')); return; }
+        g.hijos.forEach(s2 => { if (rgNorm(s2.ver + ' ' + g.ver).includes(q)) out.push(fila('regPickS', s2.nom, esc(s2.ver), esc(g.ver), '', g.nom === F.grupal && s2.nom === F.subgrupal, `data-g="${esc(g.nom)}"`)); }); });
+      return out.length ? `<div class="rg-lgrp">${out.join('')}</div>` : vacio('Ninguna categoría coincide.'); }
+    const gA = S.regPickG ? cat.find(g => g.nom === S.regPickG) : null;
+    if (gA) return `<div class="rg-lgrp">${gA.hijos.map(s2 => fila('regPickS', s2.nom, esc(s2.ver), '', '', gA.nom === F.grupal && s2.nom === F.subgrupal, `data-g="${esc(gA.nom)}"`)).join('')}</div>`;
+    return cat.length ? `<div class="rg-lgrp">${cat.map(g => { const on = g.nom === F.grupal; const sub = on && F.subgrupal ? esc((g.hijos.find(x => x.nom === F.subgrupal) || {}).ver || '') : '';
+      return g.hijos.length ? `<button type="button" class="rg-li ${on ? 'on' : ''}" data-act="regPickGo" data-v="${esc(g.nom)}"><span class="rg-lit"><span>${esc(g.ver)}</span>${sub ? `<small>${sub}</small>` : ''}</span><span class="rg-lid">${g.hijos.length}</span>${RG_CHEV}</button>`
+        : fila('regPickG', g.nom, esc(g.ver), '', '', on, 'data-hoja="1"'); }).join('')}</div>` : vacio('No hay categorías activas.'); }
+  // cuentas (origen / destino), con saldo a la derecha
+  const sel = pk === 'dest' ? F.destino : F.cuenta; const excl = F.tipo === 'traslado' ? (pk === 'dest' ? F.cuenta : F.destino) : '';
+  const l = ctaNombres().map(ctaInfo).filter(i => i.estado === 'activa' && i.n !== excl && !tjDeCuenta(i.n) && (!q || rgNorm(i.nom + ' ' + (i.tipo ? i.tipo.nombre : '')).includes(q)))
+    .sort((a, b) => { const ta = a.tipo ? +a.tipo.orden || 0 : 1e6, tb = b.tipo ? +b.tipo.orden || 0 : 1e6; return ta - tb || ctaOrdCmp(a, b); });
+  const g = new Map(); l.forEach(i => { const k = i.tipo ? i.tipo.nombre : 'Sin tipo'; if (!g.has(k)) g.set(k, []); g.get(k).push(i); });
+  const saldo = n => { try { const d = ctaDatos(n); return d ? `<span class="num ${d.saldo < -0.004 ? 'neg' : ''}">${ctaFmt(d.saldo, ctaInfo(n).mon)}</span>` : ''; } catch (e) { return ''; } };
+  const celTj = (act, v, txt, on) => { const m = String(txt).match(/<span>(.*?)<\/span>(?:<span class="rg-chev">(.*?)<\/span>)?/); return fila(act, v, m ? m[1] : txt, m && m[2] ? m[2] : '', '', on); };
+  const tjs = q ? '' : regTjCeldas(celTj, pk === 'dest' ? F.tjD : F.tj).replace('<div class="rg-gt">Tarjetas de crédito</div><div class="rg-grid">', '<div class="rg-lhd">Tarjetas de crédito</div><div class="rg-lgrp">');
+  const html = [...g].map(([k, xs]) => `<div class="rg-lhd">${esc(k)}</div><div class="rg-lgrp">${xs.map(i => fila('regPickC', i.n, esc(i.nom), i.mon === 'USD' ? 'Dólares' : '', saldo(i.n), i.n === sel)).join('')}</div>`).join('') + tjs;
+  return html || vacio('Ninguna cuenta coincide.');
+}
 function regPickHtml() {
   const F = S.regF; const pk = S.regPick; if (!pk) return '';
-  const cel = (act, v, txt, on, extra) => `<button type="button" class="rg-cel ${on ? 'on' : ''}" data-act="${act}" data-v="${esc(v)}" ${extra || ''}>${txt}</button>`;
-  let titulo, cuerpo;
-  if (pk === 'marc') { titulo = 'Marcadores'; cuerpo = marcPanelHtml(); }
-  else if (pk === 'rep') { titulo = 'Repetir'; cuerpo = repPanelHtml(); }
-  else if (pk === 'det') {
-    titulo = 'Detalle'; const l = regDetalles(F);
-    cuerpo = `<div class="rg-grid rg-grid2">${l.map(d => cel('regPickD', d.nom, esc(d.ver), d.nom === F.detalle)).join('')}${cel('regPickD', '', '<span class="muted">Sin detalle</span>', false)}</div>`;
-  } else if (pk === 'cat') {
-    titulo = 'Categoría'; const cat = regCatalogo(F.tipo); const abierto = S.regPickG != null ? S.regPickG : F.grupal; const n = cat.length; const out = [];
-    const ia = cat.findIndex(g => g.nom === abierto); const finFila = ia < 0 ? -1 : Math.min(Math.ceil((ia + 1) / 3) * 3, n) - 1;
-    cat.forEach((g, i) => { const on = g.nom === abierto;
-      out.push(cel('regPickG', g.nom, `<span>${esc(g.ver)}</span>${g.hijos.length ? `<span class="rg-chev">${on ? '⌃' : '⌄'}</span>` : ''}`, on || g.nom === F.grupal, 'data-hoja="' + (g.hijos.length ? '' : '1') + '"'));
-      if (i === finFila) { const ga = cat[ia]; out.push(`<div class="rg-subs">${ga.hijos.map(s2 => cel('regPickS', s2.nom, esc(s2.ver), ga.nom === F.grupal && s2.nom === F.subgrupal)).join('')}</div>`); } });
-    cuerpo = `<div class="rg-grid">${out.join('') || '<div class="note" style="padding:14px">No hay categorías activas.</div>'}</div>`;
-  } else {
-    titulo = pk === 'dest' ? 'Cuenta destino' : F.tipo === 'traslado' ? 'Cuenta de origen' : 'Cuenta'; const sel = pk === 'dest' ? F.destino : F.cuenta; const excl = F.tipo === 'traslado' ? (pk === 'dest' ? F.cuenta : F.destino) : '';
-    const l = ctaNombres().map(ctaInfo).filter(i => i.estado === 'activa' && i.n !== excl && !tjDeCuenta(i.n)).sort((a, b) => { const ta = a.tipo ? +a.tipo.orden || 0 : 1e6, tb = b.tipo ? +b.tipo.orden || 0 : 1e6; return ta - tb || ctaOrdCmp(a, b); });
-    const g = new Map(); l.forEach(i => { const k = i.tipo ? i.tipo.nombre : 'Sin tipo'; if (!g.has(k)) g.set(k, []); g.get(k).push(i); });
-    cuerpo = [...g].map(([k, xs]) => `<div class="rg-gt">${esc(k)}</div><div class="rg-grid">${xs.map(i => cel('regPickC', i.n, `<span>${esc(i.nom)}</span>${i.mon === 'USD' ? '<span class="rg-chev">US$</span>' : ''}`, i.n === sel)).join('')}</div>`).join('') + regTjCeldas(cel, pk === 'dest' ? F.tjD : F.tj);
-  }
-  return `<div class="rg-pick" role="dialog" aria-label="${titulo}"><div class="rg-pickh"><b>${titulo}</b>${pk === 'det' ? '<button type="button" class="btn sm ghost" data-act="regDetEsc">✎ Escribir otro</button>' : ''}${pk === 'marc' ? `<span class="row" style="gap:4px;margin-left:auto">${(S.marc || []).length ? `<button type="button" class="btn sm ghost" data-act="marcEditar">${S.marcEdit ? 'Listo' : 'Editar'}</button>` : ''}${S.marcNuevo ? '' : '<button type="button" class="btn sm ghost" data-act="marcNuevo">☆ Guardar este</button>'}</span>` : ''}<button type="button" class="btn sm ghost ico" data-act="regPickX" aria-label="Cerrar">✕</button></div><div class="rg-pickb">${cuerpo}</div></div>`;
+  const titulos = {marc: 'Marcadores', rep: 'Repetir', det: 'Detalle', cat: 'Categoría', dest: 'Cuenta destino', cta: F.tipo === 'traslado' ? 'Cuenta de origen' : 'Cuenta'};
+  const gA = pk === 'cat' && S.regPickG ? regCatalogo(F.tipo).find(g => g.nom === S.regPickG) : null; const titulo = gA ? gA.ver : titulos[pk];
+  const busca = ['cat', 'cta', 'dest', 'det'].includes(pk) && !(pk === 'det' && regDetalles(F).length < 8);
+  const izq = gA ? `<button type="button" class="rg-pback" data-act="regPickBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Categorías</button>` : '<span></span>';
+  const der = pk === 'det' ? '<button type="button" class="rg-plink" data-act="regDetEsc">Escribir</button>'
+    : pk === 'marc' ? `<span class="row" style="gap:4px">${(S.marc || []).length ? `<button type="button" class="rg-plink" data-act="marcEditar">${S.marcEdit ? 'Listo' : 'Editar'}</button>` : ''}${S.marcNuevo ? '' : '<button type="button" class="rg-plink" data-act="marcNuevo">☆ Guardar este</button>'}</span>` : '';
+  const entra = S._pickVisto !== pk; S._pickVisto = pk;
+  return `<div class="rg-pickbg" data-act="regPickX" aria-hidden="true"></div><div class="rg-pick ${entra ? 'entra' : ''}" role="dialog" aria-label="${esc(titulo)}">
+    <div class="rg-grab" aria-hidden="true"></div>
+    <div class="rg-pickh">${izq}<b>${esc(titulo)}</b><span class="rg-pickr">${der}<button type="button" class="rg-pok" data-act="regPickX">Listo</button></span></div>
+    ${busca ? `<div class="rg-psearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="rgPickQ" type="search" placeholder="Buscar" value="${esc(S.regPickQ || '')}" autocomplete="off" enterkeyhint="search"></div>` : ''}
+    <div class="rg-pickb">${regPickCuerpo()}</div></div>`;
 }
+document.addEventListener('input', e => { if (e.target.id !== 'rgPickQ' || !S.regF) return; S.regPickQ = e.target.value; const b = document.querySelector('.rg-pickb'); if (b) { b.innerHTML = regPickCuerpo(); b.scrollTop = 0; } });
 // rgDescAjustar: la descripción crece con el texto (sin barra de desplazamiento).
 function rgDescAjustar() { const t = $('#rgDesc'); if (!t) return; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; }
 document.addEventListener('input', e => { if (e.target.id === 'rgDesc') rgDescAjustar(); });
@@ -5847,7 +5938,7 @@ function pintarRegForm() {
     return `<button type="button" class="rg-sel ${n ? '' : 'vacio'}" data-act="regPick" data-v="${k}">${n ? esc(ctaInfo(n).nom) + (ctaInfo(n).mon === 'USD' ? ' <span class="rg-chev">US$</span>' : '') : ph}</button>`; };
   const monTj = F.tj && tjById(F.tj) ? `<span class="rg-tjm">${['L', 'USD'].map(m0 => `<button type="button" class="${tjMonDe(F.cuenta) === m0 ? 'on' : ''}" data-act="regTjMon" data-v="${m0}">${m0 === 'USD' ? '$' : 'L'}</button>`).join('')}</span>` : '';
   const hayDet = F.tipo !== 'traslado' && regDetalles(F).length;
-  const det = `<div class="rg-detw"><div class="rg-detr"><input class="rg-in" id="rgDet" value="${esc(F.detalle)}" placeholder="${F.tipo === 'traslado' ? 'ej. Traslado de fondos' : hayDet ? 'Toca aquí para escribir' : 'Escribe el detalle'}" autocomplete="off" autocapitalize="sentences">${hayDet ? `<button type="button" class="rg-lbtn" data-act="regPick" data-v="det" aria-label="Elegir de la lista">☰ Lista</button>` : ''}</div><div class="rg-dl" id="rgDetL" hidden></div></div>`;
+  const det = `<div class="rg-detw"><div class="rg-detr"><input class="rg-in" id="rgDet" value="${esc(F.detalle)}" placeholder="${F.tipo === 'traslado' ? 'ej. Traslado de fondos' : hayDet ? 'Escribe o elige' : 'Escribe el detalle'}" autocomplete="off" autocapitalize="sentences">${hayDet ? `<button type="button" class="rg-lbtn" data-act="regPick" data-v="det" aria-label="Elegir de la lista">☰ Lista</button>` : ''}</div><div class="rg-dl" id="rgDetL" hidden></div></div>`;
   let filas = '';
   if (F.tipo === 'traslado') {
     const cruce = F.cuenta && F.destino && monO !== monD;
@@ -5878,9 +5969,11 @@ function pintarRegForm() {
     <div class="hd">${S.regConfX ? `<h2 id="rgT" style="margin-right:auto">¿Descartar lo escrito?</h2><button class="btn sm ghost" data-act="regSeguirX">Seguir aquí</button><button class="btn sm danger" data-act="regDescartar">Descartar</button>` : `<h2 id="rgT" style="margin-right:auto">${ed ? 'Editar registro' : a ? 'Nuevo registro' : 'Registrar para aprobación'}</h2>${!ed && S.marc ? `<button class="btn sm ghost rg-star ${pk === 'marc' ? 'on' : ''}" data-act="regPick" data-v="marc" aria-label="Marcadores" title="Marcadores">☆</button>` : ''}${!a && !ed ? `<button class="btn sm ghost" data-act="regMios">Mis registros</button>` : ''}<button class="btn sm ghost ico" data-act="cerrarModal" aria-label="Cerrar">✕</button>`}</div>
     <div class="bd rg-bd">
       ${ed && r.tipo === 'traslado' ? '' : `<div class="rg-tipos" role="tablist">${tipos.map(t => `<button type="button" role="tab" class="rg-tt rg-tt-${t} ${F.tipo === t ? 'on' : ''}" data-act="regTipo" data-v="${t}" aria-selected="${F.tipo === t}">${t === 'traslado' ? 'Transferencia' : REG_TIPOS[t][0].replace(' de saldo', '')}</button>`).join('')}</div>`}
-      <div class="rg-filas">
+      <div class="rg-filas rg-grp">${filas}</div>
+      <div class="rg-filas rg-grp">
         ${fila('Fecha', `<input class="rg-in" type="date" id="rgFecha" value="${esc(F.fecha)}"><input class="rg-in rg-hora" type="time" id="rgHora" value="${esc(F.hora)}">`, 'rg-fh')}
-        ${filas}
+      </div>
+      <div class="rg-filas rg-grp">
         ${F.tipo === 'ajuste' ? '' : fila('Etiquetas', (() => { const ya = etqLista(F.etq); const yaN = ya.map(etqNorm); const ops = etqOpciones().filter(o => !yaN.includes(etqNorm(o.v))); const vin = etqVinculos(ya);
           const pr = ops.filter(o => o.pr), us = ops.filter(o => !o.pr);
           return `<div class="rg-etqw"><input type="hidden" id="rgEtq" value="${esc(F.etq || '')}">
@@ -5895,16 +5988,22 @@ function pintarRegForm() {
       <div id="rgMsg" class="note"></div>
       ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
     </div>
-    ${pk ? regPickHtml() : ''}${`<div class="rg-pie">${ed && a && ['eliminado', 'rechazado'].includes(r.estado) ? `<button class="btn" data-act="regRestaurar" data-id="${esc(r.id)}">${r.estado === 'eliminado' ? 'Restaurar' : 'Volver a revisar'}</button>` : ''}${ed && ['eliminado', 'vinculado'].includes(r.estado) ? '' : ed ? (S.regConfElim === F.id ? `<button class="btn danger" data-act="regEliminar">¿Eliminar? Sí</button>` : `<button class="btn ghost danger" data-act="regEliminar">Eliminar</button>`) : `<button class="btn rg-otro" data-act="regGuardar" data-v="seguir"><b>＋ Guardar y otro</b><span>sigue registrando</span></button>`}<button class="btn pri rg-fin" data-act="regGuardar"><b>${ed ? 'Guardar cambios' : a ? 'Guardar' : 'Enviar'}</b>${ed ? '' : `<span>${a ? 'y cerrar' : 'para aprobación'}</span>`}</button></div>`}
+    ${pk ? regPickHtml() : ''}${`<div class="rg-pie">${ed && a && ['eliminado', 'rechazado'].includes(r.estado) ? `<button class="btn" data-act="regRestaurar" data-id="${esc(r.id)}">${r.estado === 'eliminado' ? 'Restaurar' : 'Volver a revisar'}</button>` : ''}${ed && ['eliminado', 'vinculado'].includes(r.estado) ? '' : ed ? (S.regConfElim === F.id ? `<button class="btn danger" data-act="regEliminar">¿Eliminar? Sí</button>` : `<button class="btn ghost danger" data-act="regEliminar">Eliminar</button>`) : `<button class="btn rg-otro" data-act="regGuardar" data-v="seguir" title="Guarda y deja el formulario listo para el siguiente"><b>Guardar y otro</b></button>`}<button class="btn pri rg-fin" data-act="regGuardar"><b>${ed ? 'Guardar cambios' : a ? 'Guardar' : 'Enviar para aprobación'}</b></button></div>`}
   </div></div>`;
   const bd = document.querySelector('.rg-bd'); if (bd && scr) bd.scrollTop = scr;
   if (pk) { const on = document.querySelector('.rg-pick .rg-cel.on, .rg-pick .rg-subs'); if (on) on.scrollIntoView({block: 'nearest'}); const act = document.querySelector('.rg-row.activo'); if (act) act.scrollIntoView({block: 'nearest'}); }
   else if (!ed && !S._regFoco) setTimeout(() => { const m = $('#rgMonto'); if (m && !m.value) m.focus(); }, 30);
-  S._regFoco = false; rgDescAjustar();
+  S._regFoco = false; rgDescAjustar(); pildora(document.querySelector('.rg-tipos'), 'rgtipos');
+  if (S._pickDir) { const b = document.querySelector('.rg-pickb'); if (b) b.classList.add(S._pickDir === 'fwd' ? 'push' : 'pop'); S._pickDir = null; }
+  if (!pk) S._pickVisto = null;
 }
+// regPickCerrar: la hoja baja animada antes de quitarla.
+function regPickCerrar() { const p = document.querySelector('.rg-pick'), bg = document.querySelector('.rg-pickbg');
+  if (!p || matchMedia('(prefers-reduced-motion: reduce)').matches) { S._pickVisto = null; return pintarRegForm(); }
+  p.classList.add('sale'); if (bg) bg.classList.add('sale'); setTimeout(() => { S._pickVisto = null; if (S.regF) pintarRegForm(); }, 200); }
 // regPickSig: después de elegir, abre lo que sigue (como la app): categoría → cuenta → detalle.
 function regPickSig(despues) {
-  const F = S.regF; S.regPick = null; S.regPickG = null;
+  const F = S.regF; S.regPick = null; S.regPickG = null; S.regPickQ = '';
   if (despues === 'cat' && esAdmin() && !F.cuenta) S.regPick = 'cta';
   else if (despues === 'cta' && F.tipo === 'traslado' && !F.destino) S.regPick = 'dest';
   if (!S.regPick && ['cat', 'cta'].includes(despues) && ['gasto', 'ingreso'].includes(F.tipo) && !F.detalle && regDetalles(F).length) S.regPick = 'det';   // lista de detalles sin abrir el teclado
@@ -5913,12 +6012,14 @@ function regPickSig(despues) {
 function regDetMostrar() { const l = $('#rgDetL'); if (!l) return; const h = regDetListaHtml(); l.innerHTML = h; l.hidden = !h; }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || !S.regF) return; const act = b.dataset.act; const F = S.regF;
-  if (act === 'regPick') { regLeerForm(); S.regPick = S.regPick === b.dataset.v ? null : b.dataset.v; S.regPickG = null; S._regFoco = true; return pintarRegForm(); }
-  if (act === 'regPickX') { regLeerForm(); S.regPick = null; S.regPickG = null; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'regPick') { regLeerForm(); S.regPick = S.regPick === b.dataset.v ? null : b.dataset.v; S.regPickG = null; S.regPickQ = ''; S._regFoco = true; return pintarRegForm(); }
+  if (act === 'regPickX') { regLeerForm(); S.regPick = null; S.regPickG = null; S.regPickQ = ''; S._regFoco = true; return regPickCerrar(); }
+  if (act === 'regPickGo') { regLeerForm(); S.regPickG = b.dataset.v; S.regPickQ = ''; S._regFoco = true; S._pickDir = 'fwd'; pintarRegForm(); return; }
+  if (act === 'regPickBack') { regLeerForm(); S.regPickG = null; S._regFoco = true; S._pickDir = 'back'; pintarRegForm(); return; }
   if (act === 'regPickG') { regLeerForm(); const v = b.dataset.v;
     if (b.dataset.hoja) { F.grupal = v; F.subgrupal = ''; F.detalle = ''; return regPickSig('cat'); }
     const ab = S.regPickG != null ? S.regPickG : F.grupal; S.regPickG = ab === v ? '' : v; S._regFoco = true; return pintarRegForm(); }
-  if (act === 'regPickS') { regLeerForm(); const gN = S.regPickG != null && S.regPickG !== '' ? S.regPickG : F.grupal; if (F.grupal !== gN || F.subgrupal !== b.dataset.v) F.detalle = ''; F.grupal = gN; F.subgrupal = b.dataset.v; return regPickSig('cat'); }
+  if (act === 'regPickS') { regLeerForm(); const gN = b.dataset.g || (S.regPickG != null && S.regPickG !== '' ? S.regPickG : F.grupal); if (F.grupal !== gN || F.subgrupal !== b.dataset.v) F.detalle = ''; F.grupal = gN; F.subgrupal = b.dataset.v; return regPickSig('cat'); }
   if (act === 'regPickC') { regLeerForm(); const k = S.regPick === 'dest' ? 'dest' : 'cta'; const v = b.dataset.v;
     if (v.startsWith('tj:')) regTjElegir(F, k, v.slice(3)); else { if (k === 'dest') { F.destino = v; F.tjD = null; } else { F.cuenta = v; F.tj = null; } }
     return regPickSig(k); }
