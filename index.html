@@ -1241,12 +1241,38 @@ nav.tabs a[aria-current="page"]{background:color-mix(in srgb,var(--azul) 16%,tra
 .mas-ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;background:#5483B3;color:#fff}.mas-ico svg{width:17px;height:17px}
 .mi-bandeja{background:#D99A2B}.mi-validar{background:#2C9A5E}.mi-cambios{background:#C0473A}.mi-usuarios{background:#7A64D6}.mi-ajustes{background:#6B7A90}.mi-guia,.mi-bloqueo,.mi-tema,.mi-sync{background:#2C5E9E}
 .mas-salir{color:var(--bad)}.mas-salir .mas-ico{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+
+.lado-btn{display:none}
+@media (min-width:761px){
+  body:has(#topbar:not([hidden])),header.top{transition:padding-left .22s ease,width .22s ease}
+  .lado-btn{display:grid;place-items:center;margin-left:auto;width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0;flex:none}
+  .lado-btn:hover{background:color-mix(in srgb,var(--fg) 8%,transparent);color:var(--fg)}.lado-btn svg{width:19px;height:19px}
+  nav.tabs a{display:flex;align-items:center;gap:10px}
+  .nv-i{position:relative;width:20px;height:20px;display:grid;place-items:center;flex:none}.nv-i svg{width:19px;height:19px}.nv-i .dot{width:9px;height:9px;margin:0}
+  .nv-n{display:none}.nv-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  nav.tabs a.nav-sub{padding-left:16px}
+  html.lado-min body:has(#topbar:not([hidden])){padding-left:104px}
+  html.lado-min header.top{width:80px}
+  html.lado-min .top .wrap{padding:14px 10px;align-items:center}
+  html.lado-min .top .brand{flex-direction:column;gap:8px;padding:0;margin-bottom:8px}
+  html.lado-min .hd-app,html.lado-min .nv-t,html.lado-min .top .sync-meta,html.lado-min #userBox .small,html.lado-min .top .htx{display:none!important}
+  html.lado-min .lado-btn{margin:0}html.lado-min .lado-btn svg{transform:scaleX(-1)}
+  html.lado-min nav.tabs{width:100%;align-items:center}
+  html.lado-min nav.tabs a,html.lado-min nav.tabs a.nav-sub{width:52px;height:40px;padding:0;justify-content:center;border-radius:14px}
+  html.lado-min .nv-n{display:block;position:absolute;top:-7px;right:-12px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--warn);color:#fff;font:700 9.5px/16px var(--f-ui);font-style:normal;text-align:center}
+  html.lado-min .nav-grp{display:block;width:32px;height:1px;padding:0;margin:6px auto;background:var(--glass-line);font-size:0;overflow:hidden}
+  html.lado-min .top .wrap>.row{flex-direction:column;align-items:center;width:100%}
+  html.lado-min #userBox{flex-direction:column;align-items:center;width:auto}
+  html.lado-min .top .hbtn{width:38px;height:36px;padding:0!important;justify-content:center;display:grid;place-items:center}
+  html.lado-min .top .hbtn .hico{display:block;width:18px;height:18px}
+  .top .brand .hd-app{white-space:nowrap;font-size:15.5px}
+}
 </style>
 </head>
 <body>
 <header class="top" id="topbar" hidden>
   <div class="wrap">
-    <div class="brand"><svg class="hd-logo" viewBox="0 0 192 192" aria-hidden="true"><rect width="192" height="192" rx="40" fill="#052659"/><rect x="47" y="98" width="24" height="44" rx="7" fill="#C1E8FF"/><rect x="84" y="72" width="24" height="70" rx="7" fill="#DDF1FF"/><rect x="121" y="46" width="24" height="96" rx="7" fill="#FFFFFF"/><rect x="36" y="152" width="120" height="6" rx="3" fill="#C1E8FF"/></svg><b class="hd-app">Control de Gastos</b><b class="hd-tit" id="hdTitulo"></b></div>
+    <div class="brand"><svg class="hd-logo" viewBox="0 0 192 192" aria-hidden="true"><rect width="192" height="192" rx="40" fill="#052659"/><rect x="47" y="98" width="24" height="44" rx="7" fill="#C1E8FF"/><rect x="84" y="72" width="24" height="70" rx="7" fill="#DDF1FF"/><rect x="121" y="46" width="24" height="96" rx="7" fill="#FFFFFF"/><rect x="36" y="152" width="120" height="6" rx="3" fill="#C1E8FF"/></svg><b class="hd-app">Control de Gastos</b><b class="hd-tit" id="hdTitulo"></b><button type="button" class="lado-btn" id="btnLado" data-act="ladoToggle" aria-label="Contraer la barra lateral" title="Contraer la barra lateral"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/><path d="M15 10l-2 2 2 2"/></svg></button></div>
     <nav class="tabs" id="tabs"></nav>
     <div class="row" style="gap:8px">
       <span class="sync-meta" id="syncMeta"></span>
@@ -1780,7 +1806,11 @@ function renderTabs() {
   if (a) items.push(['movimientos', 'Movimientos'], ['usuarios', 'Usuarios'], ['ajustes', 'Ajustes']);
   const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
   // Escritorio: barra lateral agrupada (principal, gestores de gastos, administración). Teléfono: barra inferior + "Más".
-  const lnk = ([h, l], cls) => `<a href="#${h}" class="${cls || ''}" ${cur === h ? 'aria-current="page"' : ''}>${l}</a>`;
+  // Cada enlace lleva ícono y texto: con la barra contraída solo se ve el ícono (y el nombre al pasar el mouse).
+  const lnk = ([h, l], cls) => { const dot = (String(l).match(/^<span class="dot[^>]*><\/span>/) || [''])[0]; const txt = String(l).replace(dot, '');
+    const nom = txt.replace(/<[^>]+>/g, ' ').replace(/\s+\d+\s*$/, '').replace(/\s+/g, ' ').trim(); const n = navCount(l);
+    const ico = dot || navIco(h === 'proyectos' ? 'proyectos' : NAV_I[h] ? h : 'mas');
+    return `<a href="#${h}" class="${cls || ''}" title="${esc(nom)}" ${cur === h ? 'aria-current="page"' : ''}><span class="nv-i">${ico}${n ? `<i class="nv-n">${n}</i>` : ''}</span><span class="nv-t">${txt}</span></a>`; };
   const esG = h => h === 'proyectos' || h.startsWith('c-'); const esAd = h => ['bandeja', 'validar', 'cambios', 'movimientos', 'usuarios', 'ajustes'].includes(h);
   const prin = items.filter(([h]) => !esG(h) && !esAd(h)), gest = items.filter(([h]) => esG(h)), adm = items.filter(([h]) => esAd(h));
   const gestO = [...gest.filter(([h]) => h !== 'proyectos'), ...gest.filter(([h]) => h === 'proyectos')];
@@ -1803,6 +1833,7 @@ const NAV_I = {
   inicio: '<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>',
   cuentas: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/>',
   gestores: '<circle cx="9" cy="8" r="3.2"/><path d="M3 19a6 6 0 0 1 12 0M16 4.5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5"/>',
+  proyectos: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   vehiculos: '<path d="M5 15l1.5-5A2 2 0 0 1 8.4 8.6h7.2a2 2 0 0 1 1.9 1.4L19 15"/><rect x="3" y="15" width="18" height="4" rx="1.5"/>',
   mas: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   bandeja: '<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/>', validar: '<path d="M5 12l5 5 9-10"/>', cambios: '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>',
@@ -1844,6 +1875,11 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-act]
   if (act === 'masSync') { S.masAbierto = false; masPintar(); renderTabs(); const bs = $('#btnSync'); if (bs) bs.click(); return; }
   if (act === 'masFid') { S.masAbierto = false; masPintar(); renderTabs(); if (typeof fidAbrirCfg === 'function') fidAbrirCfg(); return; }
   if (act === 'salir' && S.masAbierto) { S.masAbierto = false; setTimeout(() => { masPintar(); if (S.me) renderTabs(); }, 0); } });
+// Barra lateral (escritorio): contraer o expandir; se recuerda en este navegador.
+const ladoAplicar = () => { const min = lsGet('cg_lado') === 'min'; document.documentElement.classList.toggle('lado-min', min); const b = document.getElementById('btnLado');
+  if (b) { const t = min ? 'Expandir la barra lateral' : 'Contraer la barra lateral'; b.setAttribute('aria-label', t); b.title = t; b.setAttribute('aria-expanded', String(!min)); } };
+ladoAplicar();
+document.addEventListener('click', e => { if (!e.target.closest('[data-act="ladoToggle"]')) return; lsSet('cg_lado', lsGet('cg_lado') === 'min' ? '' : 'min'); ladoAplicar(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.masAbierto) { S.masAbierto = false; masPintar(); renderTabs(); } });
 // gestSeg: selector de cristal Familia / Padres / Personales / Proyectos arriba de la vista (teléfono).
 function gestSeg() { const g = (S._nav && S._nav.gest) || []; if (g.length < 2) return ''; const cur = S.view.startsWith('p-') ? 'proyectos' : S.view;
