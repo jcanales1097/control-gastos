@@ -819,7 +819,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .cta-page>.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}
 body.cta-abierta{overflow:hidden}
 @media (max-width:760px){.cta-page>.modal.cta-modal{border:0}}
-.rg-vinc{background:var(--panel)}.rg-vincl{flex:1 1 200px;min-width:0;line-height:1.45}.rg-vinc>span:first-child{font-weight:600}
+.rg-vinc{background:var(--panel)}.ct-post{gap:10px;display:grid}.rg-vincl{flex:1 1 200px;min-width:0;line-height:1.45}.rg-vinc>span:first-child{font-weight:600}
 .rg-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk);font-size:13px}.rg-ctl select{width:auto;min-width:160px}
 .unif-p .unif-l{display:grid;gap:8px}.unif-l>div{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.unif-m{font-size:12.5px}.unif-n{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cr-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}.cr-filtros .in{width:auto;min-width:0;flex:0 1 auto}.cr-filtros #crQ{flex:1 1 220px}
@@ -7645,7 +7645,12 @@ function vCtaCats() {
     const chips = `${web ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>'}${nd.row && nd.row.validada ? '' : ' <span class="chip warn">por validar</span>'}${act ? '' : ' <span class="chip bad">desactivada</span>'}`;
     const c = r[0].app; const a = nd.nivel === 1 && c ? catAj(c) || {} : {};
     let panel = '';
-    if (edit === k) { const van = nd.nivel === 1 && c ? vaA(c) : [];
+    if (edit === k && S.catPostSus && S.catPostSus.k === k) { const ps = S.catPostSus;   // recién sustituida: ¿se elimina del catálogo?
+      panel = `<div class="ct-ed ct-post"><div><b>✓ Se pasaron ${ps.n} ${ps.n === 1 ? 'registro' : 'registros'} a “${esc(ps.dest)}”.</b></div>
+        ${nd.u ? `<div class="note">“${esc(nd.nombre)}” todavía tiene ${nd.u.n} registros, así que se queda en el catálogo.</div><div class="ct-edb"><span style="flex:1"></span><button class="btn sm pri" data-act="catEditar" data-k="">Listo</button></div>`
+          : `<div>¿Eliminar también “<b>${esc(nd.nombre)}</b>” del catálogo? Ya no tiene registros${nd.hijos && nd.hijos.length ? ' (se va con lo que tiene debajo)' : ''}. Si luego deshaces la sustitución, sus registros vuelven y la categoría reaparece.</div>
+          <div class="ct-edb"><span style="flex:1"></span><button class="btn sm ghost" data-act="catEditar" data-k="">Dejarla</button><button class="btn sm danger" data-act="catBorrar" data-k="${esc(k)}" data-ya="1">Sí, eliminar</button></div>`}</div>`; }
+    else if (edit === k) { const van = nd.nivel === 1 && c ? vaA(c) : [];
       const padres = nd.nivel === 1 ? [] : catPlano(arbol).filter(pr => pr.length === nd.nivel - 1);
       panel = `<div class="ct-ed"><label>Nombre<input class="in" id="ctNom" value="${esc(nd.nombre)}"></label>
         ${nd.nivel > 1 && web && !nd.u ? `<label>${CAT_NIV[nd.nivel - 1]} (padre)<select class="in" id="ctPadre">${padres.map(pr => `<option value="${esc(llave(pr))}" ${llave(pr) === llave(r.slice(0, -1)) ? 'selected' : ''}>${esc(pr.map(x => x.nombre).join(' › '))}</option>`).join('')}</select></label>` : ''}
@@ -7707,7 +7712,7 @@ async function catAccion(b) {
   if (act === 'catExpTodo') { S.catExpTodo = !S.catExpTodo; if (!S.catExpTodo) S.catExp = new Set(); return render(); }
   if (act === 'catExcel') return catExcel();
   if (act === 'catAbrir') { const e = S.catExp || (S.catExp = new Set()); if (S.catExpTodo) { S.catExpTodo = false; catPlano(catArbol(tipo)).forEach(r => e.add(r.map(x => x.key).join('›'))); } e.has(k) ? e.delete(k) : e.add(k); return render(); }
-  if (act === 'catEditar') { S.catEdit = S.catEdit === k ? '' : k; S.catConfBorrar = null; render(); const n = $('#ctNom'); if (n) n.focus({preventScroll: true}); return; }
+  if (act === 'catEditar') { S.catEdit = S.catEdit === k ? '' : k; S.catConfBorrar = null; S.catPostSus = null; render(); const n = $('#ctNom'); if (n) n.focus({preventScroll: true}); return; }
   if (act === 'catNuevoEn') { S.catForm = true; S.catPadre = k; render(); const n = $('#catNuevoNom'); if (n) { n.scrollIntoView({block: 'center'}); n.focus(); } return; }
   if (act === 'catEdOk') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; const nom = ($('#ctNom').value || '').trim(); if (!nom) return toast('Escribe el nombre.');
     const campos = {nombre: nom}; const ps = $('#ctPadre');
@@ -7727,7 +7732,7 @@ async function catAccion(b) {
       const d = await q(sb.from('categorias').insert(row).select(), CAT_NIV[pr.length + 1] + ' creado'); S.cats.push(d && d[0] ? d[0] : row); catMapas();
       if (pk) (S.catExp || (S.catExp = new Set())).add(pk); S.catPadre = pk; } catch (e) {} render(); const n = $('#catNuevoNom'); if (n) n.focus(); return; }
   if (act === 'catBorrar') { const ruta = catRuta(tipo, keys); if (!ruta) return; const nd = ruta[ruta.length - 1]; if (!nd.row || nd.u) return;   /* sin registros (ni debajo): se puede eliminar, con lo que tenga debajo */
-    if (S.catConfBorrar !== k) { S.catConfBorrar = k; return render(); } S.catConfBorrar = null;
+    if (S.catConfBorrar !== k && !b.dataset.ya) { S.catConfBorrar = k; return render(); } S.catConfBorrar = null; S.catPostSus = null;
     const quitar = new Set([nd.row.id]); let cambio = true; while (cambio) { cambio = false; S.cats.forEach(r => { if (r.padre && quitar.has(r.padre) && !quitar.has(r.id)) { quitar.add(r.id); cambio = true; } }); }
     try { await q(sb.from('categorias').delete().eq('id', nd.row.id), 'Eliminado'); S.cats = S.cats.filter(r => !quitar.has(r.id)); catMapas(); S.catEdit = ''; } catch (e) {} return render(); }
   if (act === 'catSustituir') { const ruta = catRuta(tipo, keys); const sel = $('#ctSus'); if (!ruta || !sel || !sel.value) return toast('Elige por cuál se sustituye.');
@@ -7736,7 +7741,9 @@ async function catAccion(b) {
     try { // el destino se reconoce por su nombre: si se creó aquí, se fija su nombre de enlace
       for (let i = 0; i < dest.length; i++) { const x = dest[i]; if (!x.app) { const row = await catGuardarRuta(tipo, dest.slice(0, i + 1), {app_nombre: x.nombre}); x.app = row.app_nombre; } }
       const regla = {id: crUid(), tipo, de: ruta.map(x => x.app), a: dest.map(x => x.app || x.nombre), el: new Date().toISOString()};
-      await guardarAjuste('catReglas', [...(S.aj.catReglas || []), regla]); derive(); S.catEdit = ''; toast(`Sustituida en ${n} registros`); } catch (e) {} return render(); }
+      await guardarAjuste('catReglas', [...(S.aj.catReglas || []), regla]); derive(); toast(`Sustituida en ${n} registros`);
+      // si la categoría queda en el árbol (tiene fila propia), se pregunta si se elimina
+      if (nd.row) { S.catEdit = k; S.catPostSus = {k, n, dest: dest.map(x => x.nombre).join(' › ')}; } else S.catEdit = ''; } catch (e) {} return render(); }
   if (act === 'catDeshacer') { const reglas = (S.aj.catReglas || []).filter(r => r.id !== b.dataset.id);
     try { await guardarAjuste('catReglas', reglas); derive(); toast('Sustitución deshecha: los registros vuelven a su categoría'); } catch (e) {} return render(); }
   if (act === 'catValidarTodo') { if (!S.cats) return toast('Primero corre en Supabase el SQL de la fase 2 (fase2.sql).');
