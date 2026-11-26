@@ -1477,6 +1477,25 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
 // $: Atajo para buscar un elemento de la página: $("#id").
 const $ = (s, el = document) => el.querySelector(s);
 // esc: Escapa texto para insertarlo seguro en HTML (evita que un texto rompa la página).
+// buscador: todas las palabras deben aparecer (en cualquier orden, sin importar tildes ni mayúsculas).
+// Si toda la búsqueda es un número, compara contra el monto (600 → 600.xx; 600.50 → exacto) o el número en el texto;
+// dentro de una frase, un número debe aparecer completo (60 no encuentra 5600). Rangos de monto: >500, <100, 100-300.
+const bNorm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+function buscador(q) {
+  const t = bNorm(q).trim(); if (!t) return null;
+  const num = x => parseFloat(x.replace(/[L$,\s]/g, ''));
+  const soloNum = /^[L$]?\s*[\d,]*\.?\d+$/.test(t); const nv = soloNum ? num(t) : NaN; const dec = soloNum && t.includes('.');
+  const nre = w => new RegExp('(^|[^0-9.,])' + w.replace(/[.,]/g, c => '\\' + c) + '([^0-9]|$)');
+  const rangos = [], pals = [];
+  if (soloNum) pals.push(nre(t.replace(/^[L$]\s*/, '')));
+  else t.split(/\s+/).forEach(w => { let m;
+    if ((m = w.match(/^([<>])=?([\d,]*\.?\d+)$/))) { const v = num(m[2]); rangos.push(m[1] === '>' ? x => x >= v : x => x <= v); }
+    else if ((m = w.match(/^([\d,]*\.?\d+)-([\d,]*\.?\d+)$/))) { const a = num(m[1]), b = num(m[2]); rangos.push(x => x >= Math.min(a, b) - 0.005 && x <= Math.max(a, b) + 0.005); }
+    else pals.push(/^[\d.,]+$/.test(w) ? nre(w) : w); });
+  return (partes, monto) => { const v = Math.abs(+monto || 0); const h = bNorm(partes.filter(x => x != null && x !== '').join(' '));
+    if (soloNum) return (dec ? Math.abs(v - nv) < 0.005 : Math.floor(v + 1e-9) === Math.floor(nv)) || pals[0].test(h);
+    return rangos.every(f => f(v)) && pals.every(w => typeof w === 'string' ? h.includes(w) : w.test(h)); };
+}
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 // NF: Formateador de números con 2 decimales y separador de miles (formato en-US).
 const NF = new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -2227,7 +2246,7 @@ function vInicio() {
 // vBandeja: VISTA BANDEJA (admin): registros de la app por asignar, con filtros y asignación masiva.
 function vBandeja() {
   if (!D.txs.length) return `<div class="panel"><div class="empty"><b>Aún no hay movimientos de la app</b>Sincroniza con Registro Contable para traerlos.<div style="margin-top:12px"><button class="btn pri" data-act="sync">Sincronizar</button></div></div></div>`;
-  const f = S.filtros; const qq = f.q.toUpperCase();
+  const f = S.filtros; const qq = f.q.toUpperCase(); const bq = buscador(qq);
   const lista = D.txs.filter(t => {
     const e = estadoTx(t);
     if (!(e === 'pendiente' || (f.todos && e === 'otro'))) return false;
@@ -2238,7 +2257,7 @@ function vBandeja() {
     if (f.subc && t.sub !== f.subc) return false;
     if (f.nat && (f.nat === 'ingreso' ? t.code !== 0 : t.code === 0)) return false;
     if (f.cuenta && t.cuenta !== f.cuenta) return false;
-    if (qq && !(t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)) return false;
+    if (bq && !bq([t.det, t.cat, t.sub, t.nota, t.cuenta], t.monto)) return false;
     return true;
   });
   const bdef = {k: 'fecha', dir: 'asc'}; const lista0 = lista; lista.splice(0, lista.length, ...ordenarLista(lista0, ordDe('bandeja', bdef), {fecha: t => t.fecha, det: t => t.det, cuenta: t => t.cuenta, monto: t => restante(t)}));
@@ -2529,9 +2548,9 @@ function tablaFilas(c, h, lado) {
   const mesesT = fam ? [] : [...new Set(todas.map(r => (r.fecha || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   const cats = [...new Set(todas.map(r => catG(r.cat || '')).filter(c => c && !catOc(c)))].sort((x, y) => x.localeCompare(y, 'es', {numeric: true}));   // filtro por categoría (antes era por subcategoría)
   const ctas = [...new Set(todas.map(cuentaDe))].sort((x, y) => x.localeCompare(y, 'es'));
-  const qq = (F.q || '').trim().toUpperCase();
+  const qq = (F.q || '').trim().toUpperCase(); const bq = buscador(qq);
   const rows = todas.filter(r => (!F.mes || (r.fecha || '').slice(0, 7) === F.mes) && (!F.cat || catG(r.cat || '') === F.cat) && (!F.cuenta || cuentaDe(r) === F.cuenta)
-    && (!qq || [r.descripcion, r.detalle, r.cat, r.sub, r.tipo, cuentaDe(r), fFecha(r.fecha), (+r.valor || 0).toFixed(2)].join(' ').toUpperCase().includes(qq)));
+    && (!bq || bq([r.descripcion, r.detalle, r.cat, r.sub, r.tipo, cuentaDe(r), fFecha(r.fecha)], r.valor)));
   const filtrado = F.q || F.cat || F.cuenta || F.mes;
   const okey = 'f|' + c.id + '|' + lado, odef = {k: 'fecha', dir: 'desc'};
   const rowsO = ordenarLista(rows, ordDe(okey, odef), {fecha: r => r.fecha || '', tipo: r => r.tipo, cat: r => [r.cat, r.sub].join(' '), desc: r => r.descripcion || r.detalle, valor: r => +r.valor || 0, estado: r => r.estado + (r.tx_id ? 'a' : 'm')});
@@ -4265,7 +4284,7 @@ function vConfigProy(c) {
 const EST = {asignado: ['Asignado', 'app'], pendiente: ['Pendiente', 'warn'], noaplica: ['No aplica', ''], traslado: ['Traslado', ''], futuro: ['Programado', ''], anterior: ['Antes del inicio', ''], otro: ['Sin control', '']};
 // vMovimientos: VISTA MOVIMIENTOS (admin): todos los registros de la app con filtros y estados.
 function vMovimientos() {
-  const f = S.filtros; const qq = f.q.toUpperCase();
+  const f = S.filtros; const qq = f.q.toUpperCase(); const bq = buscador(qq);
   const all = D.txs; const cnt = {}; all.forEach(t => { const e = estadoTx(t); cnt[e] = (cnt[e] || 0) + 1; });
   const g = S.fmov || (S.fmov = {cat: '', sub: '', cuenta: ''}); const ord = (x, y) => x.localeCompare(y, 'es', {numeric: true});
   const cats = [...new Set(all.map(t => catG(t.cat)).filter(c => c && !catOc(c)))].sort(ord);
@@ -4273,7 +4292,7 @@ function vMovimientos() {
   const ctas = [...new Set(all.filter(t => (!g.cat || catG(t.cat) === g.cat) && (!g.sub || t.sub === g.sub)).map(t => t.cuenta).filter(Boolean))].sort(ord);
   if (g.cuenta && !ctas.includes(g.cuenta)) ctas.unshift(g.cuenta);
   const hayF = f.q || f.estado || f.mes || g.cat || g.sub || g.cuenta;
-  let lista = all.filter(t => (!g.cat || catG(t.cat) === g.cat) && (!g.sub || t.sub === g.sub) && (!g.cuenta || t.cuenta === g.cuenta) && (!f.estado || (f.estado === '_borrado' ? !!t.borradoApp : f.estado === '_web' ? !!t.versionWeb : estadoTx(t) === f.estado)) && (!f.mes || t.mes === f.mes) && (!qq || (t.det + ' ' + t.cat + ' ' + t.sub + ' ' + t.nota + ' ' + t.cuenta).toUpperCase().includes(qq)));
+  let lista = all.filter(t => (!g.cat || catG(t.cat) === g.cat) && (!g.sub || t.sub === g.sub) && (!g.cuenta || t.cuenta === g.cuenta) && (!f.estado || (f.estado === '_borrado' ? !!t.borradoApp : f.estado === '_web' ? !!t.versionWeb : estadoTx(t) === f.estado)) && (!f.mes || t.mes === f.mes) && (!bq || bq([t.det, t.cat, t.sub, t.nota, t.cuenta], t.monto)));
   const mdef = {k: 'fecha', dir: 'desc'}; lista = ordenarLista(lista, ordDe('movs', mdef), {fecha: t => t.fecha, det: t => t.det, cuenta: t => t.cuenta, monto: t => t.monto, estado: t => estadoTx(t)});
   const total = lista.length; const suma = lista.reduce((a, t) => a + (t.code === 0 ? t.monto : t.code === 3 ? 0 : -t.monto), 0); lista = lista.slice(0, S.limite);
   const meses = [...new Set(all.map(t => t.mes))].sort().reverse();
@@ -6201,7 +6220,7 @@ function vCtaRegistros() {
   const ver = S.regVer || 'oficial'; const dup = regDuplicados(); const qq = (S.regQ || '').trim().toUpperCase();
   const cnt = k => S.reg.filter(r => r.estado === k).length;
   let l = (ver === 'dup' ? dup.map(x => x.r) : S.reg.filter(r => r.estado === ver)).slice().sort((a, b) => (b.fecha + (b.hora || '')).localeCompare(a.fecha + (a.hora || '')));
-  if (qq) l = l.filter(r => [r.detalle, r.descripcion, r.grupal, r.subgrupal, r.cuenta, r.cuenta_destino, String(r.monto)].join(' ').toUpperCase().includes(qq));
+  if (qq) { const bq = buscador(qq); l = l.filter(r => bq([r.detalle, r.descripcion, r.grupal, r.subgrupal, r.cuenta, r.cuenta_destino, r.etiquetas && [].concat(r.etiquetas).map(e => '#' + e).join(' ')], r.monto)); }
   const bt = (v, t, n) => `<button class="tj-tab ${ver === v ? 'on' : ''}" data-act="regVer" data-v="${v}">${t} <span class="tj-tc">${n}</span></button>`;
   const dupHtml = ver === 'dup' ? l.map(r => { const x = dup.find(y => y.r.id === r.id); return `<div class="rg-dup">${regFilaHtml(r, false)}<div class="rg-dupb"><span class="note">En la app: ${x.app.map(t => `${fFecha(t.fecha)} · ${esc(t.cuenta)} · ${L(t.montoApp)} · ${esc(t.nota || t.det || t.cat)}`).join(' / ')}</span><button class="btn sm pri" data-act="regVincular" data-id="${esc(r.id)}" data-t="${esc(x.app[0].id)}">Es el mismo: vincular</button></div></div>`; }).join('') : '';
   const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']; let ant = null;
@@ -6275,7 +6294,7 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'rgMonto' && S.regF && S.regF.tipo === 'ajuste') { S.regF.monto = el.value; const d = $('#rgAjDif'); if (d) d.innerHTML = regAjDifTxt(); }
-  if (el.id === 'regQ') { S.regQ = el.value; const pos = el.selectionStart; render(); const n = $('#regQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } }
+  if (el.id === 'regQ') { S.regQ = el.value; clearTimeout(S._bqT); S._bqT = setTimeout(() => { const el = $('#regQ'); if (!el) return; const pos = el.selectionStart; render(); const n = $('#regQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } }, 160); }
 });
 
 const regPendientes = () => esAdmin() && S.reg ? S.reg.filter(r => r.estado === 'pendiente') : [];
@@ -6420,11 +6439,11 @@ function vCtaGeneral() {
   const etqBar = etqs.length ? `<div class="gen-etq"><span class="note">Etiqueta:</span>${['', ...etqs].map(e => `<button class="chip ${etq === e ? 'on' : ''}" data-act="genEtq" data-v="${esc(e)}">${e ? '#' + esc(e) : 'Todas'}</button>`).join('')}</div>` : '';
   let cuerpo = '', cab = '';
   if (vista === 'd') {
-    const qq = (S.genQ || '').trim().toUpperCase(); const nq = parseFloat(qq.replace(/[^0-9.]/g, ''));
-    const coincide = f => [f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, f.otra, ...(f.t.etiquetas || [])].join(' ').toUpperCase().includes(qq) || (isFinite(nq) && nq > 0 && String(f.v).includes(String(nq)));
+    const qq = (S.genQ || '').trim().toUpperCase(); const bq = buscador(qq);
+    const coincide = f => bq([f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, f.otra, ...(f.t.etiquetas || []).map(e => '#' + e)], f.v);
     const dia = !qq && S.genDia && S.genDia.slice(0, 7) === mes ? S.genDia : ''; const l = qq ? filas.filter(coincide) : filas.filter(f => dia ? f.t.fecha === dia : f.t.mes === mes);
     const enSel = S.selCtx === 'gen' && ctaSel().size > 0; const puede = !!(S.me && S.me.activo && esAdmin());
-    cab = (S.genBus ? `<input class="in" id="genQ" type="search" placeholder="Buscar en todos los registros (texto o monto)" value="${esc(S.genQ || '')}" autocomplete="off">` : '')
+    cab = (S.genBus ? `<input class="in" id="genQ" type="search" placeholder="Buscar: palabras, monto (600) o rango (>500, 100-300)" value="${esc(S.genQ || '')}" autocomplete="off">` : '')
       + (qq ? `<div class="rc-nav"><span></span><b>${l.length} ${l.length === 1 ? 'coincide' : 'coinciden'}</b><span></span></div>` : nav(labMes(mes), tjMesAdd(mes, -1), tjMesAdd(mes, 1), 'genMes')) + franja(genSum(l)) + (dia ? `<div class="gen-dia-f"><span>Solo el ${fFecha(dia)}</span><button class="btn sm ghost" data-act="genDia" data-v="">Ver todo el mes</button></div>` : '');
     const porDia = new Map(); l.forEach(f => { if (!porDia.has(f.t.fecha)) porDia.set(f.t.fecha, []); porDia.get(f.t.fecha).push(f); });
     const dias = [...porDia.keys()]; if (S.notasDia && !qq) S.notasDia.forEach((n, fe) => { if (fe.slice(0, 7) === mes && (!dia || fe === dia) && !porDia.has(fe)) dias.push(fe); });
@@ -6623,9 +6642,9 @@ function vTjMov(t, modo) {
   const avisoMan = man.length ? `<div class="bd note tjm-man">${man.length} ${man.length === 1 ? 'pago está vinculado' : 'pagos están vinculados'} a mano a otro corte distinto al de su fecha. ${S.tjManQ ? `¿Pasarlos a la regla automática? <button class="btn sm ghost" data-act="tjManQ">No</button><button class="btn sm pri" data-act="tjManBorrar">Sí, aplicar la regla</button>` : '<button class="btn sm" data-act="tjManQ">Aplicar la regla a todos</button>'}</div>` : '';
   if (!ps.length) return `<div class="tjm-f">${filtros}</div><div class="note" style="padding:14px">Sin cortes todavía.</div>${pie}`;
   const {d, vis, extraT, vals, glob} = mk(mon);
-  const qq = S.tjBus ? (S.tjQ || '').trim().toUpperCase() : ''; const nq = parseFloat(qq.replace(/[^0-9.]/g, ''));
-  const coincide = f => [f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta].join(' ').toUpperCase().includes(qq) || (isFinite(nq) && nq > 0 && String(Math.abs(f.v)).includes(String(nq)));
-  const busca = S.tjBus ? `<input class="in" id="tjQ" type="search" placeholder="Buscar en todos los registros de la tarjeta (texto o monto)" value="${esc(S.tjQ || '')}" style="max-width:none;margin:6px 12px;width:calc(100% - 24px)">` : '';
+  const qq = S.tjBus ? (S.tjQ || '').trim().toUpperCase() : ''; const bq = buscador(qq);
+  const coincide = f => bq([f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, ...(f.t.etiquetas || []).map(e => '#' + e)], f.v);
+  const busca = S.tjBus ? `<input class="in" id="tjQ" type="search" placeholder="Buscar: palabras, monto (600) o rango (>500, 100-300)" value="${esc(S.tjQ || '')}" style="max-width:none;margin:6px 12px;width:calc(100% - 24px)">` : '';
   let nav, sum, cuerpo, info = '';
   if (vista === 'c') {
     const i = ps.findIndex(p => p.corte === cor); const p = ps[i]; const prev = ps[i - 1], next = ps[i + 1]; const R = vals(p);
@@ -7325,8 +7344,8 @@ function pintarCtaFicha() {
   const saldoAl = fin => { let s = d.base; for (const f of d.filas) { if (f.t.fecha > fin) break; s = f.saldo; } return s; };
   const resumen = (l, fin) => { const dep = crR2(l.filter(f => f.lado === 'd').reduce((s, f) => s + f.v, 0)), ret = crR2(-l.filter(f => f.lado === 'r').reduce((s, f) => s + f.v, 0)); return {dep, ret, bal: crR2(dep - ret), saldo: saldoAl(fin), n: l.length}; };
   const finMes = m => tjFechaDia(+m.slice(0, 4), +m.slice(5, 7) - 1, 31);
-  const qq = (S.ctaQ || '').trim().toUpperCase(); const nq = parseFloat(qq.replace(/[^0-9.]/g, ''));
-  const coincide = f => [f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, f.via].join(' ').toUpperCase().includes(qq) || (isFinite(nq) && nq > 0 && String(Math.abs(f.v)).includes(String(nq)));
+  const qq = (S.ctaQ || '').trim().toUpperCase(); const bq = buscador(qq);
+  const coincide = f => bq([f.t.nota, f.t.det, f.t.cat, f.t.sub, f.t.cuenta, f.via, ...(f.t.etiquetas || []).map(e => '#' + e)], f.v);
   // período y navegación
   let lab, prev = '', next = '', actNav = 'ctaMes', R, cuerpo;
   const DS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -7368,7 +7387,7 @@ function pintarCtaFicha() {
       <button class="btn sm ghost ico" data-act="ctaBus" title="Buscar" aria-label="Buscar" aria-pressed="${!!S.ctaBus}">${LUPA}</button>${icoBtn('editar', 'Editar cuenta', 'ctaEditar')}<button class="btn sm ghost ico" data-act="ctaCerrar" title="Cerrar (Esc)" aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}
     <div class="bd rc-bd">
       ${S.ctaEdit ? ctaForm(i) : ''}${aviso}
-      ${S.ctaBus ? `<input class="in" id="ctaQ" type="search" placeholder="Buscar en todos los registros (texto o monto)" value="${esc(S.ctaQ || '')}" style="max-width:none">` : ''}
+      ${S.ctaBus ? `<input class="in" id="ctaQ" type="search" placeholder="Buscar: palabras, monto (600) o rango (>500, 100-300)" value="${esc(S.ctaQ || '')}" style="max-width:none">` : ''}
       <div class="rc-nav"><button class="btn sm ghost" data-act="${actNav}" data-v="${prev}" ${prev ? '' : 'disabled'} aria-label="Anterior">‹</button><b>${lab}</b><button class="btn sm ghost" data-act="${actNav}" data-v="${next}" ${next ? '' : 'disabled'} aria-label="Siguiente">›</button></div>
       <div class="rc-tabs" role="tablist">${[['d', 'Diario'], ['m', 'Mensual'], ['a', 'Anual']].map(([k, t]) => `<button class="${vista === k && !qq ? 'on' : ''}" role="tab" aria-selected="${vista === k}" data-act="ctaVista" data-v="${k}">${t}</button>`).join('')}</div>
       <div class="rc-sum"><div><span>Depósito</span><b class="num rc-d">${num(R.dep)}</b></div><div><span>Retiro</span><b class="num rc-r">${num(R.ret)}</b></div><div><span>Balance</span><b class="num">${sNum(R.bal)}</b></div><div><span>Saldo</span><b class="num rc-sl2">${sinSaldo ? '—' : sNum(R.saldo)}</b></div></div>
@@ -7837,9 +7856,9 @@ document.addEventListener('change', async e => {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'crQ') { (S.crF = S.crF || {}).q = el.value; const pos = el.selectionStart; render(); const n = $('#crQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
-  if (el.id === 'tjQ') { S.tjQ = el.value; const pos = el.selectionStart; pintarTjFicha(true); const n = $('#tjQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
-  if (el.id === 'genQ') { S.genQ = el.value; const pos = el.selectionStart; const y = window.scrollY; render(); window.scrollTo(0, y); const n = $('#genQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
-  if (el.id === 'ctaQ') { S.ctaQ = el.value; const pos = el.selectionStart; pintarCtaFicha(); const n = $('#ctaQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
+  if (el.id === 'tjQ') { S.tjQ = el.value; clearTimeout(S._bqT); S._bqT = setTimeout(() => { const el = $('#tjQ'); if (!el) return; const pos = el.selectionStart; pintarTjFicha(true); const n = $('#tjQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } }, 160); return; }
+  if (el.id === 'genQ') { S.genQ = el.value; clearTimeout(S._bqT); S._bqT = setTimeout(() => { const el = $('#genQ'); if (!el) return; const pos = el.selectionStart; const y = window.scrollY; render(); window.scrollTo(0, y); const n = $('#genQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } }, 160); return; }
+  if (el.id === 'ctaQ') { S.ctaQ = el.value; clearTimeout(S._bqT); S._bqT = setTimeout(() => { const el = $('#ctaQ'); if (!el) return; const pos = el.selectionStart; pintarCtaFicha(); const n = $('#ctaQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } }, 160); return; }
   if (el.id === 'catQ') { S.catQ = el.value; const pos = el.selectionStart; render(); const n = $('#catQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
   if (el.id === 'ctaAdmQ') { S.ctaAdmQ = el.value; const pos = el.selectionStart; render(); const n = $('#ctaAdmQ'); if (n) { n.focus({preventScroll: true}); try { n.setSelectionRange(pos, pos); } catch (_) {} } return; }
 });
