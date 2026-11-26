@@ -7610,7 +7610,11 @@ function catArbol(tipo) {
     const m2 = sumar(uso, c, t); const sb2 = String(t.sub || '').trim(); if (!sb2) return; const m3 = sumar(m2, sb2, t); const nt = String(t.nota || '').trim(); if (nt) sumar(m3, nt, t); });
   const rows = (S.cats || []).filter(r => r.tipo === tipo);
   const hijos = (padreRow, u, nivel) => { const l = []; const usados = new Set();
-    rows.filter(r => padreRow ? r.padre === padreRow.id : nivel === 1 && !r.padre).forEach(r => { if (r.app_nombre) usados.add(r.app_nombre); l.push({row: r, app: r.app_nombre || '', nombre: r.nombre, u: u && r.app_nombre ? u.get(r.app_nombre) || null : null, nivel}); });
+    const sus = rows.filter(r => padreRow ? r.padre === padreRow.id : nivel === 1 && !r.padre);
+  const prim = new Map(); const peso = r => (r.origen !== 'web' ? 2 : 0) + (r.validada ? 1 : 0);
+  sus.forEach(r => { if (!r.app_nombre) return; const o = prim.get(r.app_nombre); if (!o || peso(r) > peso(o)) prim.set(r.app_nombre, r); });
+  sus.forEach(r => { const dup = !!(r.app_nombre && prim.get(r.app_nombre) !== r); if (r.app_nombre && !dup) usados.add(r.app_nombre);
+    l.push({row: r, app: dup ? '' : r.app_nombre || '', nombre: r.nombre, u: !dup && u && r.app_nombre ? u.get(r.app_nombre) || null : null, nivel, dup}); });
     if (u) for (const [app, x] of u) if (!usados.has(app)) l.push({row: null, app, nombre: app, u: x, nivel});
     l.forEach(nd => { nd.key = nd.app ? 'a:' + nd.app : 'r:' + nd.row.id;   /* llave estable: no cambia al guardar la fila */ nd.hijos = nivel < 3 ? hijos(nd.row, nd.u ? nd.u.ch : null, nivel + 1) : []; });
     return l.sort(porOrden); };
@@ -7642,7 +7646,7 @@ function vCtaCats() {
   const ib = (ico, tit, act, k, extra, dis) => icoBtn(ico, tit, act, '', extra).replace(`data-act="${act}"`, `data-act="${act}" data-k="${esc(k)}"${dis ? ' disabled' : ''}`);
   const filas = vis.map(r => { const nd = r[r.length - 1]; const k = llave(r); const hermanos = r.length === 1 ? arbol : r[r.length - 2].hijos; const i = hermanos.indexOf(nd);
     const abierta = qq || S.catExpTodo || exp.has(k); const act = !(nd.row && nd.row.activa === false); const web = nd.row && nd.row.origen === 'web';
-    const chips = `${web ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>'}${nd.row && nd.row.validada ? '' : ' <span class="chip warn">por validar</span>'}${act ? '' : ' <span class="chip bad">desactivada</span>'}`;
+    const chips = `${web ? '<span class="chip">creada aquí</span>' : '<span class="chip">de la app</span>'}${nd.row && nd.row.validada ? '' : ' <span class="chip warn">por validar</span>'}${act ? '' : ' <span class="chip bad">desactivada</span>'}${nd.dup ? ' <span class="chip bad">duplicada · sin registros</span>' : ''}`;
     const c = r[0].app; const a = nd.nivel === 1 && c ? catAj(c) || {} : {};
     let panel = '';
     if (edit === k && S.catPostSus && S.catPostSus.k === k) { const ps = S.catPostSus;   // recién sustituida: ¿se elimina del catálogo?
@@ -7739,7 +7743,7 @@ async function catAccion(b) {
     const dest = catRuta(tipo, sel.value.split('›')); if (!dest) return; const nd = ruta[ruta.length - 1]; const n = nd.u ? nd.u.n : 0;
     if (S.catConfSus !== k + '→' + sel.value) { S.catConfSus = k + '→' + sel.value; const bt = document.querySelector('[data-act=catSustituir]'); if (bt) { bt.textContent = `¿Sustituir en ${n} registros? Sí`; bt.classList.add('danger'); } return; } S.catConfSus = null;
     try { // el destino se reconoce por su nombre: si se creó aquí, se fija su nombre de enlace
-      for (let i = 0; i < dest.length; i++) { const x = dest[i]; if (!x.app) { const row = await catGuardarRuta(tipo, dest.slice(0, i + 1), {app_nombre: x.nombre}); x.app = row.app_nombre; } }
+      for (let i = 0; i < dest.length; i++) { const x = dest[i]; if (!x.app) { const her = i ? dest[i - 1].hijos : catArbol(tipo); const ya = her.find(h => h !== x && h.app === x.nombre); if (ya) { dest[i] = ya; continue; } const row = await catGuardarRuta(tipo, dest.slice(0, i + 1), {app_nombre: x.nombre}); x.app = row.app_nombre; } }
       const regla = {id: crUid(), tipo, de: ruta.map(x => x.app), a: dest.map(x => x.app || x.nombre), el: new Date().toISOString()};
       await guardarAjuste('catReglas', [...(S.aj.catReglas || []), regla]); derive(); toast(`Sustituida en ${n} registros`);
       // si la categoría queda en el árbol (tiene fila propia), se pregunta si se elimina
