@@ -1394,6 +1394,21 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
   body.tb-compacta #offBar{bottom:calc(62px + env(safe-area-inset-bottom,0px))}
 }
 @media (prefers-reduced-motion:reduce){.tabbar,.tb-i svg,.tb-i span{transition:none!important}}
+
+/* Teléfono: el botón de nuevo registro es un círculo de cristal a la derecha de la barra inferior (como iOS 26);
+   en el detalle de una cuenta o tarjeta queda solo ese botón, en el mismo lugar. Se encogen juntos al desplazarse. */
+@media (max-width:760px){
+  body:has(#app .rg-fab) .tabbar{right:calc(max(12px,env(safe-area-inset-right,0px)) + 74px)}
+  body:has(#app .rg-fab) .tabbar.tb-min{right:calc(max(12px,env(safe-area-inset-right,0px)) + 56px + 6%)}
+  .rg-fab,.cta-fab{right:max(12px,env(safe-area-inset-right,0px))!important;bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;width:64px!important;height:64px!important;border-radius:50%!important;
+    background:var(--glass-hi)!important;color:var(--fg)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%);
+    box-shadow:var(--glass-sh)!important;font-size:34px!important;font-weight:300!important;line-height:1!important;display:grid!important;place-items:center;padding:0 0 3px!important;
+    transition:width .32s var(--ease-ios),height .32s var(--ease-ios),bottom .32s var(--ease-ios),font-size .32s var(--ease-ios),transform .15s ease!important}
+  .rg-fab.moviendo{opacity:1!important;transform:none!important;box-shadow:var(--glass-sh)!important}
+  body.tb-compacta .rg-fab,body.tb-compacta .cta-fab{width:48px!important;height:48px!important;bottom:calc(6px + env(safe-area-inset-bottom,0px))!important;font-size:28px!important}
+  .rg-fab:active,.cta-fab:active{transform:scale(.92)!important}
+  body.mas-abierto .rg-fab{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -6237,10 +6252,13 @@ document.addEventListener('scroll', fabMov, {passive: true, capture: true}); doc
 let _tbY = 0, _tbT = null, _tbMin = false;
 function tbCompacta(min) { const tb = document.getElementById('tabbar'); if (!tb || _tbMin === min) return; _tbMin = min; tb.classList.toggle('tb-min', min); document.body.classList.toggle('tb-compacta', min);
   const t0 = performance.now(); const seguir = () => { pildora(tb, 'tab'); if (performance.now() - t0 < 360) requestAnimationFrame(seguir); }; requestAnimationFrame(seguir); }
-window.addEventListener('scroll', () => { if (!matchMedia('(max-width:760px)').matches) return; const y = window.scrollY, dy = y - _tbY; _tbY = y;
+document.addEventListener('scroll', e => { if (!matchMedia('(max-width:760px)').matches) return; const el = e.target === document ? document.scrollingElement : e.target; if (!el || el.nodeType !== 1) return;
+  if (el !== document.scrollingElement && !el.closest('.cta-page')) return;   // la página principal o el detalle de cuenta/tarjeta
+  if (_tbEl !== el) { _tbEl = el; _tbY = el.scrollTop; return; } const y = el.scrollTop, dy = y - _tbY; _tbY = y;
   if (y < 30) { clearTimeout(_tbT); return tbCompacta(false); }
   if (dy > 4) tbCompacta(true); else if (dy < -10) tbCompacta(false);
-  clearTimeout(_tbT); _tbT = setTimeout(() => tbCompacta(false), 900); }, {passive: true});
+  clearTimeout(_tbT); _tbT = setTimeout(() => tbCompacta(false), 900); }, {passive: true, capture: true});
+let _tbEl = null;
 const regFab = () => S.me && S.me.activo && esAdmin() ? `<button class="rg-fab" data-act="regNuevo" aria-label="Nuevo registro" title="Nuevo registro">+</button>` : '';
 // regDetalleHtml: en el detalle de un movimiento hecho en la plataforma: quién y cuándo, su historial y el botón para editarlo.
 // Copiar un registro: abre el formulario de registro nuevo con los mismos datos (cuenta, monto, categoría, descripción…);
