@@ -819,7 +819,7 @@ input.sw:checked{background:#34c759}input.sw:checked::after{transform:translateX
 .cta-page>.modal.cta-modal>.hd{position:sticky;top:0;background:var(--panel);z-index:3}
 body.cta-abierta{overflow:hidden}
 @media (max-width:760px){.cta-page>.modal.cta-modal{border:0}}
-.rg-vinc{background:var(--panel)}.rg-vinc>span:first-child{font-weight:600}
+.rg-vinc{background:var(--panel)}.rg-vincl{flex:1 1 200px;min-width:0;line-height:1.45}.rg-vinc>span:first-child{font-weight:600}
 .rg-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk);font-size:13px}.rg-ctl select{width:auto;min-width:160px}
 .unif-p .unif-l{display:grid;gap:8px}.unif-l>div{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.unif-m{font-size:12.5px}.unif-n{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cr-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}.cr-filtros .in{width:auto;min-width:0;flex:0 1 auto}.cr-filtros #crQ{flex:1 1 220px}
@@ -4046,6 +4046,12 @@ function regVincHtml(F) { if (!['gasto', 'ingreso'].includes(F.tipo)) return S.r
     ${c ? `<span>como</span><select class="in" id="rgCtlTipo" aria-label="Tipo o persona">${tipoOptions(c, tp, eg ? 'egreso' : 'ingreso', mes)}</select>` : ''}
     ${mps.length ? `<select class="in" id="rgVincMp" aria-label="Micro proyecto"><option value="">Sin micro proyecto</option>${mps.map(x => `<option value="${esc(x.id)}" ${V.grupo === x.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select>` : ''}
     ${c && V.auto ? '<span class="note">por la etiqueta</span>' : c && c.porMes ? '<span class="note">en el mes de la fecha del registro</span>' : ''}</div>`; }
+// Al editar: si el registro ya está en un gestor o proyecto se muestra a cuál; si no, se puede vincular igual que al crearlo.
+function regVincActuales(F) { if (!F || !F.id || !['gasto', 'ingreso'].includes(F.tipo)) return []; return [...S.movs.values()].filter(m => m.tx_id === 'W' + F.id); }
+function regVincInfo(F) { const l = regVincActuales(F);
+  return `<div class="rg-ctl rg-vinc"><span>Vinculado a</span><span class="rg-vincl">${l.map(m => { const c = ctrlById(m.control); const mp = m.grupo && (S.micro || []).find(x => x.id === m.grupo);
+    return `<b>${esc(c ? c.nombre : m.control)}</b>${c && c.porMes ? ' · ' + esc(mesLargo(m.mes)) : ''} · ${esc(m.tipo || '')}${mp ? ' · ' + esc(mp.nombre) : ''}${l.length > 1 ? ' · ' + L(m.valor) : ''}`; }).join('<br>')}</span>
+    <span class="note">Al guardar, la fila del gestor se actualiza con estos cambios. Para moverla a otro gestor, desvincúlala desde el gestor.</span></div>`; }
 // regVincLeer: lo elegido en el formulario (o null si no se vincula).
 function regVincLeer() { const s = $('#rgVinc'); const cid = s ? s.value : (S.regCtrl && S.regCtrl.cid) || ''; if (!cid || !ctrlById(cid)) return null;
   const t = $('#rgCtlTipo'), m = $('#rgVincMp'); const c = ctrlById(cid); return {cid, tipo: t ? t.value : c.tipoDefecto || 'COMPARTIDO', grupo: m ? m.value : ''}; }
@@ -6033,7 +6039,7 @@ function pintarRegForm() {
           ${vin.length ? `<div class="note etq-vin">Se vincula a: <b>${vin.map(esc).join(', ')}</b></div>` : ''}</div>`; })())}
         ${a && !ed && F.tipo !== 'ajuste' && S.series !== null ? fila('Repetir', `<button type="button" class="rg-sel ${F.rep && F.rep.frec ? '' : 'vacio'}" data-act="regPick" data-v="rep">↻ ${repTxt(F)}</button>`, pk === 'rep' ? 'activo' : '') : ''}
         ${fila('Descripción', `<textarea class="rg-in rg-desc" id="rgDesc" rows="2" placeholder="Opcional">${esc(F.desc)}</textarea>`)}
-      </div>${a && !F.id ? regVincHtml(F) : ''}
+      </div>${a ? (F.id && regVincActuales(F).length ? regVincInfo(F) : regVincHtml(F)) : ''}
       <div id="rgMsg" class="note"></div>
       ${ed ? `<div class="note">Registrado por ${esc(nombreDe(r.creado_por))} el ${fFecha(String(r.creado_el).slice(0, 10))} · ${REG_EST[r.estado][0]}. Los comprobantes se adjuntan desde el detalle del movimiento.</div>` : ''}
     </div>
@@ -6140,10 +6146,10 @@ async function regGuardar(seguir) {
   if (!F.id) { const fz = regFirma(row); const hace = Date.now() - 15 * 60e3;
     const igual = S.reg.find(r => r.creado_por === S.me.id && ['oficial', 'pendiente'].includes(r.estado) && Date.parse(r.creado_el) > hace && regFirma(r) === fz);
     if (igual && S._regDupOk !== fz) { S._regDupOk = fz; msg.innerHTML = `<span class="neg">Hace un momento guardaste uno igual (${fFecha(igual.fecha)} · ${L(+igual.monto)}). Si de verdad es otro, toca de nuevo el botón.</span>`; return; } }
-  S._regGuardando = true; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = true); const vinc = a && !F.id ? regVincLeer() : null;
+  S._regGuardando = true; document.querySelectorAll('.rg-pie .btn').forEach(x => x.disabled = true); const vinc = a && (!F.id || !regVincActuales(F).length) ? regVincLeer() : null;
   try {
     if (F.id) { const antes = Object.assign({}, regDe(F.id)); row.actualizado_el = new Date().toISOString(); const d = await q(sb.from('registros').update(row).eq('id', F.id).select(), 'Registro actualizado');
-      const nuevo = d && d[0] ? d[0] : Object.assign(antes, row); Object.assign(regDe(F.id), nuevo); await regHist(F.id, 'editado', antes, nuevo); }
+      const nuevo = d && d[0] ? d[0] : Object.assign(antes, row); Object.assign(regDe(F.id), nuevo); await regHist(F.id, 'editado', antes, nuevo); if (vinc) { derive(); S._regCreados = [F.id]; } }
     else if (a && F.rep && F.rep.frec && F.tipo !== 'ajuste') {   // repetir / cuotas: una serie con todos sus registros
       if (S.series === null) { toast('Para repetir corre primero en Supabase el SQL de la fase 4 (fase4.sql).'); throw 0; }
       const plan = repPlan(F, row.monto); const ahora = new Date().toISOString(); const sr = {id: crUid(), frecuencia: F.rep.frec, veces: plan.length, cuotas: !!F.rep.cuotas, monto_total: F.rep.cuotas ? row.monto : crR2(row.monto * plan.length), creado_por: S.me.id, creado_el: ahora};
