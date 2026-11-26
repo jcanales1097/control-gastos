@@ -1409,6 +1409,13 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
   .rg-fab:active,.cta-fab:active{transform:scale(.92)!important}
   body.mas-abierto .rg-fab{display:none!important}
 }
+
+.rg-fxw{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:6px 0}
+.rg-fxl{display:flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--fg) 7%,transparent);border-radius:10px;padding:0 10px;height:40px;min-width:0;flex:1 1 0;flex-wrap:nowrap}.rg-fxl:first-child{flex-grow:1.25}
+.rg-fxl span{font-size:12.5px;color:var(--muted);font-weight:600;flex:none}
+.rg-in.rg-fxi{display:block;flex:1 1 auto;text-align:right;font-size:15px!important;font-variant-numeric:tabular-nums;min-width:0;width:auto;padding:0;letter-spacing:-.01em}
+.rg-fxeq{color:var(--muted);font-weight:700;flex:none}
+.rg-fxn{font-size:12px}
 </style>
 </head>
 <body>
@@ -5869,7 +5876,7 @@ function regCuentasOpts(sel, excluir) {
 function abrirRegForm(id) {
   const r = id ? regDe(id) : null; const a = esAdmin();
   const prev = S.regUlt || {};
-  S.regF = r ? {id: r.id, tipo: r.tipo, fecha: r.fecha, hora: r.hora || '', cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, comision: r.comision, signo: r.signo || 1, modoAj: 'monto',
+  S.regF = r ? {id: r.id, tipo: r.tipo, fecha: r.fecha, hora: r.hora || '', cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, tasa: r.tasa ? String(+r.tasa) : '', comision: r.comision, signo: r.signo || 1, modoAj: 'monto',
       grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || '', etq: (r.etiquetas || []).join(', ')}
     : {tipo: prev.tipo || 'gasto', fecha: hoy(), hora: ahoraHora(), cuenta: prev.cuenta || '', destino: prev.destino || '', monto: '', montoD: '', comision: '', signo: 1, modoAj: 'saldo', grupal: '', subgrupal: '', detalle: '', desc: '', etq: '', rep: null};
   if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
@@ -5878,7 +5885,7 @@ function abrirRegForm(id) {
   S.regVista = 'form'; S.etqNueva = false; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
-  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); const nE = v('rgEtqN'); if (nE && nE.trim()) F.etq = etqAgregar(F.etq, nE); }
+  [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['tasa', 'rgTasa'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); const nE = v('rgEtqN'); if (nE && nE.trim()) F.etq = etqAgregar(F.etq, nE); }
 // etqAgregar: suma una etiqueta (sin repetir, aunque cambien mayúsculas o acentos; si es un proyecto, con su nombre tal cual).
 function etqAgregar(lista, v) { v = String(v || '').replace(/^#/, '').replace(/,/g, ' ').trim(); if (!v) return lista || ''; const l = etqLista(lista); if (l.some(x => etqNorm(x) === etqNorm(v))) return l.join(', ');
   const o = etqOpciones().find(o => etqNorm(o.v) === etqNorm(v)); return [...l, o ? o.v : v].join(', '); }
@@ -5972,6 +5979,10 @@ function pintarRegForm() {
   const hayDet = F.tipo !== 'traslado' && regDetalles(F).length;
   const det = `<div class="rg-detw"><div class="rg-detr"><input class="rg-in" id="rgDet" value="${esc(F.detalle)}" placeholder="${F.tipo === 'traslado' ? 'ej. Traslado de fondos' : hayDet ? 'Escribe o elige' : 'Escribe el detalle'}" autocomplete="off" autocapitalize="sentences">${hayDet ? `<button type="button" class="rg-lbtn" data-act="regPick" data-v="det" aria-label="Elegir de la lista">☰ Lista</button>` : ''}</div><div class="rg-dl" id="rgDetL" hidden></div></div>`;
   let filas = '';
+  // En lempiras (cuentas en dólares): la tasa que aplicó o el monto en lempiras que realmente se cobró; uno calcula el otro.
+  const fxFila = () => { if (monO !== 'USD') return ''; const ts = numDe(F.tasa) > 0 ? numDe(F.tasa) : tasa; const m = numDe(F.monto); const lps = m > 0 && ts ? crR2(m * ts) : '';
+    return fila('En lempiras', `<div class="rg-fxw"><label class="rg-fxl"><span>Tasa</span><input class="rg-in rg-fxi" id="rgTasa" inputmode="decimal" value="${esc(F.tasa || '')}" placeholder="${tasa ? tasa.toFixed(4) : '0.0000'}" autocomplete="off"></label><span class="rg-fxeq" aria-hidden="true">=</span><label class="rg-fxl"><span>L</span><input class="rg-in rg-fxi" id="rgLps" inputmode="decimal" value="${lps === '' ? '' : lps.toFixed(2)}" placeholder="0.00" autocomplete="off"></label></div>`, 'rg-fx')
+      + `<div class="note rg-nota rg-fxn" id="rgFxN">${numDe(F.tasa) > 0 ? `Tasa propia de este registro${tasa ? ` · la del día es L ${tasa.toFixed(4)}` : ''}.` : tasa ? `Con la tasa del día (L ${tasa.toFixed(4)}). Escribe la tasa o los lempiras que te cobraron si fue distinta.` : 'No hay tasa del día: escribe la tasa o los lempiras.'}</div>`; };
   if (F.tipo === 'traslado') {
     const cruce = F.cuenta && F.destino && monO !== monD;
     filas = fila('Importe', monTj + monto('rgMonto', F.monto, monO), 'rg-imp')
@@ -5987,10 +5998,10 @@ function pintarRegForm() {
       + (d ? `<div class="note rg-nota">Saldo en la plataforma: <b class="num">${ctaFmt(d.saldo, monO)}</b></div>` : '')
       + `<div class="dm-seg rg-seg"><button type="button" class="${F.modoAj === 'saldo' ? 'on' : ''}" data-act="regModoAj" data-v="saldo">Escribir el saldo real</button><button type="button" class="${F.modoAj === 'monto' ? 'on' : ''}" data-act="regModoAj" data-v="monto">Sumar o restar</button></div>`
       + (F.modoAj === 'saldo' ? fila('Saldo real', monto('rgMonto', F.monto, monO), 'rg-imp') + `<div class="note rg-nota" id="rgAjDif">${regAjDifTxt()}</div>`
-        : `<div class="dm-seg rg-seg"><button type="button" class="${F.signo > 0 ? 'on' : ''}" data-act="regSigno" data-v="1">Suma</button><button type="button" class="${F.signo < 0 ? 'on' : ''}" data-act="regSigno" data-v="-1">Resta</button></div>` + fila('Importe', monto('rgMonto', F.monto, monO), 'rg-imp'));
+        : `<div class="dm-seg rg-seg"><button type="button" class="${F.signo > 0 ? 'on' : ''}" data-act="regSigno" data-v="1">Suma</button><button type="button" class="${F.signo < 0 ? 'on' : ''}" data-act="regSigno" data-v="-1">Resta</button></div>` + fila('Importe', monto('rgMonto', F.monto, monO), 'rg-imp') + fxFila());
   } else {
     const catTxt = g ? (sg ? `<span class="rg-cg">${esc(g.ver)}</span>${esc(sg.ver)}` : esc(g.ver)) : '';
-    filas = fila('Importe', monTj + monto('rgMonto', F.monto, a ? monO : 'L'), 'rg-imp')
+    filas = fila('Importe', monTj + monto('rgMonto', F.monto, a ? monO : 'L'), 'rg-imp') + (a ? fxFila() : '')
       + fila('Categoría', `<button type="button" class="rg-sel ${g ? '' : 'vacio'}" data-act="regPick" data-v="cat">${catTxt || 'Elige la categoría'}</button>`, pk === 'cat' ? 'activo' : '')
       + (a ? fila('Cuenta', ctaBtn('cta', F.cuenta, 'Elige la cuenta'), pk === 'cta' ? 'activo' : '') + regTjBox(F) : '')
       + fila('Detalle', det, pk === 'det' ? 'activo' : '')
@@ -6079,6 +6090,14 @@ document.addEventListener('pointerdown', e => { if (e.target.closest('.rg-dli'))
 function regAjDifTxt() { const F = S.regF; if (!F || !F.cuenta) return ''; const real = numDe(F.monto); if (!isFinite(real)) return 'Escribe el saldo que muestra tu banco o tu billetera.';
   const d = ctaDatos(F.cuenta); const dif = crR2(real - d.saldo); const mon = ctaInfo(F.cuenta).mon;
   return Math.abs(dif) < 0.005 ? 'El saldo ya coincide: no hace falta ajustar.' : `Se registrará un ajuste que <b>${dif > 0 ? 'suma' : 'resta'} ${ctaFmt(Math.abs(dif), mon)}</b>.`; }
+// regTasaDe: la tasa del registro (la escrita, o calculada de los lempiras escritos), o la del día.
+const regTasaDe = F => { const t = numDe(F.tasa); return t > 0 ? Math.round(t * 1e6) / 1e6 : tasaUSD(); };
+// Tasa ⇄ lempiras en vivo (sin repintar el formulario).
+document.addEventListener('input', e => { const id = e.target.id; if (!S.regF || !['rgTasa', 'rgLps', 'rgMonto'].includes(id)) return; const ti = $('#rgTasa'), li = $('#rgLps'); if (!ti || !li) return;
+  const m = numDe(($('#rgMonto') || {}).value); const ts0 = tasaUSD(); const n = $('#rgFxN');
+  if (id === 'rgLps') { const l = numDe(li.value); if (l > 0 && m > 0) { const t = Math.round(l / m * 1e6) / 1e6; ti.value = String(t); S.regF.tasa = String(t); } else { ti.value = ''; S.regF.tasa = ''; } }
+  else { const t = numDe(ti.value) > 0 ? numDe(ti.value) : ts0; li.value = m > 0 && t ? crR2(m * t).toFixed(2) : ''; if (id === 'rgTasa') S.regF.tasa = ti.value; }
+  if (n) n.textContent = numDe(ti.value) > 0 ? `Tasa propia de este registro${ts0 ? ' · la del día es L ' + ts0.toFixed(4) : ''}.` : ts0 ? `Con la tasa del día (L ${ts0.toFixed(4)}). Escribe la tasa o los lempiras que te cobraron si fue distinta.` : 'No hay tasa del día: escribe la tasa o los lempiras.'; });
 // regValidar: arma la fila a guardar o devuelve el mensaje de lo que falta.
 function regArmar() {
   regLeerForm(); const F = S.regF; const a = esAdmin(); const monto = numDe(F.monto);
@@ -6093,9 +6112,9 @@ function regArmar() {
   else if (F.tipo === 'ajuste') { if (!F.cuenta) return 'Elige la cuenta.'; if (!isFinite(monto)) return 'Escribe el importe.'; row.cuenta = F.cuenta;
     if (F.modoAj === 'saldo') { const dif = crR2(monto - ctaDatos(F.cuenta).saldo); if (Math.abs(dif) < 0.005) return 'El saldo ya coincide: no hace falta ajustar.'; row.monto = Math.abs(dif); row.signo = dif > 0 ? 1 : -1; }
     else { if (!(monto > 0)) return 'Escribe el importe.'; row.monto = crR2(monto); row.signo = F.signo > 0 ? 1 : -1; }
-    if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = tasaUSD(); }
+    if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = regTasaDe(F); }
   else { if (!(monto > 0)) return 'Escribe el importe.'; if (!F.grupal) return 'Elige la categoría.'; if (a && !F.cuenta) return 'Elige la cuenta.';
-    row.monto = crR2(monto); row.grupal = F.grupal; row.subgrupal = F.subgrupal || null; if (a) { row.cuenta = F.cuenta; if (ctaInfo(F.cuenta).mon === 'USD') row.tasa = tasaUSD(); } }
+    row.monto = crR2(monto); row.grupal = F.grupal; row.subgrupal = F.subgrupal || null; if (a) { row.cuenta = F.cuenta; if (ctaInfo(F.cuenta).mon === 'USD') { row.tasa = regTasaDe(F); if (!(row.tasa > 0)) return 'Escribe la tasa o el monto en lempiras (no hay tasa del día).'; } } }
   return row;
 }
 // regGuardar: "Guardar" guarda y cierra. "Guardar y otro" guarda y deja el formulario listo para el siguiente: se quedan el tipo, la fecha
@@ -6266,7 +6285,7 @@ const regFab = () => S.me && S.me.activo && esAdmin() ? `<button class="rg-fab" 
 function copiaQHtml(t) { const r = t.web && regDe(t.web); const f = r ? r.fecha : t.fecha;
   return `<div class="copia-q"><b>Copiar este registro</b><span class="note">¿Con qué fecha queda la copia?</span><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="regCopia" data-id="${esc(t.id)}" data-hoy="">Fecha del registro · ${fFecha(f)}</button><button class="btn sm pri" data-act="regCopia" data-id="${esc(t.id)}" data-hoy="1">Hoy · ${fFecha(hoy())}</button><button class="btn sm ghost" data-act="regCopiaNo" data-id="${esc(t.id)}">Cancelar</button></div></div>`; }
 function regCopiar(id, usarHoy) { const t = D.byId.get(id); if (!t) return; const r = t.web && regDe(t.web); let c;
-  if (r) c = {tipo: r.tipo, cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, comision: r.comision, signo: r.signo || 1, modoAj: 'monto', grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || '', etq: (r.etiquetas || []).join(', '), hora: r.hora || ''};
+  if (r) c = {tipo: r.tipo, cuenta: r.cuenta || '', destino: r.cuenta_destino || '', monto: r.monto, montoD: r.monto_destino, tasa: r.tasa ? String(+r.tasa) : '', comision: r.comision, signo: r.signo || 1, modoAj: 'monto', grupal: r.grupal || '', subgrupal: r.subgrupal || '', detalle: r.detalle || '', desc: r.descripcion || '', etq: (r.etiquetas || []).join(', '), hora: r.hora || ''};
   else { const tipo = appTipo(t); const m = crR2(Math.abs(appEsUSD(t) ? (tjMonto(t).usd || 0) : (+t.montoApp || +t.monto || 0)));
     c = {tipo, monto: m, grupal: t.cat || '', subgrupal: t.sub || '', detalle: t.nota || '', desc: t.det || '', hora: t.hora || ''};
     if (tipo === 'traslado') { const o = (ctaTrasRev().get(t.id) || {}).otra || tjDestino(t) || ''; Object.assign(c, ctaSigno(t) < 0 ? {cuenta: tjCta(t.cuenta), destino: o} : {cuenta: o, destino: tjCta(t.cuenta)}, {grupal: '', subgrupal: ''}); }
