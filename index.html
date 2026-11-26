@@ -1378,6 +1378,10 @@ html.lado-anim .lado-btn svg{transition:transform .3s var(--ease-ios)}
 @media (min-width:761px){.rg-modal.picking{min-height:min(660px,88vh)}.rg-modal .rg-pie .btn{flex:0 1 220px}.rg-modal .rg-pie{justify-content:flex-end}}
 @media (prefers-reduced-motion:reduce){.rg-pick.entra,.rg-pickb.push,.rg-pickb.pop,.rg-pickbg{animation:none}}
 
+.rg-fxs{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 14px 10px;margin-top:-6px;font-size:12.5px;color:var(--muted);text-align:right;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.rg-fxs b{color:var(--fg);font-weight:600}
+.rg-grp>.rg-row.rg-imp:has(+ .rg-fxs){border-bottom:0}
+.rg-fxb{border:0;background:color-mix(in srgb,var(--azul) 12%,transparent);color:var(--fg);border-radius:999px;padding:5px 11px;font:600 12.5px var(--f-ui);cursor:pointer;white-space:nowrap;flex:none}
 /* barra inferior compacta al desplazarse */
 @media (max-width:760px){
   .tabbar{transition:height .32s var(--ease-ios),left .32s var(--ease-ios),right .32s var(--ease-ios),bottom .32s var(--ease-ios),border-radius .32s var(--ease-ios),padding .32s var(--ease-ios)}
@@ -5882,7 +5886,7 @@ function abrirRegForm(id) {
   if (!a && !['gasto', 'ingreso'].includes(S.regF.tipo)) S.regF.tipo = 'gasto';
   { const F = S.regF; const pc = F.cuenta && tjDeCuenta(F.cuenta); if (pc) { F.tj = pc.id; F.tjMon = tjMonDe(F.cuenta); } const pd = F.destino && tjDeCuenta(F.destino); if (pd) { F.tjD = pd.id; F.tjMonD = tjMonDe(F.destino); }
     if (r && r.plastico && F.tj && tjById(r.plastico)) F.tj = r.plastico; }
-  S.regVista = 'form'; S.etqNueva = false; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
+  S.regVista = 'form'; S.etqNueva = false; S.regFxAbierto = false; S.regPick = null; S.regPickG = null; S.regConfX = false; S.marcNuevo = false; S.marcEdit = false; S._regDupOk = null; S._regN = 0; pintarRegForm();
 }
 function regLeerForm() { const F = S.regF; if (!F) return; const v = id => { const e = $('#' + id); return e ? e.value : undefined; };
   [['fecha', 'rgFecha'], ['hora', 'rgHora'], ['cuenta', 'rgCuenta'], ['destino', 'rgDestino'], ['monto', 'rgMonto'], ['montoD', 'rgMontoD'], ['tasa', 'rgTasa'], ['comision', 'rgComision'], ['grupal', 'rgGrupal'], ['subgrupal', 'rgSub'], ['detalle', 'rgDet'], ['desc', 'rgDesc'], ['modoAj', 'rgModoAj'], ['etq', 'rgEtq']].forEach(([k, id]) => { const x = v(id); if (x !== undefined) F[k] = x; }); const nE = v('rgEtqN'); if (nE && nE.trim()) F.etq = etqAgregar(F.etq, nE); }
@@ -5981,6 +5985,8 @@ function pintarRegForm() {
   let filas = '';
   // En lempiras (cuentas en dólares): la tasa que aplicó o el monto en lempiras que realmente se cobró; uno calcula el otro.
   const fxFila = () => { if (monO !== 'USD') return ''; const ts = numDe(F.tasa) > 0 ? numDe(F.tasa) : tasa; const m = numDe(F.monto); const lps = m > 0 && ts ? crR2(m * ts) : '';
+    // Cerrado: solo una línea con el equivalente; "Cambiar" abre la tasa y los lempiras para editarlos.
+    if (!S.regFxAbierto) return `<div class="rg-fxs"><span id="rgFxS">${regFxResumen(F)}</span><button type="button" class="rg-fxb" data-act="regFxAbrir">Cambiar</button></div>`;
     return fila('En lempiras', `<div class="rg-fxw"><label class="rg-fxl"><span>Tasa</span><input class="rg-in rg-fxi" id="rgTasa" inputmode="decimal" value="${esc(F.tasa || '')}" placeholder="${tasa ? tasa.toFixed(4) : '0.0000'}" autocomplete="off"></label><span class="rg-fxeq" aria-hidden="true">=</span><label class="rg-fxl"><span>L</span><input class="rg-in rg-fxi" id="rgLps" inputmode="decimal" value="${lps === '' ? '' : lps.toFixed(2)}" placeholder="0.00" autocomplete="off"></label></div>`, 'rg-fx')
       + `<div class="note rg-nota rg-fxn" id="rgFxN">${numDe(F.tasa) > 0 ? `Tasa propia de este registro${tasa ? ` · la del día es L ${tasa.toFixed(4)}` : ''}.` : tasa ? `Con la tasa del día (L ${tasa.toFixed(4)}). Escribe la tasa o los lempiras que te cobraron si fue distinta.` : 'No hay tasa del día: escribe la tasa o los lempiras.'}</div>`; };
   if (F.tipo === 'traslado') {
@@ -6057,6 +6063,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || !S.regF) return; const act = b.dataset.act; const F = S.regF;
   if (act === 'regPick') { regLeerForm(); S.regPick = S.regPick === b.dataset.v ? null : b.dataset.v; S.regPickG = null; S.regPickQ = ''; S._regFoco = true; return pintarRegForm(); }
   if (act === 'regPickX') { regLeerForm(); S.regPick = null; S.regPickG = null; S.regPickQ = ''; S._regFoco = true; return regPickCerrar(); }
+  if (act === 'regFxAbrir') { regLeerForm(); S.regFxAbierto = true; S._regFoco = true; pintarRegForm(); setTimeout(() => { const t = $('#rgTasa'); if (t) t.focus(); }, 60); return; }
   if (act === 'regPickGo') { regLeerForm(); S.regPickG = b.dataset.v; S.regPickQ = ''; S._regFoco = true; S._pickDir = 'fwd'; pintarRegForm(); return; }
   if (act === 'regPickBack') { regLeerForm(); S.regPickG = null; S._regFoco = true; S._pickDir = 'back'; pintarRegForm(); return; }
   if (act === 'regPickG') { regLeerForm(); const v = b.dataset.v;
@@ -6090,10 +6097,14 @@ document.addEventListener('pointerdown', e => { if (e.target.closest('.rg-dli'))
 function regAjDifTxt() { const F = S.regF; if (!F || !F.cuenta) return ''; const real = numDe(F.monto); if (!isFinite(real)) return 'Escribe el saldo que muestra tu banco o tu billetera.';
   const d = ctaDatos(F.cuenta); const dif = crR2(real - d.saldo); const mon = ctaInfo(F.cuenta).mon;
   return Math.abs(dif) < 0.005 ? 'El saldo ya coincide: no hace falta ajustar.' : `Se registrará un ajuste que <b>${dif > 0 ? 'suma' : 'resta'} ${ctaFmt(Math.abs(dif), mon)}</b>.`; }
+// regFxResumen: "≈ L 78.46 · tasa del día 26.2412" (o "tasa propia") para la línea bajo el importe.
+function regFxResumen(F, montoTxt) { const t = numDe(F.tasa) > 0 ? numDe(F.tasa) : tasaUSD(); const m = numDe(montoTxt != null ? montoTxt : F.monto); const propia = numDe(F.tasa) > 0;
+  if (!t) return 'Sin tasa del día: toca Cambiar para escribir la tasa o los lempiras.';
+  return `${m > 0 ? `${propia ? '' : '≈ '}<b class="num">L ${crR2(m * t).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</b> · ` : ''}${propia ? 'tasa propia' : 'tasa del día'} ${(+t).toLocaleString('en-US', {maximumFractionDigits: 6, minimumFractionDigits: 4})}`; }
 // regTasaDe: la tasa del registro (la escrita, o calculada de los lempiras escritos), o la del día.
 const regTasaDe = F => { const t = numDe(F.tasa); return t > 0 ? Math.round(t * 1e6) / 1e6 : tasaUSD(); };
 // Tasa ⇄ lempiras en vivo (sin repintar el formulario).
-document.addEventListener('input', e => { const id = e.target.id; if (!S.regF || !['rgTasa', 'rgLps', 'rgMonto'].includes(id)) return; const ti = $('#rgTasa'), li = $('#rgLps'); if (!ti || !li) return;
+document.addEventListener('input', e => { const id = e.target.id; if (!S.regF || !['rgTasa', 'rgLps', 'rgMonto'].includes(id)) return; const rs = $('#rgFxS'); if (rs && id === 'rgMonto') rs.innerHTML = regFxResumen(S.regF, e.target.value); const ti = $('#rgTasa'), li = $('#rgLps'); if (!ti || !li) return;
   const m = numDe(($('#rgMonto') || {}).value); const ts0 = tasaUSD(); const n = $('#rgFxN');
   if (id === 'rgLps') { const l = numDe(li.value); if (l > 0 && m > 0) { const t = Math.round(l / m * 1e6) / 1e6; ti.value = String(t); S.regF.tasa = String(t); } else { ti.value = ''; S.regF.tasa = ''; } }
   else { const t = numDe(ti.value) > 0 ? numDe(ti.value) : ts0; li.value = m > 0 && t ? crR2(m * t).toFixed(2) : ''; if (id === 'rgTasa') S.regF.tasa = ti.value; }
